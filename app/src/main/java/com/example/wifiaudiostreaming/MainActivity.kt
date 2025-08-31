@@ -18,7 +18,13 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
@@ -43,7 +50,6 @@ class MainActivity : ComponentActivity() {
                     putExtra(AudioCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                     putExtra(AudioCaptureService.EXTRA_DATA, result.data)
 
-                    // Usiamo lo snapshot corrente delle impostazioni
                     viewModel.appSettings.value?.let { settings ->
                         putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, settings.streamInternal)
                         putExtra(AudioCaptureService.EXTRA_STREAM_MIC, settings.streamMic)
@@ -62,22 +68,27 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    private var pendingServerConnection by mutableStateOf<ServerInfo?>(null)
+    private var onMicPermissionGranted: (() -> Unit)? = null
 
     @RequiresApi(Build.VERSION_CODES.O)
     private val recordAudioPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                pendingServerConnection?.let { serverInfo ->
-                    viewModel.startClient(serverInfo)
-                    pendingServerConnection = null
-                } ?: run {
-                    startMediaProjectionRequest()
-                }
+                onMicPermissionGranted?.invoke()
             } else {
                 viewModel.updateStatus(getString(R.string.mic_permission_denied))
-                pendingServerConnection = null
                 Toast.makeText(this, getString(R.string.mic_permission_denied), Toast.LENGTH_LONG).show()
+            }
+            onMicPermissionGranted = null
+        }
+
+    // ## NUOVO: LAUNCHER PER IL PERMESSO DELLE NOTIFICHE ##
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                Toast.makeText(this, R.string.notification_permission_granted, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_LONG).show()
             }
         }
 
@@ -88,20 +99,38 @@ class MainActivity : ComponentActivity() {
             WiFiAudioStreamingTheme {
                 val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
-                // ## SOLUZIONE APPLICATA QUI ##
-                // La logica ora è a prova di "race condition".
-
-                // 1. Finché le impostazioni sono `null` (cioè in caricamento), non mostriamo nulla.
-                //    Questo evita di mostrare la UI sbagliata per una frazione di secondo.
                 if (appSettings == null) {
                     Box(modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background))
                 } else {
-                    // 2. Una volta che le impostazioni sono caricate, decidiamo cosa mostrare.
-                    //    La decisione è semplice, diretta e corretta.
                     if (appSettings!!.onboardingCompleted) {
                         MainAppContent()
+
+                        // ## NUOVO: LOGICA DI GESTIONE DEL DIALOGO ##
+                        var showNotificationPermissionDialog by remember { mutableStateOf(false) }
+
+                        // Questo `LaunchedEffect` viene eseguito solo una volta all'avvio dell'app.
+                        LaunchedEffect(Unit) {
+                            // Controlla il permesso solo su Android 13 (TIRAMISU) o superiori.
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
+                                showNotificationPermissionDialog = true
+                            }
+                        }
+
+                        if (showNotificationPermissionDialog) {
+                            NotificationPermissionDialog(
+                                onConfirm = {
+                                    showNotificationPermissionDialog = false
+                                    // Lancia la richiesta di sistema per il permesso
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                },
+                                onDismiss = {
+                                    showNotificationPermissionDialog = false
+                                }
+                            )
+                        }
+
                     } else {
                         OnboardingScreen(
                             onOnboardingFinished = {
@@ -114,16 +143,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Composable che contiene la logica e la UI dell'applicazione principale.
-     * Viene mostrato solo dopo che l'onboarding è stato completato.
-     */
     @RequiresApi(Build.VERSION_CODES.O)
     @Composable
     private fun MainAppContent() {
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
-        // Qui possiamo usare l'operatore !! perché questa funzione è chiamata
-        // solo quando appSettings non è null.
         val currentSettings = appSettings!!
 
         val showSettingsScreen = remember { mutableStateOf(false) }
@@ -149,11 +172,7 @@ class MainActivity : ComponentActivity() {
             isMulticastMode = isMulticastMode,
             onToggleMode = viewModel::toggleMode,
             onStartServer = {
-                if (hasRecordAudioPermission()) {
-                    startMediaProjectionRequest()
-                } else {
-                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
+                startMediaProjectionRequest()
             },
             onStopServer = {
                 val intent = Intent(this, AudioCaptureService::class.java).apply {
@@ -163,26 +182,38 @@ class MainActivity : ComponentActivity() {
                 viewModel.setIsStreaming(false)
             },
             onConnect = { serverInfo ->
-                val sendMic = currentSettings.sendClientMicrophone
-                if (sendMic) {
-                    if (hasRecordAudioPermission()) {
-                        viewModel.startClient(serverInfo)
-                    } else {
-                        pendingServerConnection = serverInfo
-                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                } else {
-                    viewModel.startClient(serverInfo)
-                }
+                viewModel.startClient(serverInfo)
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
             onStreamInternalChange = viewModel::setStreamInternal,
-            onStreamMicChange = viewModel::setStreamMic,
+            onStreamMicChange = { enabled ->
+                if (enabled) {
+                    if (hasRecordAudioPermission()) {
+                        viewModel.setStreamMic(true)
+                    } else {
+                        onMicPermissionGranted = { viewModel.setStreamMic(true) }
+                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                } else {
+                    viewModel.setStreamMic(false)
+                }
+            },
             onSampleRateChange = viewModel::setSampleRate,
             onChannelConfigChange = viewModel::setChannelConfig,
             onBufferSizeChange = viewModel::setBufferSize,
-            onSendClientMicrophoneChange = viewModel::setSendClientMicrophone,
+            onSendClientMicrophoneChange = { enabled ->
+                if (enabled) {
+                    if (hasRecordAudioPermission()) {
+                        viewModel.setSendClientMicrophone(true)
+                    } else {
+                        onMicPermissionGranted = { viewModel.setSendClientMicrophone(true) }
+                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                } else {
+                    viewModel.setSendClientMicrophone(false)
+                }
+            },
             onOpenSettings = { showSettingsScreen.value = true }
         )
 
@@ -200,7 +231,7 @@ class MainActivity : ComponentActivity() {
             onClose = { showSettingsScreen.value = false },
             onShowOnboarding = {
                 showSettingsScreen.value = false
-                viewModel.resetOnboarding() // Chiamiamo il nuovo metodo per mostrare di nuovo l'onboarding
+                viewModel.resetOnboarding()
             }
         )
     }
@@ -212,9 +243,18 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    // ## NUOVO: HELPER PER CONTROLLARE IL PERMESSO DELLE NOTIFICHE ##
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun hasNotificationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startMediaProjectionRequest() {
-        val settings = viewModel.appSettings.value ?: return // Esci se le impostazioni non sono caricate
+        val settings = viewModel.appSettings.value ?: return
 
         if (!settings.streamInternal && settings.streamMic) {
             val intent = Intent(this, AudioCaptureService::class.java).apply {
@@ -253,4 +293,28 @@ fun ClientDiscoveryHandler() {
             NetworkManager.stopListeningForDevices()
         }
     }
+}
+
+// ## NUOVO: COMPOSABLE PER L'ALERT DIALOG PERSONALIZZATO ##
+@Composable
+fun NotificationPermissionDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+        title = { Text(text = stringResource(R.string.notification_permission_title)) },
+        text = { Text(text = stringResource(R.string.notification_permission_description)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.grant_permission_button))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.later_button))
+            }
+        }
+    )
 }
