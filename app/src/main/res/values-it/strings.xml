@@ -114,5 +114,11 @@
     <string name="settings_item_show_intro_title">Mostra introduzione</string>
     <string name="settings_item_show_intro_desc">Rivedi il tour iniziale delle funzionalità</string>
     <string name="developer_name">Programmato da</string>
+    <string name="notification_permission_title">Permesso Notifiche</string>
+    <string name="notification_permission_description">Per garantire che lo streaming continui a funzionare anche quando l\'app è in background, è necessario concedere il permesso per le notifiche.</string>
+    <string name="grant_permission_button">Concedi Permesso</string>
+    <string name="later_button">Più Tardi</string>
+    <string name="notification_permission_granted">Grazie! Ora le notifiche sono attive.</string>
+    <string name="notification_permission_denied">Permesso negato. L\'app potrebbe non funzionare correttamente in background.</string>
 
 </resources>

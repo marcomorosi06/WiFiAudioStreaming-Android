@@ -113,4 +113,10 @@
     <string name="settings_item_show_intro_title">Show Introduction</string>
     <string name="settings_item_show_intro_desc">Review the initial feature tour</string>
     <string name="developer_name">Developed by</string>
+    <string name="notification_permission_title">Notification Permission</string>
+    <string name="notification_permission_description">To ensure streaming continues to work even when the app is in the background, granting notification permission is required.</string>
+    <string name="grant_permission_button">Grant Permission</string>
+    <string name="later_button">Later</string>
+    <string name="notification_permission_granted">Thank you! Notifications are now active.</string>
+    <string name="notification_permission_denied">Permission denied. The app may not work correctly in the background.</string>
 </resources>
