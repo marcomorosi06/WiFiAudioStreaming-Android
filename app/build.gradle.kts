@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wifiaudiostreaming"
+    namespace = "com.cuscus.wifiaudiostreaming"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.wifiaudiostreaming"
+        applicationId = "com.cuscus.wifiaudiostreaming"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

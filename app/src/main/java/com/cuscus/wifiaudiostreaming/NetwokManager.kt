@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -27,11 +27,9 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.MulticastSocket
 import java.net.NetworkInterface
-import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.cancellation.CancellationException
 
 data class ServerInfo(val ip: String, val isMulticast: Boolean, val port: Int)

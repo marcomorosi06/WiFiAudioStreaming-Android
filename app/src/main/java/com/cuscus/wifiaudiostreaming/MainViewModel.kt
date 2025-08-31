@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
 import android.app.Application
@@ -6,8 +6,8 @@ import android.content.Intent
 import androidx.annotation.RequiresPermission
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wifiaudiostreaming.data.AppSettings
-import com.example.wifiaudiostreaming.data.SettingsDataStore
+import com.cuscus.wifiaudiostreaming.data.AppSettings
+import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
