@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
 import android.app.Activity
@@ -155,8 +155,8 @@ class AudioCaptureService : Service() {
     }
 
     companion object {
-        const val ACTION_START = "com.example.wifiaudiostreamer.ACTION_START"
-        const val ACTION_STOP = "com.example.wifiaudiostreamer.ACTION_STOP"
+        const val ACTION_START = "com.cuscus.wifiaudiostreamer.ACTION_START"
+        const val ACTION_STOP = "com.cuscus.wifiaudiostreamer.ACTION_STOP"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_DATA = "data"
         const val EXTRA_STREAM_INTERNAL = "stream_internal"

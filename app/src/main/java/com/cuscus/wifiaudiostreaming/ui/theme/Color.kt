@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming.ui.theme
+package com.cuscus.wifiaudiostreaming.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

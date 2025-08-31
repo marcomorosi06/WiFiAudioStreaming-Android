@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
 import android.net.Uri
@@ -41,9 +41,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.RoundedPolygon
-import com.example.wifiaudiostreaming.data.AppSettings
+import com.cuscus.wifiaudiostreaming.data.AppSettings
 import kotlin.random.Random
-import com.example.wifiaudiostreaming.ServerInfo
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -2179,7 +2178,7 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
 fun WelcomePage() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" //TODO link github
+    val link = "https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop" //TODO link github
 
     Column(
         modifier = Modifier

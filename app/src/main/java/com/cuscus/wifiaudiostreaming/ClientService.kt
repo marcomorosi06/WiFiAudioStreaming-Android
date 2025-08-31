@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
 import android.app.Notification

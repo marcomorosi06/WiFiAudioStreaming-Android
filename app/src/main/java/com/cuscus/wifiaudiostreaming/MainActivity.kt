@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming
+package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
 import android.app.Activity
@@ -35,7 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
+import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
 
 class MainActivity : ComponentActivity() {
 

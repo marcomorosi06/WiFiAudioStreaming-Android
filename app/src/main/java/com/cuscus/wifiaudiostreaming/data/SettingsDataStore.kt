@@ -1,4 +1,4 @@
-package com.example.wifiaudiostreaming.data
+package com.cuscus.wifiaudiostreaming.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
