@@ -44,4 +44,20 @@ The app requests the following permissions, which are required for its core func
 - `android.permission.INTERNET` – Enables local network communication.  
 - `android.permission.ACCESS_WIFI_STATE` – Allows the app to check Wi-Fi connection status.  
 - `android.permission.RECORD_AUDIO` – Allows recording from the microphone or internal audio (only when streaming is active).  
-- `android.permission.POST_NOTIFICATIONS` – Displays a persistent notification whi_
+- `android.permission.POST_NOTIFICATIONS` – Displays a persistent notification while streaming is running in the background.  
+- `android.permission.FOREGROUND_SERVICE` and `android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION` (Android 10+) – Required to keep the streaming service active in the background.  
+
+---
+
+## 5. Data Retention  
+
+All network and audio data are processed in **real-time only**.  
+No data is stored on disk or saved to long-term storage.  
+When streaming stops or the application is closed, all audio and network data are cleared from memory.  
+
+---
+
+## 6. Contact  
+
+If you have any questions or concerns about this Privacy Policy, please contact me at:  
+**marcomorosi47@gmail.com**  
