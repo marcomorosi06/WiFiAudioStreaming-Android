@@ -4,7 +4,7 @@
 </a>  
 
 Turn your Android device into a **wireless audio transmitter or receiver**.  
-This application allows you to send your phone's audio to any device on the same local network, or listen to audio from another device — all without root.  
+This application allows you to send your phone's audio to any device on the same local network, or listen to audio from another device, all without root.  
 
 ---
 
