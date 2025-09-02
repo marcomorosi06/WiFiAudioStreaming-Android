@@ -12,7 +12,7 @@ This application allows you to send your phone's audio to any device on the same
 
 | Server Mode | Device Scanning (Client) | Detailed Settings |  
 | :---: | :---: | :---: |  
-| <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/server_mode.png" width="293"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/client_mode.gif" width="250"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/settings.png" width="267"> |  
+| <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/server_mode.png" width="250"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/client_mode.gif" width="250"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/settings.png" width="250"> |  
 
 ---
 
