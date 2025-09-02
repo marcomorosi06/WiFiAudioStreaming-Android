@@ -1,6 +1,7 @@
 # WiFi Audio Streaming (Android)  
-[![Available on GitLab](https://img.shields.io/badge/Available%20on-GitLab-FC6D26?style=for-the-badge&logo=gitlab)](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android)  
-[![Pipeline Status](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/badges/master/pipeline.svg)](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/pipelines)  
+<a href="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/releases">  
+<img src="https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/-/raw/master/images/get-it-on-gitlab-badge.png" alt="Get it on GitLab" height="80">  
+</a>  
 
 Turn your Android device into a **wireless audio transmitter or receiver**.  
 This application allows you to send your phone's audio to any device on the same local network, or listen to audio from another device — all without root.  
@@ -11,7 +12,7 @@ This application allows you to send your phone's audio to any device on the same
 
 | Server Mode | Device Scanning (Client) | Detailed Settings |  
 | :---: | :---: | :---: |  
-| ![Server Mode](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/server_mode.png) | ![Client Scan](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/client_mode.gif) | ![Settings](https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/settings.png) |  
+| <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/server_mode.png" width="293"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/client_mode.gif" width="250"> | <img src="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/raw/master/images/settings.png" width="267"> |  
 
 ---
 
