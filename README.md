@@ -1,4 +1,8 @@
 # WiFi Audio Streaming (Android)  
+<a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases">  
+<img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" height="80">  
+</a>  
+
 <a href="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/releases">  
 <img src="https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/-/raw/master/images/get-it-on-gitlab-badge.png" alt="Get it on GitLab" height="80">  
 </a>  
@@ -34,7 +38,7 @@ The project is also available for **Windows, macOS, and Linux**!
 Turn your computer into a wireless audio transmitter or receiver.  
 
 [![Available on GitLab](https://img.shields.io/badge/Available%20on-GitLab-FC6D26?style=for-the-badge&logo=gitlab)](https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/)  
-
+[![Available on GitHub](https://img.shields.io/badge/Available%20on-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop/)  
 ---
 
 ## 🚀 Quick Start  
