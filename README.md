@@ -37,8 +37,8 @@ This application allows you to send your phone's audio to any device on the same
 The project is also available for **Windows, macOS, and Linux**!  
 Turn your computer into a wireless audio transmitter or receiver.  
 
-[![Available on GitLab](https://img.shields.io/badge/Available%20on-GitLab-FC6D26?style=for-the-badge&logo=gitlab)](https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/)  
 [![Available on GitHub](https://img.shields.io/badge/Available%20on-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop/)  
+[![Available on GitLab](https://img.shields.io/badge/Available%20on-GitLab-FC6D26?style=for-the-badge&logo=gitlab)](https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/)  
 ---
 
 ## 🚀 Quick Start  
