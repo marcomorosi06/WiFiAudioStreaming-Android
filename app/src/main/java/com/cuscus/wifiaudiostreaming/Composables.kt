@@ -253,7 +253,7 @@ fun WiFiAudioStreamingApp(
                             OutlinedTextField(
                                 value = manualIp,
                                 onValueChange = { manualIp = it },
-                                label = { Text("Manual IP (e.g. 192.168.1.5)") }, // Testo fisso temporaneo
+                                label = { Text(stringResource(R.string.manual_ip_hint)) }, // Testo fisso temporaneo
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 shape = RoundedCornerShape(16.dp)
@@ -263,7 +263,7 @@ fun WiFiAudioStreamingApp(
                                 enabled = manualIp.isNotBlank(),
                                 modifier = Modifier.size(52.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Connect")
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.connect_button_description))
                             }
                         }
                     }
@@ -1728,7 +1728,7 @@ fun ExpressiveStreamingControlCenter(
                         val volume by NetworkManager.serverVolume.collectAsState()
 
                         Text(
-                            text = "Volume Trasmissione: ${(volume * 100).toInt()}%",
+                            text = stringResource(R.string.transmission_volume, (volume * 100).toInt()),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -1898,7 +1898,7 @@ fun ExpressiveServerControls(
         )
         if (isReady) {
             Text(
-                text = "Server IP: $localIp",
+                text = stringResource(R.string.server_ip_format, localIp),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,

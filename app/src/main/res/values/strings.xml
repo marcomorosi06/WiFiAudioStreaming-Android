@@ -120,4 +120,7 @@
     <string name="notification_permission_granted">Thank you! Notifications are now active.</string>
     <string name="notification_permission_denied">Permission denied. The app may not work correctly in the background.</string>
     <string name="status_server_disconnected">Server disconnected</string>
+    <string name="manual_ip_hint">Manual IP (e.g. 192.168.1.5)</string>
+    <string name="transmission_volume">Transmission Volume: %1$d%%</string>
+    <string name="server_ip_format">Server IP: %1$s</string>
 </resources>

@@ -121,5 +121,7 @@
     <string name="notification_permission_granted">Grazie! Ora le notifiche sono attive.</string>
     <string name="notification_permission_denied">Permesso negato. L\'app potrebbe non funzionare correttamente in background.</string>
     <string name="status_server_disconnected">Server disconnesso</string>
-
+    <string name="manual_ip_hint">IP Manuale (es. 192.168.1.5)</string>
+    <string name="transmission_volume">Volume Trasmissione: %1$d%%</string>
+    <string name="server_ip_format">IP Server: %1$s</string>
 </resources>
