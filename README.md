@@ -68,7 +68,8 @@ The app requires certain permissions to function properly:
 1. Launch the app and select **Receive (Client)**.  
 2. The app will automatically search for active servers on the network.  
 3. Select a server from the list to connect and start listening.  
-4. If the server uses a non-standard port, enter it in the settings before connecting.  
+4. **Fallback (Manual IP)**: If your router blocks automatic discovery, simply type the server's IP address into the manual input field and tap the connect arrow.
+5. If the server uses a non-standard port, enter it in the settings before connecting.  
    *Tip: The server’s port is shown after the `:` in its local IP address (default: `9090`).*  
 
 ---
