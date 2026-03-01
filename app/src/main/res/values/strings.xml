@@ -120,4 +120,21 @@
     <string name="notification_permission_granted">Thank you! Notifications are now active.</string>
     <string name="notification_permission_denied">Permission denied. The app may not work correctly in the background.</string>
     <string name="status_server_disconnected">Server disconnected</string>
+    <string name="status_authenticating">Authenticating…</string>
+    <string name="status_auth_denied">Invalid password</string>
+    <string name="status_auth_required">Password required — please enter it before connecting</string>
+    <string name="status_auth_failed_log">Attempt failed: %s</string>
+
+    <string name="label_enable_password">Protect with password</string>
+    <string name="label_password_hint">Password</string>
+    <string name="label_password_confirm_hint">Confirm password</string>
+    <string name="error_passwords_mismatch">Passwords do not match</string>
+    <string name="error_password_empty">Please enter a password</string>
+
+    <string name="dialog_enter_password_title">Protected server</string>
+    <string name="dialog_enter_password_message">This server requires a password</string>
+    <string name="dialog_connect">Connect</string>
+    <string name="dialog_cancel">Cancel</string>
+
+    <string name="content_description_lock_icon">Password-protected server</string>
 </resources>

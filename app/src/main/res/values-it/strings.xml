@@ -121,5 +121,21 @@
     <string name="notification_permission_granted">Grazie! Ora le notifiche sono attive.</string>
     <string name="notification_permission_denied">Permesso negato. L\'app potrebbe non funzionare correttamente in background.</string>
     <string name="status_server_disconnected">Server disconnesso</string>
+    <string name="status_authenticating">Autenticazione in corso…</string>
+    <string name="status_auth_denied">Password non valida</string>
+    <string name="status_auth_required">Password richiesta — inseriscila prima di connetterti</string>
+    <string name="status_auth_failed_log">Tentativo fallito: %s</string>
+
+    <!-- Server con password -->
+    <string name="label_enable_password">Proteggi con password</string>
+    <string name="label_password_hint">Password</string>
+    <string name="label_password_confirm_hint">Conferma password</string>
+    <string name="error_passwords_mismatch">Le password non corrispondono</string>
+    <string name="error_password_empty">Inserisci una password</string>
+    <string name="dialog_enter_password_title">Server protetto</string>
+    <string name="dialog_enter_password_message">Questo server richiede una password</string>
+    <string name="dialog_connect">Connetti</string>
+    <string name="dialog_cancel">Annulla</string>
+    <string name="content_description_lock_icon">Server protetto da password</string>
 
 </resources>

@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.RoundedPolygon
@@ -84,13 +85,11 @@ val allMaterialShapes = listOf(
     MaterialShapes.VerySunny
 )
 
-// Funzione per ottenere una forma casuale
 @Composable
 fun rememberRandomShape(): RoundedPolygon {
     return remember { allMaterialShapes.random() }
 }
 
-// Funzione per ottenere una forma casuale basata su un seed (per consistenza)
 @Composable
 fun rememberRandomShape(seed: String): RoundedPolygon {
     return remember(seed) {
@@ -112,10 +111,10 @@ fun WiFiAudioStreamingApp(
     localIp: String,
     onMulticastModeChange: (Boolean) -> Unit,
     onToggleMode: (Boolean) -> Unit,
-    onStartServer: () -> Unit,
+    onStartServer: (Boolean) -> Unit,
     onStopServer: () -> Unit,
-    onConnect: (ServerInfo) -> Unit,
-    onConnectManual: (String) -> Unit,
+    onConnect: (ServerInfo, String?) -> Unit,
+    onConnectManual: (String, String?) -> Unit,
     onRefresh: () -> Unit,
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
@@ -134,6 +133,47 @@ fun WiFiAudioStreamingApp(
         ),
         label = "Background Gradient"
     )
+
+    val context = LocalContext.current
+    var hasServerPassword by remember { mutableStateOf(CryptoManager.hasPassword(context)) }
+    var showSetPasswordDialog by remember { mutableStateOf(false) }
+
+    var showClientPasswordDialog by remember { mutableStateOf(false) }
+    var serverToConnect by remember { mutableStateOf<ServerInfo?>(null) }
+    var manualIpToConnect by remember { mutableStateOf<String?>(null) }
+
+    if (showSetPasswordDialog) {
+        ExpressivePasswordDialog(
+            title = "Protezione Server",
+            text = "Inserisci una password sicura per proteggere il tuo stream audio:",
+            onConfirm = { pwd ->
+                CryptoManager.registerPassword(context, pwd)
+                hasServerPassword = true
+                showSetPasswordDialog = false
+            },
+            onDismiss = {
+                showSetPasswordDialog = false
+                hasServerPassword = CryptoManager.hasPassword(context)
+            }
+        )
+    }
+
+    if (showClientPasswordDialog) {
+        ExpressivePasswordDialog(
+            title = "Password Richiesta",
+            text = "Questo server è protetto. Inserisci la password per connetterti:",
+            onConfirm = { pwd ->
+                showClientPasswordDialog = false
+                serverToConnect?.let { onConnect(it, pwd); serverToConnect = null }
+                manualIpToConnect?.let { onConnectManual(it, pwd); manualIpToConnect = null }
+            },
+            onDismiss = {
+                showClientPasswordDialog = false
+                serverToConnect = null
+                manualIpToConnect = null
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -161,9 +201,7 @@ fun WiFiAudioStreamingApp(
                 isServer = isServer,
                 onToggleMode = { isServerMode ->
                     onToggleMode(isServerMode)
-                    if (!isServerMode) {
-                        onRefresh()
-                    }
+                    if (!isServerMode) onRefresh()
                 },
                 enabled = !isStreaming,
                 modifier = Modifier.fillMaxWidth()
@@ -184,18 +222,26 @@ fun WiFiAudioStreamingApp(
                 ExpressiveAudioSourceSelector(
                     streamInternal = appSettings.streamInternal,
                     streamMic = appSettings.streamMic,
-                    experimentalFeaturesEnabled = appSettings.experimentalFeaturesEnabled, // <-- NUOVO
+                    experimentalFeaturesEnabled = appSettings.experimentalFeaturesEnabled,
                     isMulticast = isMulticastMode,
+                    hasServerPassword = hasServerPassword,
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
+                    onPasswordToggle = { checked ->
+                        if (checked) {
+                            showSetPasswordDialog = true
+                        } else {
+                            CryptoManager.clearPassword(context)
+                            hasServerPassword = false
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // PANNELLO OPZIONI CLIENT ORA DIPENDE DALLE FUNZIONI SPERIMENTALI
             AnimatedVisibility(
-                visible = !isServer && !isStreaming && appSettings.experimentalFeaturesEnabled, // <-- MODIFICATO
+                visible = !isServer && !isStreaming && appSettings.experimentalFeaturesEnabled,
                 enter = expandVertically(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -220,7 +266,7 @@ fun WiFiAudioStreamingApp(
                 streamMic = appSettings.streamMic,
                 localIp = localIp,
                 modifier = Modifier.fillMaxWidth(),
-                onStartServer = onStartServer,
+                onStartServer = { onStartServer(hasServerPassword) },
                 onStopServer = onStopServer
             )
 
@@ -237,41 +283,65 @@ fun WiFiAudioStreamingApp(
                 ) + fadeOut() + scaleOut(targetScale = 0.8f)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // --- NUOVO: CAMPO IP MANUALE ---
+
                     var manualIp by remember { mutableStateOf("") }
+                    var manualIpRequiresPassword by remember { mutableStateOf(false) }
+
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(28.dp),
                         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = manualIp,
-                                onValueChange = { manualIp = it },
-                                label = { Text("Manual IP (e.g. 192.168.1.5)") }, // Testo fisso temporaneo
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            FilledTonalIconButton(
-                                onClick = { onConnectManual(manualIp) },
-                                enabled = manualIp.isNotBlank(),
-                                modifier = Modifier.size(52.dp)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Connect")
+                                OutlinedTextField(
+                                    value = manualIp,
+                                    onValueChange = { manualIp = it },
+                                    label = { Text("IP Manuale (es. 192.168.1.5)") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        if (manualIpRequiresPassword) {
+                                            manualIpToConnect = manualIp
+                                            showClientPasswordDialog = true
+                                        } else {
+                                            onConnectManual(manualIp, null)
+                                        }
+                                    },
+                                    enabled = manualIp.isNotBlank(),
+                                    modifier = Modifier.size(52.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Connetti")
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = manualIpRequiresPassword,
+                                    onCheckedChange = { manualIpRequiresPassword = it }
+                                )
+                                Text("Il server richiede una password", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
 
-                    // --- LISTA DISPOSITIVI ESISTENTE ---
                     ExpressiveDeviceDiscoveryPanel(
                         devices = discoveredDevices,
-                        onConnect = onConnect,
+                        onConnect = { serverInfo ->
+                            if (serverInfo.isPasswordProtected) {
+                                serverToConnect = serverInfo
+                                showClientPasswordDialog = true
+                            } else {
+                                onConnect(serverInfo, null)
+                            }
+                        },
                         onRefresh = onRefresh,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -280,6 +350,8 @@ fun WiFiAudioStreamingApp(
         }
     }
 }
+
+// ... Resto del file invariato fino a ExpressiveDeviceDiscoveryPanel ...
 
 @Composable
 fun ExpressiveClientSettingsPanel(
@@ -325,10 +397,6 @@ fun ExpressiveClientSettingsPanel(
     }
 }
 
-
-/**
- * Composable helper per elementi cliccabili che mantengono lo stile della UI.
- */
 @Composable
 fun SettingsClickableItem(
     title: String,
@@ -376,7 +444,7 @@ fun ExpressiveSettingsScreen(
     onMicPortChange: (Int) -> Unit,
     onExperimentalFeaturesChange: (Boolean) -> Unit,
     onClose: () -> Unit,
-    onShowOnboarding: () -> Unit // Lambda per mostrare l'onboarding
+    onShowOnboarding: () -> Unit
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -400,12 +468,11 @@ fun ExpressiveSettingsScreen(
             onMicPortChange = onMicPortChange,
             onExperimentalFeaturesChange = onExperimentalFeaturesChange,
             onClose = onClose,
-            onShowOnboarding = onShowOnboarding // Passa la lambda al content
+            onShowOnboarding = onShowOnboarding
         )
     }
 }
 
-// NUOVO: AlertDialog per avviso funzioni sperimentali
 @Composable
 fun ExperimentalFeaturesWarningDialog(
     onDismiss: () -> Unit,
@@ -622,7 +689,6 @@ fun SettingsScreenContent(
     }
 }
 
-
 @Composable
 fun SettingsTextFieldItem(
     title: String,
@@ -667,7 +733,6 @@ fun SettingsTextFieldItem(
     }
 }
 
-// MODIFICATO: Firma aggiornata per usare ServerInfo
 @Composable
 fun ExpressiveDeviceDiscoveryPanel(
     devices: Map<String, ServerInfo>,
@@ -675,7 +740,6 @@ fun ExpressiveDeviceDiscoveryPanel(
     onRefresh: () -> Unit,
     modifier: Modifier
 ) {
-    // ... (Il corpo di questa funzione non cambia, solo la sua firma)
     val haptic = LocalHapticFeedback.current
     val cardElevation by animateFloatAsState(
         targetValue = if (devices.isNotEmpty()) 12f else 6f,
@@ -687,7 +751,7 @@ fun ExpressiveDeviceDiscoveryPanel(
     )
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation.dp),
         colors = CardDefaults.elevatedCardColors(
@@ -778,19 +842,18 @@ fun ExpressiveDeviceDiscoveryPanel(
     }
 }
 
-
 @Composable
 fun ExpressiveDeviceList(
     devices: Map<String, ServerInfo>,
     onConnect: (ServerInfo) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // La logica del forEach ora passa l'informazione sulla modalità
         devices.forEach { (hostname, serverInfo) ->
             ExpressiveDeviceCard(
                 hostname = hostname,
                 ipAddress = "${serverInfo.ip}:${serverInfo.port}",
                 isMulticast = serverInfo.isMulticast,
+                isPasswordProtected = serverInfo.isPasswordProtected,
                 onConnect = { onConnect(serverInfo) }
             )
         }
@@ -849,7 +912,7 @@ fun SettingsSwitchItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) // oppure LongPress / Confirm
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onCheckedChange(!isChecked)
             }
             .padding(horizontal = 20.dp, vertical = 12.dp),
@@ -900,7 +963,6 @@ fun SettingsSwitchItem(
         )
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -970,8 +1032,6 @@ fun SettingsSliderItem(
 ) {
     var sliderValue by remember(value) { mutableFloatStateOf(value) }
     val haptic = LocalHapticFeedback.current
-
-    // Ricordiamo l’ultimo intero attraversato per evitare vibrazioni continue
     var lastStep by remember { mutableIntStateOf(value.toInt()) }
 
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
@@ -1023,7 +1083,6 @@ fun SettingsSliderItem(
     }
 }
 
-
 data class ConnectionState(
     val isConnected: Boolean = false,
     val isError: Boolean = false,
@@ -1038,7 +1097,6 @@ data class ConnectionState(
     }
 }
 
-// Funzione helper per convertire la stringa di stato
 @Composable
 fun rememberConnectionState(status: String): ConnectionState {
     val connectedStatus = stringResource(R.string.connection_status_connected)
@@ -1055,7 +1113,6 @@ fun rememberConnectionState(status: String): ConnectionState {
     }
 }
 
-// === EXPRESSIVE TOP APP BAR ===
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveTopAppBar(
@@ -1102,7 +1159,6 @@ fun ExpressiveTopAppBar(
         }
     }
 
-    // 🔹 Qui sistemato: non più dentro derivedStateOf
     val statusText = when {
         isStreaming -> stringResource(R.string.streaming_active)
         connectionState.isConnected -> stringResource(R.string.connection_status_connected)
@@ -1202,7 +1258,6 @@ fun ExpressiveTopAppBar(
     )
 }
 
-// === EXPRESSIVE MODE SELECTOR ===
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveModeSelector(
@@ -1376,17 +1431,18 @@ fun ExpressiveModeButton(
     }
 }
 
-// === EXPRESSIVE AUDIO SOURCE SELECTOR ===
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveAudioSourceSelector(
     streamInternal: Boolean,
     streamMic: Boolean,
-    experimentalFeaturesEnabled: Boolean, // <-- NUOVO
+    experimentalFeaturesEnabled: Boolean,
     isMulticast: Boolean,
+    hasServerPassword: Boolean,
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
+    onPasswordToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -1398,7 +1454,6 @@ fun ExpressiveAudioSourceSelector(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- Sezione Sorgenti Audio (Invariata) ---
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -1416,6 +1471,7 @@ fun ExpressiveAudioSourceSelector(
                     fontWeight = FontWeight.Bold
                 )
             }
+
             ExpressiveAudioSourceToggle(
                 icon = Icons.Outlined.Speaker,
                 checkedIcon = Icons.Filled.Speaker,
@@ -1424,9 +1480,9 @@ fun ExpressiveAudioSourceSelector(
                 checked = streamInternal,
                 onCheckedChange = onStreamInternalChange
             )
+
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Il microfono è visibile solo se le funzioni sperimentali sono attive
             AnimatedVisibility(visible = experimentalFeaturesEnabled) {
                 ExpressiveAudioSourceToggle(
                     icon = Icons.Outlined.Mic,
@@ -1462,18 +1518,24 @@ fun ExpressiveAudioSourceSelector(
                 checked = isMulticast,
                 onCheckedChange = onMulticastChange
             )
+
+            Divider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp))
+
+            ExpressiveSecurityToggle(
+                checked = hasServerPassword,
+                onCheckedChange = onPasswordToggle
+            )
         }
     }
 }
 
 @Composable
 fun ExpressiveStreamingModeToggle(
-    checked: Boolean, // true per Multicast, false per Singolo Client
+    checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
 
-    // Le descrizioni e le icone cambiano in base alla selezione
     val title = if (checked) stringResource(R.string.multicast_mode_title) else stringResource(R.string.unicast_mode_title)
     val subtitle = if (checked) stringResource(R.string.multicast_mode_desc) else stringResource(R.string.unicast_mode_desc)
     val icon = if (checked) Icons.Outlined.Groups else Icons.Outlined.Person
@@ -1659,7 +1721,6 @@ fun ExpressiveAudioSourceToggle(
     }
 }
 
-// === EXPRESSIVE STREAMING CONTROL CENTER ===
 @Composable
 fun ExpressiveStreamingControlCenter(
     isServer: Boolean,
@@ -1722,7 +1783,6 @@ fun ExpressiveStreamingControlCenter(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ExpressiveStreamingActiveIndicator(onStopServer = onStopServer)
 
-                    // --- NUOVO SLIDER VOLUME SU ANDROID ---
                     if (isServer) {
                         Spacer(modifier = Modifier.height(24.dp))
                         val volume by NetworkManager.serverVolume.collectAsState()
@@ -1736,11 +1796,10 @@ fun ExpressiveStreamingControlCenter(
                         Slider(
                             value = volume,
                             onValueChange = { NetworkManager.serverVolume.value = it },
-                            valueRange = 0f..2f, // Da Muto a 200%
+                            valueRange = 0f..2f,
                             modifier = Modifier.fillMaxWidth(0.8f)
                         )
                     }
-                    // --------------------------------------
                 }
             } else if (isServer) {
                 ExpressiveServerControls(
@@ -2056,13 +2115,13 @@ fun ModeTag(isMulticast: Boolean) {
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpressiveDeviceCard(
     hostname: String,
     ipAddress: String,
     isMulticast: Boolean,
+    isPasswordProtected: Boolean,
     onConnect: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -2103,30 +2162,38 @@ fun ExpressiveDeviceCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // --- MODIFICA CHIAVE: Layout verticale per le informazioni ---
             Column(
                 modifier = Modifier.weight(1f),
-                // Aggiunge uno spazio di 4.dp tra ogni elemento nella colonna
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // 1. Nome Host
-                Text(
-                    text = hostname,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = hostname,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                // 2. Etichetta (Tag) Unicast/Multicast
+                    if (isPasswordProtected) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Protetto da Password",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
                 ModeTag(isMulticast = isMulticast)
 
-                // 3. Indirizzo IP
                 Text(
                     text = ipAddress,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // --- FINE MODIFICA ---
 
             Box(
                 modifier = Modifier
@@ -2146,7 +2213,6 @@ fun ExpressiveDeviceCard(
     }
 }
 
-// === BUTTON GROUP DEFAULTS (Material 3 Expressive) ===
 object ButtonGroupDefaults {
     val ConnectedSpaceBetween = 0.dp
 
@@ -2172,38 +2238,6 @@ object ButtonGroupDefaults {
         )
     )
 }
-
-/**
- * Composable helper per mostrare informazioni statiche nelle impostazioni.
- */
-@Composable
-fun SettingsInfoItem(
-    title: String,
-    description: String,
-    icon: ImageVector
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(20.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-
-
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2489,6 +2523,162 @@ private fun OnboardingNavigation(
                     Text(stringResource(id = R.string.next))
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+fun ExpressiveSecurityToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+
+    // Stringhe di testo fisso temporanee (anziché stringResource che non avevi in strings.xml)
+    val title = if (checked) "Protezione Attiva" else "Rete Aperta"
+    val subtitle = if (checked) "È richiesta una password per connettersi" else "Chiunque può ascoltare lo stream"
+    val icon = if (checked) Icons.Outlined.Lock else Icons.Outlined.LockOpen
+    val checkedIcon = if (checked) Icons.Filled.Lock else Icons.Filled.LockOpen
+
+    val rowScale by animateFloatAsState(
+        targetValue = if (checked) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "Security Row Scale"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape = RoundedCornerShape(28.dp))
+            .background(
+                if (checked) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                else MaterialTheme.colorScheme.surfaceContainer
+            )
+            .padding(16.dp)
+            .scale(rowScale),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AnimatedContent(
+            targetState = checked,
+            transitionSpec = { scaleIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) togetherWith scaleOut() },
+            label = "Security Icon Animation"
+        ) { isChecked ->
+            Icon(
+                imageVector = if (isChecked) checkedIcon else icon,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = if (isChecked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            AnimatedContent(
+                targetState = subtitle,
+                transitionSpec = { (slideInVertically { height -> height / 2 } + fadeIn()) togetherWith (slideOutVertically { height -> -height / 2 } + fadeOut()) },
+                label = "Security Subtitle"
+            ) { text ->
+                Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                onCheckedChange(it)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onError,
+                checkedTrackColor = MaterialTheme.colorScheme.error
+            ),
+            thumbContent = {
+                AnimatedContent(targetState = checked, label = "Security Switch Thumb") { isChecked ->
+                    Icon(
+                        imageVector = if (isChecked) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ExpressivePasswordDialog(
+    title: String,
+    text: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(text)
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(password) },
+                enabled = password.isNotBlank(),
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+@Composable
+fun SettingsInfoItem(
+    title: String,
+    description: String,
+    icon: ImageVector
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(28.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(20.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

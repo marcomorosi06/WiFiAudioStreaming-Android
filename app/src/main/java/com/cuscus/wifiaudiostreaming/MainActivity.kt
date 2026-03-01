@@ -40,6 +40,7 @@ import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var currentIsPasswordProtected: Boolean = false
 
     @RequiresApi(Build.VERSION_CODES.O)
     private val mediaProjectionLauncher =
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     action = AudioCaptureService.ACTION_START
                     putExtra(AudioCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                     putExtra(AudioCaptureService.EXTRA_DATA, result.data)
+                    putExtra("is_password_protected", currentIsPasswordProtected)
 
                     viewModel.appSettings.value?.let { settings ->
                         putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, settings.streamInternal)
@@ -174,8 +176,8 @@ class MainActivity : ComponentActivity() {
             isMulticastMode = isMulticastMode,
             localIp = localIp,
             onToggleMode = viewModel::toggleMode,
-            onStartServer = {
-                startMediaProjectionRequest()
+            onStartServer = { isPasswordProtected ->
+                startMediaProjectionRequest(isPasswordProtected)
             },
             onStopServer = {
                 val intent = Intent(this, AudioCaptureService::class.java).apply {
@@ -184,11 +186,11 @@ class MainActivity : ComponentActivity() {
                 startService(intent)
                 viewModel.setIsStreaming(false)
             },
-            onConnect = { serverInfo ->
-                viewModel.startClient(serverInfo)
+            onConnect = { serverInfo, pwd ->
+                viewModel.startClient(serverInfo, pwd)
             },
-            onConnectManual = { ip ->
-                viewModel.startClientManually(ip)
+            onConnectManual = { ip, pwd ->
+                viewModel.startClientManually(ip, pwd)
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
@@ -259,7 +261,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun startMediaProjectionRequest() {
+    private fun startMediaProjectionRequest(isPasswordProtected: Boolean) { // <-- AGGIUNTO PARAMETRO
         val settings = viewModel.appSettings.value ?: return
 
         if (!settings.streamInternal && settings.streamMic) {
@@ -272,6 +274,7 @@ class MainActivity : ComponentActivity() {
                 putExtra("buffer_size", settings.bufferSize)
                 putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value)
                 putExtra("streaming_port", settings.streamingPort)
+                putExtra("is_password_protected", isPasswordProtected) // <-- AGGIUNTO
             }
             startForegroundService(intent)
             viewModel.setIsStreaming(true)
@@ -280,6 +283,11 @@ class MainActivity : ComponentActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            // Purtroppo il launcher non accetta parametri extra direttamente.
+            // Dovrai salvare `isPasswordProtected` in una variabile di classe in MainActivity
+            // e passarla nell'Intent all'interno di `mediaProjectionLauncher` all'inizio del file.
+            this.currentIsPasswordProtected = isPasswordProtected // vedi spiegazione sotto!
+
             mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
         } else {
             viewModel.updateStatus(getString(R.string.internal_audio_android_version_required))

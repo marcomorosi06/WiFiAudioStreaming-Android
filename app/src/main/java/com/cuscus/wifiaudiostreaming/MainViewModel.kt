@@ -24,9 +24,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMulticastMode = MutableStateFlow(true)
     val isMulticastMode: StateFlow<Boolean> = _isMulticastMode.asStateFlow()
 
-    // ## SOLUZIONE APPLICATA QUI ##
-    // Il StateFlow ora è nullable (AppSettings?) e parte da `null` come valore iniziale.
-    // Questo ci permette di distinguere lo stato "in caricamento" da quello "caricato".
     val appSettings: StateFlow<AppSettings?> = settingsDataStore.settingsFlow
         .stateIn(
             scope = viewModelScope,
@@ -125,7 +122,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Funzione aggiuntiva per resettare l'onboarding dalle impostazioni
     fun resetOnboarding() {
         viewModelScope.launch {
             settingsDataStore.setOnboardingCompleted(false)
@@ -141,7 +137,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startClient(serverInfo: ServerInfo) {
+    // MODIFICA QUI: Aggiunto password: String? = null
+    fun startClient(serverInfo: ServerInfo, password: String? = null) {
         val intent = Intent(getApplication(), ClientService::class.java)
         getApplication<Application>().startService(intent)
         setIsStreaming(true)
@@ -156,9 +153,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 bufferSize = currentSettings.bufferSize,
                 sendMicrophone = currentSettings.sendClientMicrophone,
                 micPort = currentSettings.micPort,
+                password = password, // <-- Passaggio della password
                 onServerDisconnected = {
-                    // Eseguito sul Main thread da NetworkManager.
-                    // Fa esattamente quello che fa il tasto Stop nella UI.
+                    setIsStreaming(false)
+                    val stopIntent = Intent(getApplication(), ClientService::class.java)
+                    getApplication<Application>().stopService(stopIntent)
+                },
+                onAuthDenied = {
+                    updateStatus("Autenticazione Fallita / Password Errata")
                     setIsStreaming(false)
                     val stopIntent = Intent(getApplication(), ClientService::class.java)
                     getApplication<Application>().stopService(stopIntent)
@@ -168,15 +170,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @SuppressLint("MissingPermission")
-    fun startClientManually(ip: String) {
+    // MODIFICA QUI: Aggiunto password: String? = null
+    fun startClientManually(ip: String, password: String? = null) {
         val currentSettings = appSettings.value ?: return
-        // Creiamo un ServerInfo fittizio per la connessione Unicast manuale
+
         val manualServerInfo = ServerInfo(
             ip = ip,
             isMulticast = false,
-            port = currentSettings.streamingPort
+            port = currentSettings.streamingPort,
+            isPasswordProtected = password != null // Deduce se è protetto
         )
-        startClient(manualServerInfo)
+        // Passa info e password a startClient
+        startClient(manualServerInfo, password)
     }
 
     fun stopStreaming() {

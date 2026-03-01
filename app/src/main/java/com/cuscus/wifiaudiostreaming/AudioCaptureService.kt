@@ -1,6 +1,7 @@
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
@@ -41,8 +42,8 @@ class AudioCaptureService : Service() {
                 val channelConfig = intent.getStringExtra("channel_config") ?: "STEREO"
                 val bufferSize = intent.getIntExtra("buffer_size", 6144)
                 val isMulticast = intent.getBooleanExtra(EXTRA_IS_MULTICAST, true)
-                // MODIFICATO: Leggi la porta dall'intent, con un default di 9090
                 val streamingPort = intent.getIntExtra("streaming_port", 9090)
+                val isPasswordProtected = intent.getBooleanExtra("is_password_protected", false) // <-- 1. ESTRAI IL PARAMETRO
 
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
@@ -62,7 +63,8 @@ class AudioCaptureService : Service() {
                         channelConfig = channelConfig,
                         bufferSize = bufferSize,
                         isMulticast = isMulticast,
-                        streamingPort = streamingPort // <-- PASSA LA NUOVA PORTA
+                        streamingPort = streamingPort,
+                        isPasswordProtected = isPasswordProtected // <-- 2. PASSALO ALLA FUNZIONE
                     )
                 }
             }
@@ -80,6 +82,7 @@ class AudioCaptureService : Service() {
         stopSelf()
     }
 
+    @SuppressLint("MissingPermission")
     private fun startForegroundWithNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
