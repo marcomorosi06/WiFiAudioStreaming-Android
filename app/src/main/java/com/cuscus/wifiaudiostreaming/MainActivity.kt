@@ -156,6 +156,8 @@ class MainActivity : ComponentActivity() {
         val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
         val discoveredDevices by viewModel.discoveredDevices.collectAsStateWithLifecycle()
         val isMulticastMode by viewModel.isMulticastMode.collectAsStateWithLifecycle()
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val localIp = remember { NetworkManager.getLocalIpAddress(context) }
 
         ClientDiscoveryHandler()
 
@@ -170,6 +172,7 @@ class MainActivity : ComponentActivity() {
             connectionStatus = connectionStatus,
             discoveredDevices = discoveredDevices,
             isMulticastMode = isMulticastMode,
+            localIp = localIp,
             onToggleMode = viewModel::toggleMode,
             onStartServer = {
                 startMediaProjectionRequest()
@@ -183,6 +186,9 @@ class MainActivity : ComponentActivity() {
             },
             onConnect = { serverInfo ->
                 viewModel.startClient(serverInfo)
+            },
+            onConnectManual = { ip ->
+                viewModel.startClientManually(ip)
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
@@ -278,6 +284,29 @@ class MainActivity : ComponentActivity() {
         } else {
             viewModel.updateStatus(getString(R.string.internal_audio_android_version_required))
         }
+    }
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (NetworkManager.isServerStreaming) {
+            when (keyCode) {
+                android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+                    NetworkManager.serverVolume.value = (NetworkManager.serverVolume.value + 0.1f).coerceAtMost(2.0f)
+                    return true // Consuma l'evento: impedisce al sistema di alzare il suo audio!
+                }
+                android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    NetworkManager.serverVolume.value = (NetworkManager.serverVolume.value - 0.1f).coerceAtLeast(0.0f)
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (NetworkManager.isServerStreaming &&
+            (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            return true // Consuma l'evento: previene il classico "BEEP" di sistema al rilascio del tasto
+        }
+        return super.onKeyUp(keyCode, event)
     }
 }
 

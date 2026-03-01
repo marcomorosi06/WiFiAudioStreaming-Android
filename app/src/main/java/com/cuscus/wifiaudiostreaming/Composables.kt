@@ -109,11 +109,13 @@ fun WiFiAudioStreamingApp(
     connectionStatus: String,
     discoveredDevices: Map<String, ServerInfo>,
     isMulticastMode: Boolean,
+    localIp: String,
     onMulticastModeChange: (Boolean) -> Unit,
     onToggleMode: (Boolean) -> Unit,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     onConnect: (ServerInfo) -> Unit,
+    onConnectManual: (String) -> Unit,
     onRefresh: () -> Unit,
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
@@ -216,6 +218,7 @@ fun WiFiAudioStreamingApp(
                 isStreaming = isStreaming,
                 streamInternal = appSettings.streamInternal,
                 streamMic = appSettings.streamMic,
+                localIp = localIp,
                 modifier = Modifier.fillMaxWidth(),
                 onStartServer = onStartServer,
                 onStopServer = onStopServer
@@ -233,12 +236,46 @@ fun WiFiAudioStreamingApp(
                     animationSpec = spring(stiffness = Spring.StiffnessMedium)
                 ) + fadeOut() + scaleOut(targetScale = 0.8f)
             ) {
-                ExpressiveDeviceDiscoveryPanel(
-                    devices = discoveredDevices,
-                    onConnect = onConnect,
-                    onRefresh = onRefresh,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // --- NUOVO: CAMPO IP MANUALE ---
+                    var manualIp by remember { mutableStateOf("") }
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = manualIp,
+                                onValueChange = { manualIp = it },
+                                label = { Text("Manual IP (e.g. 192.168.1.5)") }, // Testo fisso temporaneo
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            FilledTonalIconButton(
+                                onClick = { onConnectManual(manualIp) },
+                                enabled = manualIp.isNotBlank(),
+                                modifier = Modifier.size(52.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Connect")
+                            }
+                        }
+                    }
+
+                    // --- LISTA DISPOSITIVI ESISTENTE ---
+                    ExpressiveDeviceDiscoveryPanel(
+                        devices = discoveredDevices,
+                        onConnect = onConnect,
+                        onRefresh = onRefresh,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -1629,6 +1666,7 @@ fun ExpressiveStreamingControlCenter(
     isStreaming: Boolean,
     streamInternal: Boolean,
     streamMic: Boolean,
+    localIp: String,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     modifier: Modifier
@@ -1654,7 +1692,7 @@ fun ExpressiveStreamingControlCenter(
     )
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = cardColor),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation.dp)
@@ -1681,11 +1719,34 @@ fun ExpressiveStreamingControlCenter(
             label = "Streaming Control Animation"
         ) { streaming ->
             if (streaming) {
-                ExpressiveStreamingActiveIndicator(onStopServer = onStopServer)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ExpressiveStreamingActiveIndicator(onStopServer = onStopServer)
+
+                    // --- NUOVO SLIDER VOLUME SU ANDROID ---
+                    if (isServer) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        val volume by NetworkManager.serverVolume.collectAsState()
+
+                        Text(
+                            text = "Volume Trasmissione: ${(volume * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Slider(
+                            value = volume,
+                            onValueChange = { NetworkManager.serverVolume.value = it },
+                            valueRange = 0f..2f, // Da Muto a 200%
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        )
+                    }
+                    // --------------------------------------
+                }
             } else if (isServer) {
                 ExpressiveServerControls(
                     streamInternal = streamInternal,
                     streamMic = streamMic,
+                    localIp = localIp,
                     onStartServer = onStartServer
                 )
             } else {
@@ -1694,7 +1755,6 @@ fun ExpressiveStreamingControlCenter(
         }
     }
 }
-
 @Composable
 fun ExpressiveStreamingActiveIndicator(onStopServer: () -> Unit) {
     val haptic = LocalHapticFeedback.current
@@ -1782,6 +1842,7 @@ fun ExpressiveStreamingActiveIndicator(onStopServer: () -> Unit) {
 fun ExpressiveServerControls(
     streamInternal: Boolean,
     streamMic: Boolean,
+    localIp: String,
     onStartServer: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -1835,6 +1896,15 @@ fun ExpressiveServerControls(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
+        if (isReady) {
+            Text(
+                text = "Server IP: $localIp",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
 
         if (isReady) {
             Text(

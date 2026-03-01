@@ -37,6 +37,11 @@ data class ServerInfo(val ip: String, val isMulticast: Boolean, val port: Int)
 @SuppressLint("MissingPermission")
 object NetworkManager {
 
+    // --- GESTIONE VOLUME SERVER ANDROID ---
+    val serverVolume = MutableStateFlow(1.0f)
+    var isServerStreaming = false
+    // --------------------------------------
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var streamingJob: Job? = null
     private var listeningJob: Job? = null
@@ -54,7 +59,32 @@ object NetworkManager {
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
 
-    // --- (Le funzioni da getAllLocalIpAddresses a startServerAudio rimangono invariate) ---
+    fun getLocalIpAddress(context: Context): String {
+        try {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            val ipAddress = wifiManager.connectionInfo.ipAddress
+            if (ipAddress != 0) {
+                return String.format(
+                    "%d.%d.%d.%d",
+                    ipAddress and 0xff,
+                    ipAddress shr 8 and 0xff,
+                    ipAddress shr 16 and 0xff,
+                    ipAddress shr 24 and 0xff
+                )
+            }
+            java.net.NetworkInterface.getNetworkInterfaces().toList().forEach { intf ->
+                if (!intf.isLoopback && intf.isUp) {
+                    intf.inetAddresses.toList().forEach { addr ->
+                        if (addr is java.net.Inet4Address && !addr.hostAddress.startsWith("192.168.112")) {
+                            return addr.hostAddress
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+        return "127.0.0.1"
+    }
+
     private fun getAllLocalIpAddresses(): Set<String> {
         val ipSet = mutableSetOf<String>()
         try {
@@ -69,11 +99,27 @@ object NetworkManager {
         return ipSet
     }
 
+    private fun getWifiNetworkInterface(): NetworkInterface? {
+        return try {
+            NetworkInterface.getNetworkInterfaces().toList().firstOrNull { iface ->
+                iface.isUp &&
+                        !iface.isLoopback &&
+                        !iface.isVirtual &&
+                        iface.inetAddresses.toList().any { addr ->
+                            addr is java.net.Inet4Address &&
+                                    !addr.isLoopbackAddress &&
+                                    !addr.hostAddress.startsWith("192.168.112") &&
+                                    !addr.hostAddress.startsWith("192.168.42")
+                        }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun startListeningForDevices(context: Context) {
         if (listeningJob?.isActive == true) return
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        // Il MulticastLock è FONDAMENTALE per assicurare che la radio Wi-Fi non vada
-        // in risparmio energetico, bloccando la ricezione dei pacchetti multicast.
         val multicastLock = wifiManager.createMulticastLock("wifi_audio_streamer_discovery_lock")
         multicastLock.setReferenceCounted(true)
 
@@ -84,12 +130,9 @@ object NetworkManager {
                 val localIps = getAllLocalIpAddresses()
                 val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
 
-                // Crea un MulticastSocket sulla porta di discovery
                 socket = MulticastSocket(NetworkSettings.DISCOVERY_PORT).apply {
-                    // Si iscrive al gruppo per ricevere i pacchetti
+                    getWifiNetworkInterface()?.let { networkInterface = it }
                     joinGroup(groupAddress)
-                    // Imposta un timeout per non bloccare il ciclo indefinitamente
-                    // e permettere il controllo di `isActive`
                     soTimeout = 5000
                 }
 
@@ -99,7 +142,6 @@ object NetworkManager {
                 while (isActive) {
                     try {
                         socket.receive(packet)
-
                         val remoteIp = packet.address.hostAddress
                         val message = String(packet.data, 0, packet.length).trim()
 
@@ -110,7 +152,6 @@ object NetworkManager {
                                 val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
                                 val port = parts[3].toIntOrNull() ?: continue
 
-                                // Aggiungi solo se non è già stato scoperto
                                 if (!discoveredDevices.value.containsKey(hostname)) {
                                     val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
                                     discoveredDevices.value += (hostname to serverInfo)
@@ -119,7 +160,6 @@ object NetworkManager {
                             }
                         }
                     } catch (e: SocketTimeoutException) {
-                        // Il timeout è normale, serve solo per sbloccare la receive e controllare `isActive`
                         continue
                     }
                 }
@@ -127,15 +167,12 @@ object NetworkManager {
                 if (e !is CancellationException) println("Listening error: ${e.message}")
             } finally {
                 try {
-                    // Abbandona il gruppo e chiudi il socket
                     socket?.leaveGroup(InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP))
                     socket?.close()
                 } catch (e: Exception) {
                     println("Error closing multicast socket: ${e.message}")
                 }
-                if (multicastLock.isHeld) {
-                    multicastLock.release()
-                }
+                if (multicastLock.isHeld) multicastLock.release()
             }
         }
     }
@@ -150,7 +187,8 @@ object NetworkManager {
         broadcastingJob = scope.launch {
             val deviceName = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
-                    Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME) ?: "${Build.MANUFACTURER} ${Build.MODEL}"
+                    Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+                        ?: "${Build.MANUFACTURER} ${Build.MODEL}"
                 } else {
                     "${Build.MANUFACTURER} ${Build.MODEL}"
                 }
@@ -158,23 +196,37 @@ object NetworkManager {
 
             val mode = if (isMulticast) "MULTICAST" else "UNICAST"
             val message = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;$mode;$streamingPort"
+            val messageBytes = message.toByteArray()
 
-            val selectorManager = SelectorManager(Dispatchers.IO)
-            // Indirizzo di destinazione modificato per il multicast
-            val multicastGroupAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, NetworkSettings.DISCOVERY_PORT)
-            val socket = aSocket(selectorManager).udp().bind(InetSocketAddress("0.0.0.0", 0))
+            val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
+            val wifiIface = getWifiNetworkInterface()
 
+            var socket: MulticastSocket? = null
             try {
+                socket = MulticastSocket().apply {
+                    timeToLive = 4
+                    wifiIface?.let { networkInterface = it }
+                }
+
                 while (isActive) {
-                    val packet = buildPacket { writeText(message) }
-                    // Invia il datagramma al gruppo multicast invece che in broadcast
-                    socket.send(Datagram(packet, multicastGroupAddress))
+                    try {
+                        val packet = DatagramPacket(
+                            messageBytes,
+                            messageBytes.size,
+                            groupAddress,
+                            NetworkSettings.DISCOVERY_PORT
+                        )
+                        socket.send(packet)
+                        println("Broadcasting presence: $message on iface ${wifiIface?.name ?: "default"}")
+                    } catch (e: Exception) {
+                        if (e !is CancellationException) println("Broadcasting error: ${e.message}")
+                    }
                     delay(3000)
                 }
-            } catch(e: Exception) {
-                if (e !is CancellationException) println("Broadcasting error: ${e.message}")
+            } catch (e: Exception) {
+                if (e !is CancellationException) println("Broadcasting setup error: ${e.message}")
             } finally {
-                socket.close()
+                socket?.close()
             }
         }
     }
@@ -237,6 +289,11 @@ object NetworkManager {
         }
     }
 
+    // =========================================================
+    // FIX 2 (server side) — setupAudioRecorders viene chiamato
+    // SUBITO in modalità unicast, prima di aspettare il client,
+    // così i recorder sono già "caldi" quando arriva l'HELLO.
+    // =========================================================
     @RequiresApi(Build.VERSION_CODES.Q)
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startServerAudio(
@@ -260,6 +317,7 @@ object NetworkManager {
         }
 
         streamingJob = scope.launch {
+            isServerStreaming = true
             var internalRecord: AudioRecord? = null
             var micRecord: AudioRecord? = null
             var sendSocket: BoundDatagramSocket? = null
@@ -296,11 +354,16 @@ object NetworkManager {
                     }
                 }
 
-                suspend fun streamingLoop(targetAddress: SocketAddress, bufSize: Int) {
+                suspend fun streamingLoop(
+                    targetAddress: SocketAddress,
+                    bufSize: Int,
+                    clientAlive: java.util.concurrent.atomic.AtomicBoolean? = null
+                ) {
                     val internalBuffer = if (streamInternal) ByteArray(bufSize) else null
                     val micBuffer = if (streamMic) ByteArray(bufSize) else null
                     val mixedBuffer = ByteArray(bufSize)
-                    while(isActive) {
+
+                    while (isActive && clientAlive?.get() != false) {
                         val internalBytes = internalRecord?.read(internalBuffer!!, 0, internalBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
                         val micBytes = micRecord?.read(micBuffer!!, 0, micBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
 
@@ -312,25 +375,41 @@ object NetworkManager {
                             else -> micBytes
                         }
 
-                        val packet = buildPacket {
-                            if (streamInternal && streamMic && bytesToProcess > 0) {
-                                val internalShorts = ByteBuffer.wrap(internalBuffer!!, 0, bytesToProcess).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-                                val micShorts = ByteBuffer.wrap(micBuffer!!, 0, bytesToProcess).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-                                for (i in 0 until bytesToProcess / 2) {
-                                    val mixedSample = internalShorts[i].toInt() + micShorts[i].toInt()
-                                    val clippedSample = mixedSample.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-                                    mixedBuffer[2 * i] = (clippedSample.toInt() and 0xff).toByte()
-                                    mixedBuffer[2 * i + 1] = (clippedSample.toInt() shr 8 and 0xff).toByte()
-                                }
-                                writeFully(mixedBuffer, 0, bytesToProcess)
-                            } else if (streamInternal && internalBytes > 0) {
-                                writeFully(internalBuffer!!, 0, internalBytes)
-                            } else if (streamMic && micBytes > 0) {
-                                writeFully(micBuffer!!, 0, micBytes)
+                        val bufferToSend = if (streamInternal && streamMic && bytesToProcess > 0) {
+                            val internalShorts = ByteBuffer.wrap(internalBuffer!!, 0, bytesToProcess).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                            val micShorts = ByteBuffer.wrap(micBuffer!!, 0, bytesToProcess).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                            for (i in 0 until bytesToProcess / 2) {
+                                val mixedSample = internalShorts[i].toInt() + micShorts[i].toInt()
+                                val clippedSample = mixedSample.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                                mixedBuffer[2 * i] = (clippedSample.toInt() and 0xff).toByte()
+                                mixedBuffer[2 * i + 1] = (clippedSample.toInt() shr 8 and 0xff).toByte()
                             }
-                        }
-                        if (packet.remaining > 0) {
-                            sendSocket?.send(Datagram(packet, targetAddress))
+                            mixedBuffer
+                        } else if (streamInternal && internalBytes > 0) {
+                            internalBuffer!!
+                        } else if (streamMic && micBytes > 0) {
+                            micBuffer!!
+                        } else null
+
+                        if (bufferToSend != null && bytesToProcess > 0) {
+                            val vol = serverVolume.value
+                            if (vol != 1.0f) {
+                                val shorts = ByteBuffer.wrap(bufferToSend, 0, bytesToProcess).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                                for (i in 0 until bytesToProcess / 2) {
+                                    var sample = (shorts[i].toInt() * vol).toInt()
+                                    sample = sample.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                                    bufferToSend[2 * i] = (sample and 0xff).toByte()
+                                    bufferToSend[2 * i + 1] = ((sample shr 8) and 0xff).toByte()
+                                }
+                            }
+                            val packet = buildPacket { writeFully(bufferToSend, 0, bytesToProcess) }
+                            try {
+                                sendSocket?.send(Datagram(packet, targetAddress))
+                            } catch (_: Exception) {
+                                // send fallito → client sparito
+                                clientAlive?.set(false)
+                                break
+                            }
                         }
                     }
                 }
@@ -339,31 +418,87 @@ object NetworkManager {
                     val targetAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, streamingPort)
                     sendSocket = aSocket(selectorManager).udp().bind()
                     setupAudioRecorders(bufferSize)
-                    streamingLoop(targetAddress, bufferSize)
+                    try {
+                        streamingLoop(targetAddress, bufferSize)
+                    } finally {
+                        // BYE al gruppo multicast: tutti i client si disconnettono
+                        try {
+                            val byePacket = buildPacket { writeText("BYE") }
+                            sendSocket?.send(Datagram(byePacket, targetAddress))
+                            println("--- Sent BYE to multicast group ---")
+                        } catch (_: Exception) {}
+                    }
                 } else {
+                    // Loop esterno: il server torna in waiting dopo ogni disconnect
                     connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                    setupAudioRecorders(bufferSize)
+
                     val localAddress = InetSocketAddress("0.0.0.0", streamingPort)
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
 
-                    val clientDatagram = sendSocket.receive()
-                    val clientAddress = clientDatagram.address
-                    val message = clientDatagram.packet.readText().trim()
+                    while (isActive) {
+                        startBroadcastingPresence(context, isMulticast = false, streamingPort)
+                        connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
 
-                    if (message == NetworkSettings.CLIENT_HELLO_MESSAGE) {
+                        val clientDatagram = sendSocket.receive()
+                        val clientAddress = clientDatagram.address
+                        val message = clientDatagram.packet.readText().trim()
+
+                        if (message != NetworkSettings.CLIENT_HELLO_MESSAGE) continue
+
+                        connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
+                        stopBroadcastingPresence()
+
+                        // Drain AudioRecord
+                        val drainBuffer = ByteArray(bufferSize)
+                        var staleBytesTotal = 0
+                        var staleBytes: Int
+                        do {
+                            staleBytes = internalRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
+                            if (staleBytes > 0) staleBytesTotal += staleBytes
+                            val micStale = micRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
+                            if (micStale > 0) staleBytesTotal += micStale
+                        } while (staleBytes > 0)
+                        println("--- Drained $staleBytesTotal stale bytes ---")
+
                         val ackPacket = buildPacket { writeText("HELLO_ACK") }
                         sendSocket.send(Datagram(ackPacket, clientAddress))
-                        connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
 
-                        setupAudioRecorders(bufferSize)
-                        streamingLoop(clientAddress, bufferSize)
-                    } else {
-                        connectionStatus.value = context.getString(R.string.status_handshake_failed_from_client, clientAddress)
-                        sendSocket.close()
+                        val clientAlive = java.util.concurrent.atomic.AtomicBoolean(true)
+
+                        // PING ogni secondo al client
+                        val pingJob = launch {
+                            var failures = 0
+                            while (isActive && clientAlive.get()) {
+                                delay(1000)
+                                try {
+                                    sendSocket.send(Datagram(buildPacket { writeText("PING") }, clientAddress))
+                                    failures = 0
+                                } catch (_: Exception) {
+                                    if (++failures >= 3) { clientAlive.set(false) }
+                                }
+                            }
+                        }
+
+                        try {
+                            streamingLoop(clientAddress, bufferSize, clientAlive)
+                        } finally {
+                            pingJob.cancel()
+                            // BYE solo se è il server a chiudersi (client ancora vivo)
+                            if (clientAlive.get()) {
+                                try {
+                                    sendSocket.send(Datagram(buildPacket { writeText("BYE") }, clientAddress))
+                                    println("--- Sent BYE to $clientAddress ---")
+                                } catch (_: Exception) {}
+                            }
+                            // Il while(isActive) torna in waiting automaticamente
+                        }
                     }
                 }
             } catch (e: Exception) {
                 if (e !is CancellationException) connectionStatus.value = context.getString(R.string.status_server_error, e.message)
             } finally {
+                isServerStreaming = false
                 internalRecord?.stop(); internalRecord?.release()
                 micRecord?.stop(); micRecord?.release()
                 sendSocket?.close()
@@ -381,7 +516,8 @@ object NetworkManager {
         channelConfig: String,
         bufferSize: Int,
         sendMicrophone: Boolean,
-        micPort: Int
+        micPort: Int,
+        onServerDisconnected: (() -> Unit)? = null  // chiamata quando il server si disconnette
     ) {
         stopStreaming(context)
 
@@ -396,36 +532,108 @@ object NetworkManager {
                     var socket: BoundDatagramSocket? = null
                     try {
                         val selectorManager = SelectorManager(Dispatchers.IO)
+                        val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
+
+                        // =========================================================
+                        // FIX 3 — Buffer ridotto da *8 a *2.
+                        // Il valore *8 aggiungeva una latenza strutturale enorme
+                        // (fino a ~700ms con bufferSize=6400 a 48kHz stereo 16bit).
+                        // *2 mantiene abbastanza headroom per il jitter di rete
+                        // senza introdurre un ritardo percepibile.
+                        // =========================================================
+                        val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2) // ← FIX 3: era *8
+
+                        // =========================================================
+                        // FIX 1 — AudioTrack creato e avviato PRIMA di mandare HELLO.
+                        // In origine veniva aperto solo dopo aver ricevuto l'ACK,
+                        // aggiungendo ~50-200ms di inizializzazione hardware
+                        // sul percorso critico della connessione.
+                        // =========================================================
+                        audioTrack = AudioTrack.Builder()
+                            .setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            .setAudioFormat(
+                                AudioFormat.Builder()
+                                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                    .setSampleRate(sampleRate)
+                                    .setChannelMask(channelConfigOut)
+                                    .build()
+                            )
+                            .setBufferSizeInBytes(playbackBufferSize)
+                            .setTransferMode(AudioTrack.MODE_STREAM)
+                            .build()
+
+                        audioTrack.play() // ← FIX 1: la linea audio è pronta prima dell'handshake
+
                         connectionStatus.value = context.getString(R.string.status_contacting_server, serverInfo.ip)
-                        val remoteAddress = InetSocketAddress(serverInfo.ip, serverInfo.port)
                         socket = aSocket(selectorManager).udp().bind()
+                        val remoteAddress = InetSocketAddress(serverInfo.ip, serverInfo.port)
                         val helloPacket = buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) }
                         socket.send(Datagram(helloPacket, remoteAddress))
 
                         connectionStatus.value = context.getString(R.string.status_waiting_for_ack)
-                        val ackDatagram = withTimeout(5000) { socket.receive() }
+                        val ackDatagram = withTimeout(15000) { socket.receive() }
                         val ackMsg = ackDatagram.packet.readText().trim()
                         if (ackMsg != "HELLO_ACK") {
                             throw Exception(context.getString(R.string.status_handshake_failed_unexpected_response, ackMsg))
                         }
 
-                        val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
-                        val playbackBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(bufferSize * 8)
-                        audioTrack = AudioTrack.Builder()
-                            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-                            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(channelConfigOut).build())
-                            .setBufferSizeInBytes(playbackBufferSize).setTransferMode(AudioTrack.MODE_STREAM).build()
-
-                        audioTrack.play()
+                        // AudioTrack già pronto — nessun ritardo qui
                         connectionStatus.value = context.getString(R.string.status_streaming)
 
                         val buffer = ByteArray(bufferSize * 2)
-                        while (isActive) {
-                            val datagram = socket.receive()
-                            val packet = datagram.packet
-                            val bytesRead = packet.readAvailable(buffer)
-                            if (bytesRead > 0) {
-                                audioTrack.write(buffer, 0, bytesRead, AudioTrack.WRITE_BLOCKING)
+                        var lastPingReceived = System.currentTimeMillis()
+                        val pingTimeoutMs = 3000L
+                        var serverDisconnected = false  // flag per distinguere disconnect da stop utente
+
+                        // Watchdog: controlla ogni secondo se il server è ancora vivo
+                        val watchdogJob = launch {
+                            while (isActive) {
+                                delay(1000)
+                                if (System.currentTimeMillis() - lastPingReceived > pingTimeoutMs) {
+                                    println("--- Server timeout: no PING for ${pingTimeoutMs}ms ---")
+                                    serverDisconnected = true
+                                    streamingJob?.cancel()
+                                    break
+                                }
+                            }
+                        }
+
+                        try {
+                            while (isActive) {
+                                val datagram = socket.receive()
+                                val packet = datagram.packet
+                                val bytes = ByteArray(packet.remaining.toInt())
+                                packet.readFully(bytes)
+                                val text = bytes.toString(Charsets.UTF_8).trim()
+
+                                when (text) {
+                                    "PING" -> lastPingReceived = System.currentTimeMillis()
+                                    "BYE"  -> {
+                                        println("--- Received BYE from server ---")
+                                        serverDisconnected = true
+                                        streamingJob?.cancel()
+                                        break
+                                    }
+                                    else -> if (bytes.isNotEmpty()) {
+                                        audioTrack.write(bytes, 0, bytes.size, AudioTrack.WRITE_BLOCKING)
+                                    }
+                                }
+                            }
+                        } finally {
+                            watchdogJob.cancel()
+                            // Se è il server ad essersi disconnesso (non l'utente che ha premuto stop)
+                            // invochiamo la callback che fa esattamente come il tasto stop nella UI
+                            if (serverDisconnected) {
+                                scope.launch(Dispatchers.Main) {
+                                    stopStreaming(context)
+                                    onServerDisconnected?.invoke()
+                                }
                             }
                         }
                     } finally {
@@ -433,6 +641,7 @@ object NetworkManager {
                         socket?.close()
                     }
                 } else {
+                    // Multicast — nessuna modifica necessaria, era già ottimale
                     var audioTrack: AudioTrack? = null
                     var multicastSocket: MulticastSocket? = null
                     val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -441,25 +650,56 @@ object NetworkManager {
                         multicastLock.acquire()
                         connectionStatus.value = context.getString(R.string.status_joining_multicast)
                         val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
-                        multicastSocket = MulticastSocket(serverInfo.port)
-                        multicastSocket.joinGroup(groupAddress)
+                        multicastSocket = MulticastSocket(serverInfo.port).apply {
+                            getWifiNetworkInterface()?.let { networkInterface = it }
+                            joinGroup(groupAddress)
+                        }
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
-                        val playbackBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(bufferSize * 8)
+                        val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        // FIX 3 applicato anche al multicast per consistenza
+                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
                         audioTrack = AudioTrack.Builder()
-                            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-                            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(channelConfigOut).build())
-                            .setBufferSizeInBytes(playbackBufferSize).setTransferMode(AudioTrack.MODE_STREAM).build()
+                            .setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            .setAudioFormat(
+                                AudioFormat.Builder()
+                                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                    .setSampleRate(sampleRate)
+                                    .setChannelMask(channelConfigOut)
+                                    .build()
+                            )
+                            .setBufferSizeInBytes(playbackBufferSize)
+                            .setTransferMode(AudioTrack.MODE_STREAM)
+                            .build()
 
                         audioTrack.play()
                         connectionStatus.value = context.getString(R.string.status_streaming)
 
                         val buffer = ByteArray(bufferSize * 2)
                         val packet = DatagramPacket(buffer, buffer.size)
+                        var serverDisconnected = false
                         while (isActive) {
                             multicastSocket.receive(packet)
                             if (packet.length > 0) {
+                                // Controlla se è un BYE prima di scrivere sull'AudioTrack
+                                if (packet.length == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") {
+                                    println("--- Received BYE from multicast server ---")
+                                    serverDisconnected = true
+                                    break
+                                }
                                 audioTrack.write(packet.data, 0, packet.length, AudioTrack.WRITE_BLOCKING)
+                            }
+                        }
+
+                        if (serverDisconnected) {
+                            scope.launch(Dispatchers.Main) {
+                                stopStreaming(context)
+                                onServerDisconnected?.invoke()
                             }
                         }
                     } finally {

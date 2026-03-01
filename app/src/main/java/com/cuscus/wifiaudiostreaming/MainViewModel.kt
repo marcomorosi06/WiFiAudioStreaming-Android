@@ -1,6 +1,7 @@
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Intent
 import androidx.annotation.RequiresPermission
@@ -154,9 +155,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 channelConfig = currentSettings.channelConfig,
                 bufferSize = currentSettings.bufferSize,
                 sendMicrophone = currentSettings.sendClientMicrophone,
-                micPort = currentSettings.micPort
+                micPort = currentSettings.micPort,
+                onServerDisconnected = {
+                    // Eseguito sul Main thread da NetworkManager.
+                    // Fa esattamente quello che fa il tasto Stop nella UI.
+                    setIsStreaming(false)
+                    val stopIntent = Intent(getApplication(), ClientService::class.java)
+                    getApplication<Application>().stopService(stopIntent)
+                }
             )
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun startClientManually(ip: String) {
+        val currentSettings = appSettings.value ?: return
+        // Creiamo un ServerInfo fittizio per la connessione Unicast manuale
+        val manualServerInfo = ServerInfo(
+            ip = ip,
+            isMulticast = false,
+            port = currentSettings.streamingPort
+        )
+        startClient(manualServerInfo)
     }
 
     fun stopStreaming() {

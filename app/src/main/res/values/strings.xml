@@ -119,4 +119,5 @@
     <string name="later_button">Later</string>
     <string name="notification_permission_granted">Thank you! Notifications are now active.</string>
     <string name="notification_permission_denied">Permission denied. The app may not work correctly in the background.</string>
+    <string name="status_server_disconnected">Server disconnected</string>
 </resources>
