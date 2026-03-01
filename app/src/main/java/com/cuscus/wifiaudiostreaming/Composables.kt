@@ -2248,7 +2248,7 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
 fun WelcomePage() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val link = "https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop" //TODO link github
+    val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" //TODO link github
 
     Column(
         modifier = Modifier
