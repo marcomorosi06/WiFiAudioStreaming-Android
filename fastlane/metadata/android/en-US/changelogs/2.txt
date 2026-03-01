@@ -1,0 +1,13 @@
+🚀 Major Update: v0.2.0-beta is here!
+
+⚡ Performance & Latency:
+• Massive latency reduction: Completely rebuilt the audio buffer logic and hardware initialization for true real-time streaming.
+
+✨ New Features:
+• Server Volume Control: Adjust transmission volume directly from the UI or use your device's physical volume buttons.
+• Manual IP Connection: You can now manually enter a Server IP address to bypass network discovery issues.
+• Safety Guardrails: Added a confirmation dialog before enabling experimental features (like bidirectional mic streaming).
+
+🛠 Under the Hood & Fixes:
+• Full Android 13+ Support: Fixed background service persistence and added proper notification permission handling.
+• UI Polish: Smoother animations, better haptic feedback, and improved Material 3 design across all screens.
