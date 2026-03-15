@@ -14,6 +14,8 @@
 Turn your Android device into a **wireless audio transmitter or receiver**.  
 This application allows you to send your phone's audio to any device on the same local network, or listen to audio from another device, all without root.  
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/marcomorosi)
+
 ---
 
 ## 📸 Overview  
@@ -100,6 +102,14 @@ To build the project from source code:
 * **Networking**: Ktor Networking (UDP sockets)  
 * **Audio Management**: Android `AudioRecord` & `AudioTrack` APIs  
 * **Settings Storage**: Jetpack DataStore  
+
+---
+
+## ☕ Support the Project
+
+This project is completely free, open-source, and ad-free. If it helped you as much as it helped me (or just saved you a headache!), consider buying me a coffee to support its developer!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/marcomorosi)
 
 ---
 
