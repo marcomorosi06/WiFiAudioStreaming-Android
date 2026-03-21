@@ -8,12 +8,17 @@ android {
     namespace = "com.cuscus.wifiaudiostreaming"
     compileSdk = 36
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     defaultConfig {
         applicationId = "com.cuscus.wifiaudiostreaming"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0-beta"
+        versionCode = 4
+        versionName = "0.3.1-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
