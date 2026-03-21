@@ -1,6 +1,7 @@
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
@@ -41,9 +42,13 @@ class AudioCaptureService : Service() {
                 val channelConfig = intent.getStringExtra("channel_config") ?: "STEREO"
                 val bufferSize = intent.getIntExtra("buffer_size", 6144)
                 val isMulticast = intent.getBooleanExtra(EXTRA_IS_MULTICAST, true)
-                // MODIFICATO: Leggi la porta dall'intent, con un default di 9090
-                val streamingPort = intent.getIntExtra("streaming_port", 9090)
 
+                val streamingPort = intent.getIntExtra("streaming_port", 9090)
+                val networkInterfaceName = intent.getStringExtra("network_interface") ?: "Auto"
+                val rtpEnabled = intent.getBooleanExtra("rtp_enabled", false)
+                val rtpPort = intent.getIntExtra("rtp_port", 9094)
+                val httpEnabled = intent.getBooleanExtra("http_enabled", false)
+                val httpPort = intent.getIntExtra("http_port", 8080)
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
 
@@ -62,7 +67,12 @@ class AudioCaptureService : Service() {
                         channelConfig = channelConfig,
                         bufferSize = bufferSize,
                         isMulticast = isMulticast,
-                        streamingPort = streamingPort // <-- PASSA LA NUOVA PORTA
+                        streamingPort = streamingPort,
+                        networkInterfaceName = networkInterfaceName,
+                        rtpEnabled = rtpEnabled,
+                        rtpPort = rtpPort,
+                        httpEnabled = httpEnabled,
+                        httpPort = httpPort
                     )
                 }
             }
@@ -80,6 +90,7 @@ class AudioCaptureService : Service() {
         stopSelf()
     }
 
+    @SuppressLint("MissingPermission")
     private fun startForegroundWithNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

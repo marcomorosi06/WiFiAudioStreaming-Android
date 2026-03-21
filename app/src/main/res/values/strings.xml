@@ -120,7 +120,43 @@
     <string name="notification_permission_granted">Thank you! Notifications are now active.</string>
     <string name="notification_permission_denied">Permission denied. The app may not work correctly in the background.</string>
     <string name="status_server_disconnected">Server disconnected</string>
-    <string name="manual_ip_hint">Manual IP (only Unicast)</string>
+    <string name="manual_ip_hint">Manual IP</string>
     <string name="transmission_volume">Transmission Volume: %1$d%%</string>
     <string name="server_ip_format">Server IP: %1$s</string>
+    <string name="settings_item_network_interface_title">Network Interface</string>
+    <string name="settings_item_network_interface_desc">Select VPN adapter (e.g. tun0) for remote streaming</string>
+    <string name="settings_group_server_protocols">Server Protocols</string>
+    <string name="settings_item_wfas_title">WFAS (Native)</string>
+    <string name="settings_item_wfas_desc">Low-latency custom protocol. Always on.</string>
+    <string name="settings_item_rtp_title">RTP/PCM Stream</string>
+    <string name="settings_item_rtp_desc">Standard protocol for VLC, Kodi, or FFplay.</string>
+    <string name="settings_item_http_title">HTTP Web Stream</string>
+    <string name="settings_item_http_desc">Stream directly to a web browser.</string>
+    <string name="settings_item_http_port_title">HTTP Port</string>
+    <string name="settings_item_http_port_desc">The port for the web interface.</string>
+    <string name="settings_item_http_codec_title">Web Codec (Compatibility)</string>
+    <string name="settings_item_http_codec_desc">Choose Opus for low latency, or AAC for Safari/iOS.</string>
+    <string name="codec_opus">Opus (Chrome / Firefox)</string>
+    <string name="codec_aac">AAC (Safari / iOS)</string>
+    <string name="settings_item_rtp_port_title">RTP Port</string>
+    <string name="settings_item_rtp_port_desc">Port for the RTP stream</string>
+    <string name="rtp_forces_multicast">Multicast is enforced when RTP stream is enabled.</string>
+    <string name="copy_sdp">Copy SDP</string>
+    <string name="save_sdp">Save SDP</string>
+    <string name="sdp_copied">SDP copied to clipboard</string>
+    <string name="rtp_description">Copy or save the SDP file to listen with VLC or FFplay</string>
+    <string name="support_kofi_title">Buy me a coffee</string>
+    <string name="support_kofi_desc">If you like the app, buy me a coffee! ☕</string>
+    <string name="onboarding_protocols_title">Multiple Protocols</string>
+    <string name="onboarding_protocols_subtitle">Choose the best way to stream audio based on your setup.</string>
+
+    <string name="onboarding_proto1_title">WFAS (Native)</string>
+    <string name="onboarding_proto1_desc">Requires the WiFi Audio Streaming app on both devices. It offers the best synchronization, ideal for gaming and watching videos.</string>
+
+    <string name="onboarding_proto2_title">RTP Stream</string>
+    <string name="onboarding_proto2_desc">Stream to external media players like VLC, Kodi, or FFplay. Just save the SDP file from the app and open it with your favorite player.</string>
+
+    <string name="onboarding_proto3_title">HTTP Web Stream</string>
+    <string name="onboarding_proto3_desc">Listen directly from any web browser (Chrome, Safari, Smart TVs) without installing anything. Just type the server\'s IP address and port.</string>
+    <string name="http_latency_warning">Note: Web browsers enforce internal buffering for HTTP streams, which inevitably introduces a 1–3 second delay. This is normal and cannot be bypassed.</string>
 </resources>

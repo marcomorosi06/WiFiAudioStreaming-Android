@@ -132,14 +132,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startListening() {
-        NetworkManager.startListeningForDevices(getApplication())
-    }
-
     fun setIsStreaming(streaming: Boolean) {
         _isStreaming.value = streaming
     }
 
+    fun setNetworkInterface(name: String) {
+        viewModelScope.launch { settingsDataStore.saveNetworkInterface(name) }
+    }
+
+    fun setServerProtocols(rtpEnabled: Boolean, rtpPort: Int, httpEnabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveServerProtocols(rtpEnabled, rtpPort, httpEnabled) }
+    }
+
+    fun setHttpSettings(port: Int, safariMode: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveHttpSettings(port, safariMode) }
+    }
+
+    // Aggiorna startListening (passando l'interfaccia)
+    fun startListening() {
+        val currentSettings = appSettings.value
+        NetworkManager.startListeningForDevices(getApplication(), currentSettings?.networkInterface ?: "Auto")
+    }
+
+    // Aggiorna startClient (passando l'interfaccia)
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startClient(serverInfo: ServerInfo) {
         val intent = Intent(getApplication(), ClientService::class.java)
@@ -156,9 +171,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 bufferSize = currentSettings.bufferSize,
                 sendMicrophone = currentSettings.sendClientMicrophone,
                 micPort = currentSettings.micPort,
+                networkInterfaceName = currentSettings.networkInterface,
                 onServerDisconnected = {
-                    // Eseguito sul Main thread da NetworkManager.
-                    // Fa esattamente quello che fa il tasto Stop nella UI.
                     setIsStreaming(false)
                     val stopIntent = Intent(getApplication(), ClientService::class.java)
                     getApplication<Application>().stopService(stopIntent)
@@ -170,13 +184,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @SuppressLint("MissingPermission")
     fun startClientManually(ip: String) {
         val currentSettings = appSettings.value ?: return
-        // Creiamo un ServerInfo fittizio per la connessione Unicast manuale
-        val manualServerInfo = ServerInfo(
-            ip = ip,
-            isMulticast = false,
-            port = currentSettings.streamingPort
-        )
-        startClient(manualServerInfo)
+
+        viewModelScope.launch {
+            updateStatus("Detecting mode for $ip...")
+            val port = currentSettings.streamingPort
+
+            val knownServer = discoveredDevices.value.values.find { it.ip == ip }
+
+            val isMulti = knownServer?.isMulticast ?: NetworkManager.probeIsMulticast(ip, port)
+
+            val manualServerInfo = ServerInfo(
+                ip = ip,
+                isMulticast = isMulti,
+                port = port
+            )
+            startClient(manualServerInfo)
+        }
     }
 
     fun stopStreaming() {

@@ -20,7 +20,13 @@ data class AppSettings(
     val sendClientMicrophone: Boolean,
     val micPort: Int,
     val experimentalFeaturesEnabled: Boolean,
-    val onboardingCompleted: Boolean
+    val onboardingCompleted: Boolean,
+    val networkInterface: String,
+    val rtpEnabled: Boolean,
+    val rtpPort: Int,
+    val httpEnabled: Boolean,
+    val httpPort: Int,
+    val httpSafariMode: Boolean
 )
 
 class SettingsDataStore(context: Context) {
@@ -37,6 +43,13 @@ class SettingsDataStore(context: Context) {
         val MIC_PORT = intPreferencesKey("mic_port")
         val EXPERIMENTAL_FEATURES_ENABLED = booleanPreferencesKey("experimental_features_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val NETWORK_INTERFACE = stringPreferencesKey("network_interface")
+
+        val RTP_ENABLED = booleanPreferencesKey("rtp_enabled")
+        val RTP_PORT = intPreferencesKey("rtp_port")
+        val HTTP_ENABLED = booleanPreferencesKey("http_enabled")
+        val HTTP_PORT = intPreferencesKey("http_port")
+        val HTTP_SAFARI_MODE = booleanPreferencesKey("http_safari_mode")
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
@@ -50,7 +63,13 @@ class SettingsDataStore(context: Context) {
             sendClientMicrophone = preferences[PreferencesKeys.SEND_CLIENT_MICROPHONE] ?: false,
             micPort = preferences[PreferencesKeys.MIC_PORT] ?: 9092,
             experimentalFeaturesEnabled = preferences[PreferencesKeys.EXPERIMENTAL_FEATURES_ENABLED] ?: false,
-            onboardingCompleted = preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false
+            onboardingCompleted = preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false,
+            networkInterface = preferences[PreferencesKeys.NETWORK_INTERFACE] ?: "Auto",
+            rtpEnabled = preferences[PreferencesKeys.RTP_ENABLED] ?: false,
+            rtpPort = preferences[PreferencesKeys.RTP_PORT] ?: 9094,
+            httpEnabled = preferences[PreferencesKeys.HTTP_ENABLED] ?: false,
+            httpPort = preferences[PreferencesKeys.HTTP_PORT] ?: 8080,
+            httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false
         )
     }
 
@@ -101,6 +120,27 @@ class SettingsDataStore(context: Context) {
     suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
+        }
+    }
+
+    suspend fun saveNetworkInterface(interfaceName: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.NETWORK_INTERFACE] = interfaceName
+        }
+    }
+
+    suspend fun saveServerProtocols(rtpEnabled: Boolean, rtpPort: Int, httpEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.RTP_ENABLED] = rtpEnabled
+            preferences[PreferencesKeys.RTP_PORT] = rtpPort
+            preferences[PreferencesKeys.HTTP_ENABLED] = httpEnabled
+        }
+    }
+
+    suspend fun saveHttpSettings(port: Int, safariMode: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HTTP_PORT] = port
+            preferences[PreferencesKeys.HTTP_SAFARI_MODE] = safariMode
         }
     }
 }

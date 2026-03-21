@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -32,9 +33,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
 
 class MainActivity : ComponentActivity() {
@@ -44,7 +47,7 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private val mediaProjectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
+            if (result.resultCode == RESULT_OK) {
                 val intent = Intent(this, AudioCaptureService::class.java).apply {
                     action = AudioCaptureService.ACTION_START
                     putExtra(AudioCaptureService.EXTRA_RESULT_CODE, result.resultCode)
@@ -58,6 +61,11 @@ class MainActivity : ComponentActivity() {
                         putExtra("buffer_size", settings.bufferSize)
                         putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value)
                         putExtra("streaming_port", settings.streamingPort)
+                        putExtra("network_interface", settings.networkInterface)
+                        putExtra("rtp_enabled", settings.rtpEnabled)
+                        putExtra("rtp_port", settings.rtpPort)
+                        putExtra("http_enabled", settings.httpEnabled)
+                        putExtra("http_port", settings.httpPort)
                     }
                 }
                 startForegroundService(intent)
@@ -156,7 +164,7 @@ class MainActivity : ComponentActivity() {
         val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
         val discoveredDevices by viewModel.discoveredDevices.collectAsStateWithLifecycle()
         val isMulticastMode by viewModel.isMulticastMode.collectAsStateWithLifecycle()
-        val context = androidx.compose.ui.platform.LocalContext.current
+        val context = LocalContext.current
         val localIp = remember { NetworkManager.getLocalIpAddress(context) }
 
         ClientDiscoveryHandler()
@@ -220,7 +228,10 @@ class MainActivity : ComponentActivity() {
                     viewModel.setSendClientMicrophone(false)
                 }
             },
-            onOpenSettings = { showSettingsScreen.value = true }
+            onOpenSettings = { showSettingsScreen.value = true },
+            onNetworkInterfaceChange = viewModel::setNetworkInterface,
+            onServerProtocolsChange = viewModel::setServerProtocols,
+            onHttpSettingsChange = viewModel::setHttpSettings
         )
 
         ExpressiveSettingsScreen(
@@ -238,7 +249,10 @@ class MainActivity : ComponentActivity() {
             onShowOnboarding = {
                 showSettingsScreen.value = false
                 viewModel.resetOnboarding()
-            }
+            },
+            onNetworkInterfaceChange = viewModel::setNetworkInterface,
+            onServerProtocolsChange = viewModel::setServerProtocols,
+            onHttpSettingsChange = viewModel::setHttpSettings
         )
     }
 
@@ -272,6 +286,11 @@ class MainActivity : ComponentActivity() {
                 putExtra("buffer_size", settings.bufferSize)
                 putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value)
                 putExtra("streaming_port", settings.streamingPort)
+                putExtra("network_interface", settings.networkInterface)
+                putExtra("rtp_enabled", settings.rtpEnabled)
+                putExtra("rtp_port", settings.rtpPort)
+                putExtra("http_enabled", settings.httpEnabled)
+                putExtra("http_port", settings.httpPort)
             }
             startForegroundService(intent)
             viewModel.setIsStreaming(true)
@@ -279,20 +298,20 @@ class MainActivity : ComponentActivity() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
         } else {
             viewModel.updateStatus(getString(R.string.internal_audio_android_version_required))
         }
     }
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (NetworkManager.isServerStreaming) {
             when (keyCode) {
-                android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
                     NetworkManager.serverVolume.value = (NetworkManager.serverVolume.value + 0.1f).coerceAtMost(2.0f)
                     return true // Consuma l'evento: impedisce al sistema di alzare il suo audio!
                 }
-                android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     NetworkManager.serverVolume.value = (NetworkManager.serverVolume.value - 0.1f).coerceAtLeast(0.0f)
                     return true
                 }
@@ -301,9 +320,9 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (NetworkManager.isServerStreaming &&
-            (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
             return true // Consuma l'evento: previene il classico "BEEP" di sistema al rilascio del tasto
         }
         return super.onKeyUp(keyCode, event)
@@ -312,7 +331,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ClientDiscoveryHandler() {
-    val viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val viewModel: MainViewModel = viewModel()
     val isServer by viewModel.isServer.collectAsStateWithLifecycle()
 
     LaunchedEffect(isServer) {

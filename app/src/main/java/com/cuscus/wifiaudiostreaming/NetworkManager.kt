@@ -48,6 +48,12 @@ object NetworkManager {
     private var broadcastingJob: Job? = null
     private var originalMediaVolume: Int? = null
     private var micStreamingJob: Job? = null
+    @Volatile private var rtpPcmQueue: java.util.concurrent.ArrayBlockingQueue<ByteArray>? = null
+    private var rtpJob: Job? = null
+
+    @Volatile private var httpPcmQueue: java.util.concurrent.ArrayBlockingQueue<ByteArray>? = null
+    private var httpJob: Job? = null
+    private var httpServerSocket: java.net.ServerSocket? = null
 
     private object NetworkSettings {
         const val DISCOVERY_PORT = 9091
@@ -59,6 +65,7 @@ object NetworkManager {
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
 
+    @SuppressLint("DefaultLocale")
     fun getLocalIpAddress(context: Context): String {
         try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
@@ -85,6 +92,90 @@ object NetworkManager {
         return "127.0.0.1"
     }
 
+    suspend fun probeIsMulticast(ip: String, port: Int): Boolean {
+        return try {
+            var isUnicast = false
+            withTimeout(1000) { // Aspetta massimo 1 secondo
+                aSocket(SelectorManager(Dispatchers.IO)).udp().bind().use { sock ->
+                    val remoteAddress = InetSocketAddress(ip, port)
+                    sock.send(Datagram(buildPacket { writeText("MODE_PROBE") }, remoteAddress))
+                    val ack = sock.receive()
+                    if (ack.packet.readText().trim() == "UNICAST") {
+                        isUnicast = true
+                    }
+                }
+            }
+            !isUnicast
+        } catch (e: Exception) {
+            true // Se va in timeout, assumiamo Multicast
+        }
+    }
+
+    private fun CoroutineScope.launchRtpSidecar(
+        sampleRate: Int,
+        channels: Int,
+        port: Int,
+        isMulticast: Boolean,
+        clientIp: String?, // Usato se siamo in Unicast
+        wifiIface: NetworkInterface?
+    ) = launch(Dispatchers.IO) {
+        val queue = java.util.concurrent.ArrayBlockingQueue<ByteArray>(25)
+        rtpPcmQueue = queue
+
+        var sequenceNumber = (Math.random() * 65535).toInt()
+        var rtpTimestamp = (Math.random() * Int.MAX_VALUE).toLong()
+        val ssrc = (Math.random() * Int.MAX_VALUE).toLong()
+
+        val socket = if (isMulticast) {
+            MulticastSocket().apply {
+                timeToLive = 4
+                wifiIface?.let { networkInterface = it }
+            }
+        } else DatagramSocket()
+
+        val destAddress = if (isMulticast) {
+            InetAddress.getByName("239.255.0.1")
+        } else {
+            InetAddress.getByName(clientIp ?: "255.255.255.255")
+        }
+
+        try {
+            while (isActive) {
+                val pcmLeBytes = queue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
+                val maxPayloadSize = 1400
+                var offset = 0
+
+                while (offset < pcmLeBytes.size) {
+                    val chunkSize = minOf(maxPayloadSize, pcmLeBytes.size - offset)
+                    val rtpPacket = ByteArray(12 + chunkSize)
+                    val buf = java.nio.ByteBuffer.wrap(rtpPacket).order(java.nio.ByteOrder.BIG_ENDIAN)
+
+                    // Header RTP
+                    buf.put(0x80.toByte()); buf.put(96.toByte())
+                    buf.putShort((sequenceNumber and 0xFFFF).toShort())
+                    buf.putInt((rtpTimestamp and 0xFFFFFFFFL).toInt())
+                    buf.putInt((ssrc and 0xFFFFFFFFL).toInt())
+
+                    // Conversione Little-Endian -> Big-Endian (Network Byte Order)
+                    val leBuf = java.nio.ByteBuffer.wrap(pcmLeBytes, offset, chunkSize).order(java.nio.ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                    val beBuf = buf.asShortBuffer()
+                    while (leBuf.hasRemaining()) beBuf.put(leBuf.get())
+
+                    runCatching { socket.send(DatagramPacket(rtpPacket, rtpPacket.size, destAddress, port)) }
+
+                    sequenceNumber = (sequenceNumber + 1) and 0xFFFF
+                    rtpTimestamp += (chunkSize / 2 / channels)
+                    offset += chunkSize
+                }
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException) e.printStackTrace()
+        } finally {
+            socket.close()
+            rtpPcmQueue = null
+        }
+    }
+
     private fun getAllLocalIpAddresses(): Set<String> {
         val ipSet = mutableSetOf<String>()
         try {
@@ -99,25 +190,32 @@ object NetworkManager {
         return ipSet
     }
 
-    private fun getWifiNetworkInterface(): NetworkInterface? {
+    private fun getWifiNetworkInterface(preferredName: String = "Auto"): NetworkInterface? {
         return try {
-            NetworkInterface.getNetworkInterfaces().toList().firstOrNull { iface ->
-                iface.isUp &&
-                        !iface.isLoopback &&
-                        !iface.isVirtual &&
-                        iface.inetAddresses.toList().any { addr ->
-                            addr is java.net.Inet4Address &&
-                                    !addr.isLoopbackAddress &&
-                                    !addr.hostAddress.startsWith("192.168.112") &&
-                                    !addr.hostAddress.startsWith("192.168.42")
-                        }
+            val interfaces = NetworkInterface.getNetworkInterfaces().toList()
+
+            if (preferredName != "Auto") {
+                // Se l'utente ha forzato una scheda, ignoriamo i filtri (fondamentale per le VPN)
+                interfaces.firstOrNull { it.displayName == preferredName || it.name == preferredName }
+            } else {
+                interfaces.firstOrNull { iface ->
+                    iface.isUp &&
+                            !iface.isLoopback &&
+                            !iface.isVirtual &&
+                            iface.inetAddresses.toList().any { addr ->
+                                addr is java.net.Inet4Address &&
+                                        !addr.isLoopbackAddress &&
+                                        !addr.hostAddress.startsWith("192.168.112") &&
+                                        !addr.hostAddress.startsWith("192.168.42")
+                            }
+                }
             }
         } catch (e: Exception) {
             null
         }
     }
 
-    fun startListeningForDevices(context: Context) {
+    fun startListeningForDevices(context: Context, networkInterfaceName: String = "Auto") {
         if (listeningJob?.isActive == true) return
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val multicastLock = wifiManager.createMulticastLock("wifi_audio_streamer_discovery_lock")
@@ -131,7 +229,7 @@ object NetworkManager {
                 val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
 
                 socket = MulticastSocket(NetworkSettings.DISCOVERY_PORT).apply {
-                    getWifiNetworkInterface()?.let { networkInterface = it }
+                    getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
                     joinGroup(groupAddress)
                     soTimeout = 5000
                 }
@@ -147,7 +245,7 @@ object NetworkManager {
 
                         if (remoteIp != null && remoteIp !in localIps && message.startsWith(NetworkSettings.DISCOVERY_MESSAGE)) {
                             val parts = message.split(";")
-                            if (parts.size == 4) {
+                            if (parts.size >= 4) {
                                 val hostname = parts[1]
                                 val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
                                 val port = parts[3].toIntOrNull() ?: continue
@@ -182,7 +280,7 @@ object NetworkManager {
         listeningJob = null
     }
 
-    fun startBroadcastingPresence(context: Context, isMulticast: Boolean, streamingPort: Int) {
+    fun startBroadcastingPresence(context: Context, isMulticast: Boolean, streamingPort: Int, networkInterfaceName: String = "Auto", rtpEnabled: Boolean = false) {
         if (broadcastingJob?.isActive == true) return
         broadcastingJob = scope.launch {
             val deviceName = try {
@@ -195,11 +293,12 @@ object NetworkManager {
             } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" }
 
             val mode = if (isMulticast) "MULTICAST" else "UNICAST"
-            val message = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;$mode;$streamingPort"
+            val protocolsStr = if (rtpEnabled) "protocols=WFAS,RTP" else "protocols=WFAS"
+            val message = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;$mode;$streamingPort;$protocolsStr"
             val messageBytes = message.toByteArray()
 
             val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
-            val wifiIface = getWifiNetworkInterface()
+            val wifiIface = getWifiNetworkInterface(networkInterfaceName)
 
             var socket: MulticastSocket? = null
             try {
@@ -305,10 +404,15 @@ object NetworkManager {
         channelConfig: String,
         bufferSize: Int,
         isMulticast: Boolean,
-        streamingPort: Int
+        streamingPort: Int,
+        networkInterfaceName: String = "Auto",
+        rtpEnabled: Boolean = false,
+        rtpPort: Int = 9094,
+        httpEnabled: Boolean = false,
+        httpPort: Int = 8080
     ) {
         if (streamingJob?.isActive == true) return
-        startBroadcastingPresence(context, isMulticast, streamingPort)
+        startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled)
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         originalMediaVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -405,8 +509,19 @@ object NetworkManager {
                             val packet = buildPacket { writeFully(bufferToSend, 0, bytesToProcess) }
                             try {
                                 sendSocket?.send(Datagram(packet, targetAddress))
+
+                                rtpPcmQueue?.let { queue ->
+                                    if (queue.remainingCapacity() > 0) {
+                                        queue.offer(bufferToSend.copyOf(bytesToProcess))
+                                    }
+                                }
+
+                                httpPcmQueue?.let { queue ->
+                                    if (queue.remainingCapacity() > 0) {
+                                        queue.offer(bufferToSend.copyOf(bytesToProcess))
+                                    }
+                                }
                             } catch (_: Exception) {
-                                // send fallito → client sparito
                                 clientAlive?.set(false)
                                 break
                             }
@@ -414,10 +529,39 @@ object NetworkManager {
                     }
                 }
 
+                val channels = if (channelConfig == "STEREO") 2 else 1
+                val wifiIface = getWifiNetworkInterface(networkInterfaceName)
+
+                httpJob?.cancel()
+                try { httpServerSocket?.close() } catch (_: Exception) {}
+                httpPcmQueue?.clear()
+                httpPcmQueue = null
+
+                if (httpEnabled) {
+                    httpJob = scope.launchHttpSidecar(sampleRate, channels, httpPort)
+                }
+
+                if (httpEnabled) {
+                    httpJob?.cancel()
+                    httpJob = scope.launchHttpSidecar(sampleRate, channels, httpPort)
+                }
+
                 if (isMulticast) {
                     val targetAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, streamingPort)
                     sendSocket = aSocket(selectorManager).udp().bind()
                     setupAudioRecorders(bufferSize)
+
+                    if (rtpEnabled) {
+                        rtpJob = scope.launchRtpSidecar(
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            port = rtpPort,
+                            isMulticast = true,
+                            clientIp = null,
+                            wifiIface = wifiIface
+                        )
+                    }
+
                     try {
                         streamingLoop(targetAddress, bufferSize)
                     } finally {
@@ -437,17 +581,21 @@ object NetworkManager {
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
 
                     while (isActive) {
-                        startBroadcastingPresence(context, isMulticast = false, streamingPort)
+                        startBroadcastingPresence(context, isMulticast = false, streamingPort, networkInterfaceName, rtpEnabled)
                         connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
 
                         val clientDatagram = sendSocket.receive()
                         val clientAddress = clientDatagram.address
                         val message = clientDatagram.packet.readText().trim()
 
+                        if (message == "MODE_PROBE") {
+                            sendSocket.send(Datagram(buildPacket { writeText("UNICAST") }, clientAddress))
+                            continue
+                        }
+
                         if (message != NetworkSettings.CLIENT_HELLO_MESSAGE) continue
 
                         connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
-                        stopBroadcastingPresence()
 
                         // Drain AudioRecord
                         val drainBuffer = ByteArray(bufferSize)
@@ -465,6 +613,21 @@ object NetworkManager {
                         sendSocket.send(Datagram(ackPacket, clientAddress))
 
                         val clientAlive = java.util.concurrent.atomic.AtomicBoolean(true)
+
+                        if (rtpEnabled) {
+                            rtpJob?.cancel()
+
+                            val clientInetAddress = (clientAddress as? InetSocketAddress)?.hostname
+
+                            rtpJob = scope.launchRtpSidecar(
+                                sampleRate = sampleRate,
+                                channels = channels,
+                                port = rtpPort,
+                                isMulticast = false,
+                                clientIp = clientInetAddress,
+                                wifiIface = wifiIface
+                            )
+                        }
 
                         // PING ogni secondo al client
                         val pingJob = launch {
@@ -517,7 +680,8 @@ object NetworkManager {
         bufferSize: Int,
         sendMicrophone: Boolean,
         micPort: Int,
-        onServerDisconnected: (() -> Unit)? = null  // chiamata quando il server si disconnette
+        networkInterfaceName: String = "Auto",
+        onServerDisconnected: (() -> Unit)? = null
     ) {
         stopStreaming(context)
 
@@ -651,7 +815,7 @@ object NetworkManager {
                         connectionStatus.value = context.getString(R.string.status_joining_multicast)
                         val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                         multicastSocket = MulticastSocket(serverInfo.port).apply {
-                            getWifiNetworkInterface()?.let { networkInterface = it }
+                            getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
                             joinGroup(groupAddress)
                         }
 
@@ -731,8 +895,15 @@ object NetworkManager {
     fun stopStreaming(context: Context) {
         streamingJob?.cancel()
         micStreamingJob?.cancel()
+        rtpJob?.cancel()
         streamingJob = null
         micStreamingJob = null
+        rtpJob = null
+        httpJob = null
+        httpServerSocket = null
+
+        httpJob?.cancel()
+        try { httpServerSocket?.close() } catch (_: Exception) {}
 
         originalMediaVolume?.let {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -749,5 +920,177 @@ object NetworkManager {
         stopBroadcastingPresence()
         stopListeningForDevices()
         scope.cancel()
+    }
+
+    private fun addADTStoPacket(packet: ByteArray, packetLen: Int, sampleRate: Int, channels: Int) {
+        val profile = 2 // AAC LC
+        val freqIdx = when (sampleRate) {
+            96000 -> 0; 88200 -> 1; 64000 -> 2; 48000 -> 3; 44100 -> 4; 32000 -> 5;
+            24000 -> 6; 22050 -> 7; 16000 -> 8; 12000 -> 9; 11025 -> 10; 8000 -> 11; else -> 3
+        }
+        packet[0] = 0xFF.toByte()
+        packet[1] = 0xF9.toByte()
+        packet[2] = (((profile - 1) shl 6) + (freqIdx shl 2) + (channels shr 2)).toByte()
+        packet[3] = (((channels and 3) shl 6) + (packetLen shr 11)).toByte()
+        packet[4] = ((packetLen and 0x7FF) shr 3).toByte()
+        packet[5] = (((packetLen and 7) shl 5) + 0x1F).toByte()
+        packet[6] = 0xFC.toByte()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun CoroutineScope.launchHttpSidecar(
+        sampleRate: Int,
+        channels: Int,
+        port: Int
+    ) = launch(Dispatchers.IO) {
+        val queue = java.util.concurrent.ArrayBlockingQueue<ByteArray>(50)
+        httpPcmQueue = queue
+
+        var serverSocket: java.net.ServerSocket? = null
+        try {
+            serverSocket = java.net.ServerSocket(port)
+            httpServerSocket = serverSocket
+            println("HTTP Server avviato sulla porta $port")
+
+            while (isActive) {
+                val client = serverSocket.accept()
+                launch(Dispatchers.IO) {
+                    try {
+                        val input = java.io.BufferedReader(java.io.InputStreamReader(client.inputStream))
+                        val output = client.outputStream
+                        val requestLine = input.readLine() ?: return@launch
+
+                        if (requestLine.startsWith("GET /stream ")) {
+                            // --- IL BROWSER VUOLE L'AUDIO ---
+                            output.write("HTTP/1.1 200 OK\r\nContent-Type: audio/aac\r\nConnection: keep-alive\r\nCache-Control: no-cache\r\n\r\n".toByteArray())
+                            output.flush()
+
+                            val format = android.media.MediaFormat.createAudioFormat(android.media.MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels).apply {
+                                setInteger(android.media.MediaFormat.KEY_AAC_PROFILE, android.media.MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+                                setInteger(android.media.MediaFormat.KEY_BIT_RATE, 128000)
+                                // FIX 2: Obblighiamo il chip ad accettare input giganti senza andare in overflow
+                                setInteger(android.media.MediaFormat.KEY_MAX_INPUT_SIZE, 100000)
+                            }
+
+                            val codec = android.media.MediaCodec.createEncoderByType(android.media.MediaFormat.MIMETYPE_AUDIO_AAC)
+                            codec.configure(format, null, null, android.media.MediaCodec.CONFIGURE_FLAG_ENCODE)
+                            codec.start()
+
+                            val bufferInfo = android.media.MediaCodec.BufferInfo()
+                            try {
+                                while (isActive && !client.isClosed) {
+                                    val pcmData = queue.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                    if (pcmData != null) {
+                                        var offset = 0
+                                        while (offset < pcmData.size && isActive && !client.isClosed) {
+                                            val inputIndex = codec.dequeueInputBuffer(10000)
+                                            if (inputIndex >= 0) {
+                                                val inputBuffer = codec.getInputBuffer(inputIndex)
+                                                inputBuffer?.clear()
+                                                val capacity = inputBuffer?.capacity() ?: pcmData.size
+                                                val chunk = minOf(pcmData.size - offset, capacity)
+                                                inputBuffer?.put(pcmData, offset, chunk)
+                                                codec.queueInputBuffer(inputIndex, 0, chunk, System.nanoTime() / 1000, 0)
+                                                offset += chunk
+                                            }
+                                        }
+                                    }
+
+                                    var outputIndex = codec.dequeueOutputBuffer(bufferInfo, 10000)
+                                    while (outputIndex >= 0) {
+                                        val outputBuffer = codec.getOutputBuffer(outputIndex)
+
+                                        // --- FIX 1: IGNORA IL METADATO DI SISTEMA CHE FA CRASHARE IL BROWSER! ---
+                                        if ((bufferInfo.flags and android.media.MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                                            bufferInfo.size = 0
+                                        }
+                                        // ------------------------------------------------------------------------
+
+                                        if (outputBuffer != null && bufferInfo.size > 0) {
+                                            val outData = ByteArray(bufferInfo.size + 7)
+                                            addADTStoPacket(outData, outData.size, sampleRate, channels)
+                                            outputBuffer.position(bufferInfo.offset)
+                                            outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
+                                            outputBuffer.get(outData, 7, bufferInfo.size)
+
+                                            output.write(outData)
+                                            output.flush()
+                                        }
+                                        codec.releaseOutputBuffer(outputIndex, false)
+                                        outputIndex = codec.dequeueOutputBuffer(bufferInfo, 0)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                println("Client HTTP disconnesso regolarmente (Pipe rotta).")
+                            } finally {
+                                codec.stop()
+                                codec.release()
+
+                            }
+                        } else {
+                            // --- LA PAGINA WEB ---
+                            val html = """
+                                <!DOCTYPE html>
+                                <html lang="en">
+                                <head>
+                                    <meta charset="UTF-8">
+                                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                    <title>WiFi Audio Streamer</title>
+                                    <style>
+                                        :root { --bg: #0f0f0f; --surface: #1e1e1e; --primary: #BB86FC; --text: #e0e0e0; --text-mut: #888; }
+                                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+                                        .card { background: var(--surface); padding: 32px; border-radius: 28px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 100%; border: 1px solid #2a2a2a; }
+                                        .icon { font-size: 48px; margin-bottom: 12px; }
+                                        h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: #fff; }
+                                        p.subtitle { color: var(--text-mut); margin: 0 0 24px 0; font-size: 14px; }
+                                        audio { width: 100%; border-radius: 50px; outline: none; display: none; }
+                                        .play-btn { background: var(--primary); color: #000; border: none; padding: 16px 32px; border-radius: 50px; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s; width: 100%; margin-bottom: 16px; }
+                                        .play-btn:active { transform: scale(0.96); }
+                                        .links { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+                                        .links a { text-decoration: none; color: var(--text); background: rgba(255,255,255,0.05); padding: 14px; border-radius: 16px; font-size: 14px; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.05); font-weight: 500; }
+                                        .links a:hover { background: rgba(255,255,255,0.1); }
+                                        .kofi { margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); }
+                                        .kofi a { color: #FF5E5B; text-decoration: none; font-weight: bold; font-size: 15px; transition: opacity 0.2s; }
+                                        .kofi a:hover { opacity: 0.8; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="card">
+                                        <div class="icon">🎧</div>
+                                        <h2>WiFi Audio Streaming</h2>
+                                        <p class="subtitle">Codec AAC</p>
+                                        
+                                        <audio id="player" controls src="/stream"></audio>
+                                        <button id="playBtn" class="play-btn" onclick="document.getElementById('player').style.display='block'; document.getElementById('player').play(); this.style.display='none';">▶ PLAY AUDIO</button>
+
+                                        <div class="links">
+                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" target="_blank">💻 Get Desktop App (GitHub)</a>
+                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android" target="_blank">📱 Get Android App (GitHub)</a>
+                                            <a href="https://apt.izzysoft.de/fdroid/index/apk/com.cuscus.wifiaudiostreaming" target="_blank">📲 Get Android App (IzzyOnDroid)</a>
+                                        </div>
+
+                                        <div class="kofi">
+                                            <a href="https://ko-fi.com/marcomorosi" target="_blank">☕ Support me on Ko-fi</a>
+                                        </div>
+                                    </div>
+                                </body>
+                                </html>
+                            """.trimIndent()
+                            val response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: ${html.toByteArray().size}\r\nConnection: close\r\n\r\n$html"
+                            output.write(response.toByteArray())
+                            output.flush()
+                            client.close()
+                        }
+                    } catch (e: Exception) {
+                        client.close()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException) println("HTTP Server error: ${e.message}")
+        } finally {
+            serverSocket?.close()
+            httpPcmQueue = null
+        }
     }
 }

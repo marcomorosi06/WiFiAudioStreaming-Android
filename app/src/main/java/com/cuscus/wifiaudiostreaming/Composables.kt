@@ -44,6 +44,8 @@ import androidx.graphics.shapes.RoundedPolygon
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import kotlin.random.Random
 import kotlinx.coroutines.launch
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val allMaterialShapes = listOf(
@@ -123,7 +125,10 @@ fun WiFiAudioStreamingApp(
     onChannelConfigChange: (String) -> Unit,
     onBufferSizeChange: (Int) -> Unit,
     onSendClientMicrophoneChange: (Boolean) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onNetworkInterfaceChange: (String) -> Unit,
+    onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
+    onHttpSettingsChange: (Int, Boolean) -> Unit
 ) {
     val backgroundGradient by animateColorAsState(
         targetValue = if (isStreaming) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
@@ -184,8 +189,9 @@ fun WiFiAudioStreamingApp(
                 ExpressiveAudioSourceSelector(
                     streamInternal = appSettings.streamInternal,
                     streamMic = appSettings.streamMic,
-                    experimentalFeaturesEnabled = appSettings.experimentalFeaturesEnabled, // <-- NUOVO
+                    experimentalFeaturesEnabled = appSettings.experimentalFeaturesEnabled,
                     isMulticast = isMulticastMode,
+                    rtpEnabled = appSettings.rtpEnabled,
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
@@ -223,6 +229,18 @@ fun WiFiAudioStreamingApp(
                 onStartServer = onStartServer,
                 onStopServer = onStopServer
             )
+
+            AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.rtpEnabled,
+                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+            ) {
+                ExpressiveRtpSdpBanner(
+                    port = appSettings.rtpPort,
+                    sampleRate = appSettings.sampleRate,
+                    channels = if (appSettings.channelConfig == "STEREO") 2 else 1
+                )
+            }
 
             AnimatedVisibility(
                 visible = !isServer && !isStreaming,
@@ -376,7 +394,10 @@ fun ExpressiveSettingsScreen(
     onMicPortChange: (Int) -> Unit,
     onExperimentalFeaturesChange: (Boolean) -> Unit,
     onClose: () -> Unit,
-    onShowOnboarding: () -> Unit // Lambda per mostrare l'onboarding
+    onShowOnboarding: () -> Unit,
+    onNetworkInterfaceChange: (String) -> Unit,
+    onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
+    onHttpSettingsChange: (Int, Boolean) -> Unit,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -400,7 +421,10 @@ fun ExpressiveSettingsScreen(
             onMicPortChange = onMicPortChange,
             onExperimentalFeaturesChange = onExperimentalFeaturesChange,
             onClose = onClose,
-            onShowOnboarding = onShowOnboarding // Passa la lambda al content
+            onShowOnboarding = onShowOnboarding,
+            onNetworkInterfaceChange = onNetworkInterfaceChange,
+            onServerProtocolsChange = onServerProtocolsChange,
+            onHttpSettingsChange = onHttpSettingsChange
         )
     }
 }
@@ -442,9 +466,13 @@ fun SettingsScreenContent(
     onMicPortChange: (Int) -> Unit,
     onExperimentalFeaturesChange: (Boolean) -> Unit,
     onClose: () -> Unit,
-    onShowOnboarding: () -> Unit
+    onShowOnboarding: () -> Unit,
+    onNetworkInterfaceChange: (String) -> Unit,
+    onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
+    onHttpSettingsChange: (Int, Boolean) -> Unit
 ) {
     var showExperimentalWarningDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     if (showExperimentalWarningDialog) {
         ExperimentalFeaturesWarningDialog(
@@ -576,6 +604,98 @@ fun SettingsScreenContent(
                             }
                         )
                     }
+                    val interfaces = remember {
+                        val map = mutableMapOf<String, String>("Auto" to "Auto")
+                        try {
+                            NetworkInterface.getNetworkInterfaces().toList().forEach { iface ->
+                                if (iface.isUp && !iface.isLoopback && iface.inetAddresses.toList().any { it is Inet4Address }) {
+                                    map[iface.displayName] = iface.name
+                                }
+                            }
+                        } catch (e: Exception) {}
+                        map
+                    }
+
+                    SettingsSelectionItem(
+                        title = stringResource(R.string.settings_item_network_interface_title),
+                        description = stringResource(R.string.settings_item_network_interface_desc),
+                        icon = Icons.Outlined.VpnKey,
+                        currentValue = appSettings.networkInterface,
+                        options = interfaces,
+                        onOptionSelected = { onNetworkInterfaceChange(it) }
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_server_protocols),
+                    icon = Icons.Outlined.Hub
+                ) {
+                    SettingsInfoItem(
+                        title = stringResource(R.string.settings_item_wfas_title),
+                        description = stringResource(R.string.settings_item_wfas_desc),
+                        icon = Icons.Outlined.WifiTethering
+                    )
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_rtp_title),
+                        description = stringResource(R.string.settings_item_rtp_desc),
+                        icon = Icons.Outlined.Radio,
+                        isChecked = appSettings.rtpEnabled,
+                        onCheckedChange = { onServerProtocolsChange(it, appSettings.rtpPort, appSettings.httpEnabled) }
+                    )
+
+                    AnimatedVisibility(visible = appSettings.rtpEnabled) {
+                        SettingsTextFieldItem(
+                            title = stringResource(R.string.settings_item_rtp_port_title),
+                            description = stringResource(R.string.settings_item_rtp_port_desc),
+                            icon = Icons.Outlined.VpnKey,
+                            value = appSettings.rtpPort.toString(),
+                            onValueChange = { portStr ->
+                                portStr.toIntOrNull()?.let { port ->
+                                    onServerProtocolsChange(appSettings.rtpEnabled, port, appSettings.httpEnabled)
+                                }
+                            }
+                        )
+                    }
+
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_http_title),
+                        description = stringResource(R.string.settings_item_http_desc),
+                        icon = Icons.Outlined.Language,
+                        isChecked = appSettings.httpEnabled,
+                        onCheckedChange = { onServerProtocolsChange(appSettings.rtpEnabled, appSettings.rtpPort, it) }
+                    )
+
+                    AnimatedVisibility(visible = appSettings.httpEnabled) {
+                        SettingsTextFieldItem(
+                            title = stringResource(R.string.settings_item_http_port_title),
+                            description = stringResource(R.string.settings_item_http_port_desc),
+                            icon = Icons.Outlined.VpnKey,
+                            value = appSettings.httpPort.toString(),
+                            onValueChange = { portStr ->
+                                portStr.toIntOrNull()?.let { port ->
+                                    onHttpSettingsChange(port, appSettings.httpSafariMode)
+                                }
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.http_latency_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -615,6 +735,16 @@ fun SettingsScreenContent(
                         title = stringResource(R.string.developer_name),
                         description = "Marco Morosi",
                         icon = Icons.Outlined.Person
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    SettingsClickableItem(
+                        title = stringResource(R.string.support_kofi_title),
+                        description = stringResource(R.string.support_kofi_desc),
+                        icon = Icons.Outlined.LocalCafe,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi"))
+                            context.startActivity(intent)
+                        }
                     )
                 }
             }
@@ -1382,8 +1512,9 @@ fun ExpressiveModeButton(
 fun ExpressiveAudioSourceSelector(
     streamInternal: Boolean,
     streamMic: Boolean,
-    experimentalFeaturesEnabled: Boolean, // <-- NUOVO
+    experimentalFeaturesEnabled: Boolean,
     isMulticast: Boolean,
+    rtpEnabled: Boolean, // <-- NUOVO PARAMETRO AGGIUNTO
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
@@ -1398,7 +1529,6 @@ fun ExpressiveAudioSourceSelector(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // --- Sezione Sorgenti Audio (Invariata) ---
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -1426,7 +1556,6 @@ fun ExpressiveAudioSourceSelector(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Il microfono è visibile solo se le funzioni sperimentali sono attive
             AnimatedVisibility(visible = experimentalFeaturesEnabled) {
                 ExpressiveAudioSourceToggle(
                     icon = Icons.Outlined.Mic,
@@ -1438,7 +1567,7 @@ fun ExpressiveAudioSourceSelector(
                 )
             }
 
-            Divider(modifier = Modifier.padding(vertical = 20.dp, horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 20.dp, horizontal = 16.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1458,8 +1587,10 @@ fun ExpressiveAudioSourceSelector(
                 )
             }
 
+            // QUI APPLICHIAMO IL BLOCCO:
             ExpressiveStreamingModeToggle(
-                checked = isMulticast,
+                checked = isMulticast || rtpEnabled, // Forza il multicast se RTP è on
+                enabled = !rtpEnabled,               // Blocca lo switch se RTP è on
                 onCheckedChange = onMulticastChange
             )
         }
@@ -1469,13 +1600,18 @@ fun ExpressiveAudioSourceSelector(
 @Composable
 fun ExpressiveStreamingModeToggle(
     checked: Boolean, // true per Multicast, false per Singolo Client
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
 
-    // Le descrizioni e le icone cambiano in base alla selezione
     val title = if (checked) stringResource(R.string.multicast_mode_title) else stringResource(R.string.unicast_mode_title)
-    val subtitle = if (checked) stringResource(R.string.multicast_mode_desc) else stringResource(R.string.unicast_mode_desc)
+
+    // Logica per il sottotitolo personalizzato se l'RTP è attivo
+    val subtitle = if (!enabled) stringResource(R.string.rtp_forces_multicast)
+    else if (checked) stringResource(R.string.multicast_mode_desc)
+    else stringResource(R.string.unicast_mode_desc)
+
     val icon = if (checked) Icons.Outlined.Groups else Icons.Outlined.Person
     val checkedIcon = if (checked) Icons.Filled.Groups else Icons.Filled.Person
 
@@ -1493,7 +1629,7 @@ fun ExpressiveStreamingModeToggle(
             .fillMaxWidth()
             .clip(shape = RoundedCornerShape(28.dp))
             .background(
-                if (checked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                if (checked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (enabled) 0.3f else 0.15f)
                 else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
             )
             .padding(16.dp)
@@ -1503,9 +1639,7 @@ fun ExpressiveStreamingModeToggle(
         AnimatedContent(
             targetState = checked,
             transitionSpec = {
-                scaleIn(
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
-                ).togetherWith(scaleOut())
+                scaleIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)).togetherWith(scaleOut())
             },
             label = "Streaming Mode Icon Animation"
         ) { isChecked ->
@@ -1513,7 +1647,8 @@ fun ExpressiveStreamingModeToggle(
                 imageVector = if (isChecked) checkedIcon else icon,
                 contentDescription = null,
                 modifier = Modifier.size(32.dp),
-                tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                tint = if (isChecked) MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f)
+                else MaterialTheme.colorScheme.secondary
             )
         }
 
@@ -1523,7 +1658,8 @@ fun ExpressiveStreamingModeToggle(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f)
             )
             AnimatedContent(
                 targetState = subtitle,
@@ -1543,15 +1679,13 @@ fun ExpressiveStreamingModeToggle(
 
         Switch(
             checked = checked,
+            enabled = enabled,
             onCheckedChange = {
                 onCheckedChange(it)
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             },
             thumbContent = {
-                AnimatedContent(
-                    targetState = checked,
-                    label = "Switch Thumb Icon"
-                ) { isChecked ->
+                AnimatedContent(targetState = checked, label = "Switch Thumb Icon") { isChecked ->
                     Icon(
                         imageVector = if (isChecked) Icons.Default.Groups else Icons.Default.Person,
                         contentDescription = null,
@@ -2208,7 +2342,7 @@ fun SettingsInfoItem(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
-    val pagerState = rememberPagerState { 2 } // 2 pagine totali
+    val pagerState = rememberPagerState { 3 }
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -2239,6 +2373,7 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
             when (page) {
                 0 -> WelcomePage()
                 1 -> FeaturesPage()
+                2 -> ProtocolsPage()
             }
         }
     }
@@ -2387,6 +2522,65 @@ fun FeaturesPage() {
 }
 
 @Composable
+fun ProtocolsPage() {
+    val haptic = LocalHapticFeedback.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Icon(
+            imageVector = Icons.Default.Hub,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+
+        Text(
+            text = stringResource(R.string.onboarding_protocols_title),
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = stringResource(R.string.onboarding_protocols_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            FeatureRow(
+                icon = Icons.Default.Speed,
+                title = stringResource(R.string.onboarding_proto1_title),
+                description = stringResource(R.string.onboarding_proto1_desc),
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+            )
+            FeatureRow(
+                icon = Icons.Default.Radio,
+                title = stringResource(R.string.onboarding_proto2_title),
+                description = stringResource(R.string.onboarding_proto2_desc),
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+            )
+            FeatureRow(
+                icon = Icons.Default.Language,
+                title = stringResource(R.string.onboarding_proto3_title),
+                description = stringResource(R.string.onboarding_proto3_desc),
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+            )
+        }
+    }
+}
+
+@Composable
 private fun FeatureRow(
     icon: ImageVector,
     title: String,
@@ -2490,5 +2684,189 @@ private fun OnboardingNavigation(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ExpressiveRtpSdpBanner(
+    port: Int,
+    sampleRate: Int,
+    channels: Int
+) {
+    val context = LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+
+    val sdpContent = """
+        v=0
+        o=- 0 0 IN IP4 127.0.0.1
+        s=WiFiAudioStreaming RTP
+        c=IN IP4 239.255.0.1
+        t=0 0
+        m=audio $port RTP/AVP 96
+        a=rtpmap:96 L16/$sampleRate/$channels
+    """.trimIndent()
+
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/sdp")
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.openOutputStream(it)?.use { out ->
+                out.write(sdpContent.toByteArray())
+            }
+        }
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Radio, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_item_rtp_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                Text(stringResource(R.string.rtp_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalIconButton(
+                    onClick = {
+                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(sdpContent))
+                        copied = true
+                    },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)
+                ) {
+                    Icon(if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_sdp))
+                }
+                FilledTonalIconButton(
+                    onClick = { launcher.launch("stream.sdp") },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)
+                ) {
+                    Icon(Icons.Outlined.SaveAlt, contentDescription = stringResource(R.string.save_sdp))
+                }
+            }
+        }
+    }
+
+    if (copied) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(2000)
+            copied = false
+        }
+    }
+}
+
+@Composable
+fun SettingsCodecSelectorItem(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    isSafariMode: Boolean,
+    onCodecChange: (Boolean) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+        // Intestazione (Sopra)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(20.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Contenitore Pulsanti (Sotto, orizzontale)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            CodecAnimatedButton(
+                text = stringResource(R.string.codec_opus),
+                selected = !isSafariMode,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCodecChange(false)
+                },
+                modifier = Modifier.weight(1f)
+            )
+
+            CodecAnimatedButton(
+                text = stringResource(R.string.codec_aac),
+                selected = isSafariMode,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCodecChange(true)
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CodecAnimatedButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Fisica dell'animazione: Bouncy e fluida
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.03f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "button_scale"
+    )
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = spring(),
+        label = "button_bg"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(),
+        label = "button_text_color"
+    )
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = contentColor,
+            textAlign = TextAlign.Center
+        )
     }
 }
