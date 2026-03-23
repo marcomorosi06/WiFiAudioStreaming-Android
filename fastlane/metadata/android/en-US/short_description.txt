@@ -1,1 +1,1 @@
-stream audio over your local network
+Stream audio over your local network
