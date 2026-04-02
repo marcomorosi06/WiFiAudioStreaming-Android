@@ -543,23 +543,32 @@ class RefreshDiscoveryAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        (NetworkManager.discoveredDevices as MutableStateFlow).value = emptyMap()
+        // NON SVUOTIAMO PIÙ LA MAPPA ALL'INIZIO!
 
-        updateAppWidgetState(context, glanceId) { prefs ->
-            prefs[WidgetKeys.DISCOVERED_DEVICES] = ""
+        // 1. Controlliamo se l'App o l'AutoConnect stanno già ascoltando la rete
+        val wasActive = NetworkManager.isListeningActive()
+
+        if (!wasActive) {
+            NetworkManager.startListeningForDevices(context, "Auto")
         }
-        ClientWidget().update(context, glanceId)
 
-        NetworkManager.startListeningForDevices(context, "Auto")
-        delay(3_500)
+        // 2. Diamo 3.5 secondi ai server per rispondere al ping
+        delay(3500)
+
+        // 3. Leggiamo i dispositivi trovati
         val devices = NetworkManager.discoveredDevices.value
-        NetworkManager.stopListeningForDevices()
 
+        // 4. Spegniamo la rete SOLO se l'avevamo accesa noi
+        if (!wasActive) {
+            NetworkManager.stopListeningForDevices()
+        }
+
+        // 5. Aggiorniamo la grafica del widget
         val serialized = devices.entries.joinToString(";;") {
             "${it.key}::${it.value.ip}::${it.value.isMulticast}::${it.value.port}"
         }
 
-        updateAppWidgetState(context, glanceId) { prefs ->
+        androidx.glance.appwidget.state.updateAppWidgetState(context, glanceId) { prefs ->
             prefs[WidgetKeys.DISCOVERED_DEVICES] = serialized
         }
         ClientWidget().update(context, glanceId)

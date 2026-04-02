@@ -188,4 +188,18 @@
     <string name="fred_hint_4">Continua, non fermarti!</string>
     <string name="fred_hint_5">Ci sei quasi...</string>
     <string name="fred_hint_6">Un ultimo tocco...</string>
+    <string name="auto_connect_listening">In ascolto di server prioritari...</string>
+    <string name="auto_connect_priorities_title">Priorità Auto-Connect</string>
+    <string name="auto_connect_ip_label">Indirizzo IP</string>
+    <string name="auto_connect_ssid_label">Rete Wi-Fi (Opzionale)</string>
+    <string name="auto_connect_add_button">Aggiungi Server</string>
+    <string name="auto_connect_move_up">Sposta su</string>
+    <string name="auto_connect_move_down">Sposta giù</string>
+    <string name="auto_connect_remove">Rimuovi</string>
+    <string name="auto_connect_priority_desc">Ordina i server. L\'app proverà a connettersi partendo dal primo.</string>
+    <string name="auto_connect_use_current_wifi">Usa Wi-Fi attuale</string>
+    <string name="auto_connect_ssid_error">Connettiti a una rete Wi-Fi e abilita la Posizione per leggere il nome.</string>
+    <string name="auto_connect_wifi_hint">Leggi il nome della rete e scrivilo qui</string>
+    <string name="auto_connect_switch_title">Auto-Connect in Background</string>
+    <string name="auto_connect_switch_desc">L\'app rimarrà attiva in background per connettersi ai server con la stella.</string>
 </resources>

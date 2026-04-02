@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 startForegroundService(intent)
+                NetworkManager.isServerStreaming = true
                 viewModel.setIsStreaming(true)
             } else {
                 viewModel.setIsStreaming(false)
@@ -202,6 +203,19 @@ class MainActivity : ComponentActivity() {
             updateWidgetState(context, isStreaming, isServer)
         }
 
+        LaunchedEffect(currentSettings.autoConnectEnabled) {
+            val autoConnectIntent = Intent(context, AutoConnectService::class.java)
+            if (currentSettings.autoConnectEnabled) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(autoConnectIntent)
+                } else {
+                    context.startService(autoConnectIntent)
+                }
+            } else {
+                context.stopService(autoConnectIntent)
+            }
+        }
+
         BackHandler(enabled = showSettingsScreen.value) {
             showSettingsScreen.value = false
         }
@@ -219,11 +233,15 @@ class MainActivity : ComponentActivity() {
                 startMediaProjectionRequest()
             },
             onStopServer = {
-                val intent = Intent(this, AudioCaptureService::class.java).apply {
-                    action = AudioCaptureService.ACTION_STOP
+                if (isServer) {
+                    val intent = Intent(this, AudioCaptureService::class.java).apply {
+                        action = AudioCaptureService.ACTION_STOP
+                    }
+                    startService(intent)
+                    viewModel.setIsStreaming(false)
+                } else {
+                    viewModel.stopStreaming()
                 }
-                startService(intent)
-                viewModel.setIsStreaming(false)
             },
             onConnect = { serverInfo ->
                 viewModel.startClient(serverInfo)
@@ -264,7 +282,8 @@ class MainActivity : ComponentActivity() {
             onOpenSettings = { showSettingsScreen.value = true },
             onNetworkInterfaceChange = viewModel::setNetworkInterface,
             onServerProtocolsChange = viewModel::setServerProtocols,
-            onHttpSettingsChange = viewModel::setHttpSettings
+            onHttpSettingsChange = viewModel::setHttpSettings,
+            onToggleAutoConnectIp = viewModel::toggleAutoConnectIp
         )
 
         ExpressiveSettingsScreen(
@@ -286,7 +305,9 @@ class MainActivity : ComponentActivity() {
             onNetworkInterfaceChange = viewModel::setNetworkInterface,
             onServerProtocolsChange = viewModel::setServerProtocols,
             onHttpSettingsChange = viewModel::setHttpSettings,
-            onClientTileIpChange = viewModel::setClientTileIp
+            onClientTileIpChange = viewModel::setClientTileIp,
+            onAutoConnectEnabledChange = viewModel::setAutoConnectEnabled,
+            onSaveAutoConnectList = viewModel::saveAutoConnectList
         )
     }
 
@@ -327,6 +348,7 @@ class MainActivity : ComponentActivity() {
                 putExtra("http_port", settings.httpPort)
             }
             startForegroundService(intent)
+            NetworkManager.isServerStreaming = true
             viewModel.setIsStreaming(true)
             return
         }
@@ -370,9 +392,13 @@ fun ClientDiscoveryHandler() {
 
     LaunchedEffect(isServer) {
         if (!isServer) {
-            viewModel.startListening()
+            if (!NetworkManager.autoConnectOwnsListening) {
+                viewModel.startListening()
+            }
         } else {
-            NetworkManager.stopListeningForDevices()
+            if (!NetworkManager.autoConnectOwnsListening) {
+                NetworkManager.stopListeningForDevices()
+            }
         }
     }
 }

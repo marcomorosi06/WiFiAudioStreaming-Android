@@ -187,4 +187,18 @@
     <string name="fred_hint_4">Keep going, don\'t stop!</string>
     <string name="fred_hint_5">Almost there...</string>
     <string name="fred_hint_6">One last touch...</string>
+    <string name="auto_connect_listening">Listening for priority servers...</string>
+    <string name="auto_connect_priorities_title">Auto-Connect Priorities</string>
+    <string name="auto_connect_ip_label">IP Address</string>
+    <string name="auto_connect_ssid_label">Wi-Fi Network (Optional)</string>
+    <string name="auto_connect_add_button">Add Server</string>
+    <string name="auto_connect_move_up">Move Up</string>
+    <string name="auto_connect_move_down">Move Down</string>
+    <string name="auto_connect_remove">Remove</string>
+    <string name="auto_connect_priority_desc">Order servers. The app will attempt to connect starting from the top.</string>
+    <string name="auto_connect_use_current_wifi">Use current Wi-Fi</string>
+    <string name="auto_connect_ssid_error">Connect to a Wi-Fi network and enable Location to read the SSID.</string>
+    <string name="auto_connect_wifi_hint">Read the network name and type it here</string>
+    <string name="auto_connect_switch_title">Auto-Connect in Background</string>
+    <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
 </resources>

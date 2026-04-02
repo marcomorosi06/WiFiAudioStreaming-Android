@@ -7,14 +7,29 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+data class AutoConnectEntry(val ip: String, val ssid: String = "") {
+    override fun toString() = "$ip|$ssid"
+    companion object {
+        fun fromString(str: String): AutoConnectEntry {
+            val parts = str.split("|")
+            return AutoConnectEntry(parts[0], parts.getOrNull(1) ?: "")
+        }
+        fun parseList(str: String): List<AutoConnectEntry> {
+            return str.split(",").filter { it.isNotBlank() }.map { fromString(it) }
+        }
+        fun serializeList(list: List<AutoConnectEntry>): String {
+            return list.joinToString(",") { it.toString() }
+        }
+    }
+}
+
 val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-// Data class per contenere tutte le impostazioni in modo strutturato
 data class AppSettings(
     val streamInternal: Boolean,
     val streamMic: Boolean,
     val sampleRate: Int,
-    val channelConfig: String, // "MONO" o "STEREO"
+    val channelConfig: String,
     val bufferSize: Int,
     val streamingPort: Int,
     val sendClientMicrophone: Boolean,
@@ -27,7 +42,9 @@ data class AppSettings(
     val httpEnabled: Boolean,
     val httpPort: Int,
     val httpSafariMode: Boolean,
-    val clientTileIp: String = ""
+    val clientTileIp: String = "",
+    val autoConnectEnabled: Boolean = false,
+    val autoConnectList: String = ""
 )
 
 class SettingsDataStore(context: Context) {
@@ -45,13 +62,14 @@ class SettingsDataStore(context: Context) {
         val EXPERIMENTAL_FEATURES_ENABLED = booleanPreferencesKey("experimental_features_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val NETWORK_INTERFACE = stringPreferencesKey("network_interface")
-
         val RTP_ENABLED = booleanPreferencesKey("rtp_enabled")
         val RTP_PORT = intPreferencesKey("rtp_port")
         val HTTP_ENABLED = booleanPreferencesKey("http_enabled")
         val HTTP_PORT = intPreferencesKey("http_port")
         val HTTP_SAFARI_MODE = booleanPreferencesKey("http_safari_mode")
         val CLIENT_TILE_IP = stringPreferencesKey("client_tile_ip")
+        val AUTO_CONNECT_ENABLED = booleanPreferencesKey("auto_connect_enabled")
+        val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
@@ -72,7 +90,9 @@ class SettingsDataStore(context: Context) {
             httpEnabled = preferences[PreferencesKeys.HTTP_ENABLED] ?: false,
             httpPort = preferences[PreferencesKeys.HTTP_PORT] ?: 8080,
             httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false,
-            clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: ""
+            clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: "",
+            autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
+            autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: ""
         )
     }
 
@@ -150,6 +170,32 @@ class SettingsDataStore(context: Context) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.HTTP_PORT] = port
             preferences[PreferencesKeys.HTTP_SAFARI_MODE] = safariMode
+        }
+    }
+
+    suspend fun setAutoConnectEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] = enabled
+        }
+    }
+
+    suspend fun toggleAutoConnectIp(ip: String) {
+        dataStore.edit { preferences ->
+            val current = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: ""
+            val list = AutoConnectEntry.parseList(current).toMutableList()
+            val existing = list.find { it.ip == ip }
+            if (existing != null) {
+                list.remove(existing)
+            } else {
+                list.add(AutoConnectEntry(ip, ""))
+            }
+            preferences[PreferencesKeys.AUTO_CONNECT_LIST] = AutoConnectEntry.serializeList(list)
+        }
+    }
+
+    suspend fun saveAutoConnectList(list: List<AutoConnectEntry>) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.AUTO_CONNECT_LIST] = AutoConnectEntry.serializeList(list)
         }
     }
 }

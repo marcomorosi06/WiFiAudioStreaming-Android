@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.cuscus.wifiaudiostreaming.NetworkManager.updateWidgetState
 import kotlinx.coroutines.*
 
@@ -48,7 +49,7 @@ class ClientService : Service() {
 
     private fun checkNotificationPermission(): Boolean {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ActivityCompat.checkSelfPermission(
+                ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED

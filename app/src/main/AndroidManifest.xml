@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -51,6 +52,11 @@
         <service
             android:name=".AudioCaptureService"
             android:foregroundServiceType="mediaProjection|microphone"
+            android:exported="false" />
+
+        <service
+            android:name=".AutoConnectService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <service

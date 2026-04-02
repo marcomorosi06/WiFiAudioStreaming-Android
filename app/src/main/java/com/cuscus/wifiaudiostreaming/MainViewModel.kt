@@ -8,6 +8,7 @@ import androidx.annotation.RequiresPermission
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cuscus.wifiaudiostreaming.data.AppSettings
+import com.cuscus.wifiaudiostreaming.data.AutoConnectEntry
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,10 +17,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsDataStore = SettingsDataStore(application)
 
     private val _isServer = MutableStateFlow(true)
-    val isServer: StateFlow<Boolean> = _isServer.asStateFlow()
+    val isServer: StateFlow<Boolean> = combine(
+        _isServer,
+        NetworkManager.isStreamingCurrent
+    ) { serverMode, streaming ->
+        if (streaming) NetworkManager.isServerStreaming else serverMode
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    private val _isStreaming = MutableStateFlow(false)
-    val isStreaming: StateFlow<Boolean> = _isStreaming.asStateFlow()
+    val isStreaming: StateFlow<Boolean> = NetworkManager.isStreamingCurrent.asStateFlow()
 
     private val _isMulticastMode = MutableStateFlow(true)
     val isMulticastMode: StateFlow<Boolean> = _isMulticastMode.asStateFlow()
@@ -133,7 +138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setIsStreaming(streaming: Boolean) {
-        _isStreaming.value = streaming
+        NetworkManager.isStreamingCurrent.value = streaming
     }
 
     fun setNetworkInterface(name: String) {
@@ -150,6 +155,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setClientTileIp(ip: String) {
         viewModelScope.launch { settingsDataStore.saveClientTileIp(ip) }
+    }
+
+    fun setAutoConnectEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.setAutoConnectEnabled(enabled) }
+    }
+
+    fun toggleAutoConnectIp(ip: String) {
+        viewModelScope.launch { settingsDataStore.toggleAutoConnectIp(ip) }
+    }
+
+    fun saveAutoConnectList(list: List<AutoConnectEntry>) {
+        viewModelScope.launch { settingsDataStore.saveAutoConnectList(list) }
     }
 
     // Aggiorna startListening (passando l'interfaccia)
@@ -220,9 +237,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        val intent = Intent(getApplication(), ClientService::class.java)
-        getApplication<Application>().stopService(intent)
         super.onCleared()
-        NetworkManager.stopAll()
     }
 }

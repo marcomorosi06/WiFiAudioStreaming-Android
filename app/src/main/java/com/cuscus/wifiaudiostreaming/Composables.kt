@@ -2,6 +2,8 @@ package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -38,10 +40,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -49,9 +53,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.data.AppSettings
+import com.cuscus.wifiaudiostreaming.data.AutoConnectEntry
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlinx.coroutines.launch
@@ -139,7 +145,8 @@ fun WiFiAudioStreamingApp(
     onOpenSettings: () -> Unit,
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
-    onHttpSettingsChange: (Int, Boolean) -> Unit
+    onHttpSettingsChange: (Int, Boolean) -> Unit,
+    onToggleAutoConnectIp: (String) -> Unit
 ) {
     val backgroundGradient by animateColorAsState(
         targetValue = if (isStreaming) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
@@ -210,26 +217,6 @@ fun WiFiAudioStreamingApp(
                 )
             }
 
-            // PANNELLO OPZIONI CLIENT ORA DIPENDE DALLE FUNZIONI SPERIMENTALI
-            AnimatedVisibility(
-                visible = !isServer && !isStreaming && appSettings.experimentalFeaturesEnabled, // <-- MODIFICATO
-                enter = expandVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                ) + fadeIn() + scaleIn(initialScale = 0.8f),
-                exit = shrinkVertically(
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
-                ) + fadeOut() + scaleOut(targetScale = 0.8f)
-            ) {
-                ExpressiveClientSettingsPanel(
-                    sendMicrophone = appSettings.sendClientMicrophone,
-                    onSendMicrophoneChange = onSendClientMicrophoneChange,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
             ExpressiveStreamingControlCenter(
                 isServer = isServer,
                 isStreaming = isStreaming,
@@ -254,6 +241,17 @@ fun WiFiAudioStreamingApp(
             }
 
             AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.httpEnabled,
+                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+            ) {
+                ExpressiveHttpBanner(
+                    ip = localIp,
+                    port = appSettings.httpPort
+                )
+            }
+
+            AnimatedVisibility(
                 visible = !isServer && !isStreaming,
                 enter = expandVertically(
                     animationSpec = spring(
@@ -266,7 +264,6 @@ fun WiFiAudioStreamingApp(
                 ) + fadeOut() + scaleOut(targetScale = 0.8f)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // --- NUOVO: CAMPO IP MANUALE ---
                     var manualIp by remember { mutableStateOf("") }
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -282,7 +279,7 @@ fun WiFiAudioStreamingApp(
                             OutlinedTextField(
                                 value = manualIp,
                                 onValueChange = { manualIp = it },
-                                label = { Text(stringResource(R.string.manual_ip_hint)) }, // Testo fisso temporaneo
+                                label = { Text(stringResource(R.string.manual_ip_hint)) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 shape = RoundedCornerShape(16.dp)
@@ -297,11 +294,12 @@ fun WiFiAudioStreamingApp(
                         }
                     }
 
-                    // --- LISTA DISPOSITIVI ESISTENTE ---
                     ExpressiveDeviceDiscoveryPanel(
                         devices = discoveredDevices,
+                        autoConnectList = appSettings.autoConnectList,
                         onConnect = onConnect,
                         onRefresh = onRefresh,
+                        onToggleAutoConnectIp = onToggleAutoConnectIp,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -313,6 +311,7 @@ fun WiFiAudioStreamingApp(
 @Composable
 fun ExpressiveClientSettingsPanel(
     sendMicrophone: Boolean,
+    experimentalFeaturesEnabled: Boolean,
     onSendMicrophoneChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -320,9 +319,7 @@ fun ExpressiveClientSettingsPanel(
         modifier = modifier,
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -342,22 +339,21 @@ fun ExpressiveClientSettingsPanel(
                     fontWeight = FontWeight.Bold
                 )
             }
-            ExpressiveAudioSourceToggle(
-                icon = Icons.Outlined.MicOff,
-                checkedIcon = Icons.Filled.Mic,
-                title = stringResource(R.string.send_mic_to_server_title),
-                subtitle = stringResource(R.string.send_mic_to_server_subtitle),
-                checked = sendMicrophone,
-                onCheckedChange = onSendMicrophoneChange
-            )
+
+            AnimatedVisibility(visible = experimentalFeaturesEnabled) {
+                ExpressiveAudioSourceToggle(
+                    icon = Icons.Outlined.MicOff,
+                    checkedIcon = Icons.Filled.Mic,
+                    title = stringResource(R.string.send_mic_to_server_title),
+                    subtitle = stringResource(R.string.send_mic_to_server_subtitle),
+                    checked = sendMicrophone,
+                    onCheckedChange = onSendMicrophoneChange
+                )
+            }
         }
     }
 }
 
-
-/**
- * Composable helper per elementi cliccabili che mantengono lo stile della UI.
- */
 @Composable
 fun SettingsClickableItem(
     title: String,
@@ -409,7 +405,9 @@ fun ExpressiveSettingsScreen(
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
     onHttpSettingsChange: (Int, Boolean) -> Unit,
-    onClientTileIpChange: (String) -> Unit
+    onClientTileIpChange: (String) -> Unit,
+    onAutoConnectEnabledChange: (Boolean) -> Unit,
+    onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -437,7 +435,9 @@ fun ExpressiveSettingsScreen(
             onNetworkInterfaceChange = onNetworkInterfaceChange,
             onServerProtocolsChange = onServerProtocolsChange,
             onHttpSettingsChange = onHttpSettingsChange,
-            onClientTileIpChange = onClientTileIpChange
+            onClientTileIpChange = onClientTileIpChange,
+            onSaveAutoConnectList = onSaveAutoConnectList,
+            onAutoConnectEnabledChange = onAutoConnectEnabledChange
         )
     }
 }
@@ -483,7 +483,9 @@ fun SettingsScreenContent(
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
     onHttpSettingsChange: (Int, Boolean) -> Unit,
-    onClientTileIpChange: (String) -> Unit
+    onClientTileIpChange: (String) -> Unit,
+    onAutoConnectEnabledChange: (Boolean) -> Unit,
+    onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
 ) {
     var showExperimentalWarningDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -502,10 +504,10 @@ fun SettingsScreenContent(
         topBar = {
             var fredClickCount by remember { mutableIntStateOf(0) }
             var showFred by remember { mutableStateOf(false) }
-            var currentToast by remember { mutableStateOf<android.widget.Toast?>(null) }
+            var currentToast by remember { mutableStateOf<Toast?>(null) }
 
             if (showFred) {
-                androidx.compose.ui.window.Dialog(onDismissRequest = { showFred = false }) {
+                Dialog(onDismissRequest = { showFred = false }) {
                     Card(
                         shape = RoundedCornerShape(28.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -518,13 +520,13 @@ fun SettingsScreenContent(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Image(
-                                painter = androidx.compose.ui.res.painterResource(id = R.drawable.fred),
+                                painter = painterResource(id = R.drawable.fred),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(max = 400.dp)
                                     .clip(RoundedCornerShape(20.dp)),
-                                contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
+                                contentScale = ContentScale.FillWidth
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
@@ -554,7 +556,7 @@ fun SettingsScreenContent(
                                 }
 
                                 currentToast?.cancel()
-                                val toast = android.widget.Toast.makeText(context, toastMessage, android.widget.Toast.LENGTH_SHORT)
+                                val toast = Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT)
                                 toast.show()
                                 currentToast = toast
 
@@ -665,7 +667,7 @@ fun SettingsScreenContent(
                     SettingsTextFieldItem(
                         title = stringResource(R.string.main_audio_port_title),
                         description = stringResource(R.string.main_audio_port_desc),
-                        icon = Icons.Outlined.Router,
+                        icon = Icons.Outlined.VpnKey,
                         value = appSettings.streamingPort.toString(),
                         onValueChange = {
                             it.toIntOrNull()?.let(onStreamingPortChange)
@@ -778,49 +780,68 @@ fun SettingsScreenContent(
             }
 
             item {
-                var tileIpText by remember(appSettings.clientTileIp) { mutableStateOf(appSettings.clientTileIp) }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                SettingsGroupCard(
+                    title = stringResource(R.string.auto_connect_priorities_title),
+                    icon = Icons.Outlined.Autorenew
                 ) {
-                    Text(
-                        text = stringResource(R.string.settings_tile_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.auto_connect_switch_title),
+                        description = stringResource(R.string.auto_connect_switch_desc),
+                        icon = Icons.Outlined.Autorenew,
+                        isChecked = appSettings.autoConnectEnabled,
+                        onCheckedChange = onAutoConnectEnabledChange
                     )
 
-                    OutlinedTextField(
-                        value = tileIpText,
-                        onValueChange = {
-                            tileIpText = it
-                            onClientTileIpChange(it)
-                        },
-                        label = { Text(stringResource(R.string.settings_tile_ip_label)) },
-                        placeholder = { Text(stringResource(R.string.settings_tile_ip_placeholder)) },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Uri,
-                            imeAction = ImeAction.Done
-                        ),
-                        singleLine = true,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Rounded.AddComment,
-                                contentDescription = null
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    )
+                    AnimatedVisibility(visible = appSettings.autoConnectEnabled) {
+                        AutoConnectPriorityListManager(
+                            autoConnectListString = appSettings.autoConnectList,
+                            onListChange = onSaveAutoConnectList
+                        )
+                    }
+                }
+            }
 
-                    Text(
-                        text = stringResource(R.string.settings_tile_ip_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
-                    )
+            item {
+                var tileIpText by remember(appSettings.clientTileIp) { mutableStateOf(appSettings.clientTileIp) }
+                val focusManager = LocalFocusManager.current
+
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_tile_title),
+                    icon = Icons.Outlined.Widgets
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = tileIpText,
+                            onValueChange = { tileIpText = it },
+                            label = { Text(stringResource(R.string.settings_tile_ip_label)) },
+                            placeholder = { Text(stringResource(R.string.settings_tile_ip_placeholder)) },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                                imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(onDone = {
+                                onClientTileIpChange(tileIpText)
+                                focusManager.clearFocus()
+                            }),
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Rounded.AddComment, contentDescription = null)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+
+                        Text(
+                            text = stringResource(R.string.settings_tile_ip_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
+                        )
+                    }
                 }
             }
 
@@ -910,10 +931,17 @@ fun SettingsTextFieldItem(
                     text = newValue
                 }
             },
-            label = { Text(stringResource(R.string.port_number_label)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            label = { Text(title) },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            leadingIcon = {
+                Icon(imageVector = icon, contentDescription = null)
+            },
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             keyboardActions = KeyboardActions(onDone = {
                 onValueChange(text)
                 focusManager.clearFocus()
@@ -922,22 +950,19 @@ fun SettingsTextFieldItem(
     }
 }
 
-// MODIFICATO: Firma aggiornata per usare ServerInfo
 @Composable
 fun ExpressiveDeviceDiscoveryPanel(
     devices: Map<String, ServerInfo>,
+    autoConnectList: String,
     onConnect: (ServerInfo) -> Unit,
     onRefresh: () -> Unit,
+    onToggleAutoConnectIp: (String) -> Unit,
     modifier: Modifier
 ) {
-    // ... (Il corpo di questa funzione non cambia, solo la sua firma)
     val haptic = LocalHapticFeedback.current
     val cardElevation by animateFloatAsState(
         targetValue = if (devices.isNotEmpty()) 12f else 6f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "Discovery Panel Elevation"
     )
 
@@ -945,9 +970,7 @@ fun ExpressiveDeviceDiscoveryPanel(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Row(
@@ -956,136 +979,98 @@ fun ExpressiveDeviceDiscoveryPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val headerIconScale by animateFloatAsState(
-                        targetValue = if (devices.isNotEmpty()) 1.1f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ),
-                        label = "Discovery Header Icon Scale"
-                    )
-
-                    Icon(
-                        imageVector = Icons.Default.Devices,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .scale(headerIconScale),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    val headerIconScale by animateFloatAsState(targetValue = if (devices.isNotEmpty()) 1.1f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), label = "Discovery Header Icon Scale")
+                    Icon(imageVector = Icons.Default.Devices, contentDescription = null, modifier = Modifier.size(28.dp).scale(headerIconScale), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = stringResource(R.string.nearby_devices_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(text = stringResource(R.string.nearby_devices_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-
-                val refreshRotation by animateFloatAsState(
-                    targetValue = if (devices.isEmpty()) 360f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    ),
-                    label = "Refresh Button Rotation"
-                )
-
-                FilledTonalIconButton(
-                    onClick = {
-                        onRefresh()
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    modifier = Modifier.graphicsLayer { rotationZ = refreshRotation }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.refresh_button_description),
-                        modifier = Modifier.size(20.dp)
-                    )
+                val refreshRotation by animateFloatAsState(targetValue = if (devices.isEmpty()) 360f else 0f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), label = "Refresh Button Rotation")
+                FilledTonalIconButton(onClick = { onRefresh(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) }, modifier = Modifier.graphicsLayer { rotationZ = refreshRotation }) {
+                    Icon(imageVector = Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh_button_description), modifier = Modifier.size(20.dp))
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
             AnimatedContent(
                 targetState = devices.isEmpty(),
-                transitionSpec = {
-                    (fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) +
-                            expandVertically(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                )
-                            )).togetherWith(
-                        fadeOut(animationSpec = tween(200)) +
-                                shrinkVertically(animationSpec = tween(200))
-                    )
-                },
+                transitionSpec = { (fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))).togetherWith(fadeOut(animationSpec = tween(200)) + shrinkVertically(animationSpec = tween(200))) },
                 label = "Device Discovery Content Animation"
             ) { isEmpty ->
                 if (isEmpty) {
                     ExpressiveSearchingIndicator()
                 } else {
-                    ExpressiveDeviceList(devices = devices, onConnect = onConnect)
+                    ExpressiveDeviceList(devices = devices, autoConnectList = autoConnectList, onConnect = onConnect, onToggleAutoConnectIp = onToggleAutoConnectIp)
                 }
             }
         }
     }
 }
 
-
 @Composable
 fun ExpressiveDeviceList(
     devices: Map<String, ServerInfo>,
-    onConnect: (ServerInfo) -> Unit
+    autoConnectList: String,
+    onConnect: (ServerInfo) -> Unit,
+    onToggleAutoConnectIp: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // La logica del forEach ora passa l'informazione sulla modalità
         devices.forEach { (hostname, serverInfo) ->
             ExpressiveDeviceCard(
                 hostname = hostname,
                 ipAddress = "${serverInfo.ip}:${serverInfo.port}",
                 isMulticast = serverInfo.isMulticast,
-                onConnect = { onConnect(serverInfo) }
+                isAutoConnectTarget = autoConnectList.contains(serverInfo.ip),
+                onConnect = { onConnect(serverInfo) },
+                onToggleAutoConnect = { onToggleAutoConnectIp(serverInfo.ip) }
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsGroupCard(
-    title: String,
-    icon: ImageVector,
-    content: @Composable ColumnScope.() -> Unit
+fun ExpressiveDeviceCard(
+    hostname: String,
+    ipAddress: String,
+    isMulticast: Boolean,
+    isAutoConnectTarget: Boolean,
+    onConnect: () -> Unit,
+    onToggleAutoConnect: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
     ElevatedCard(
+        onClick = {
+            onConnect()
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        },
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = Modifier.padding(vertical = 16.dp)) {
-            Row(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                Icon(imageVector = if (isMulticast) Icons.Default.Groups else Icons.Default.Person, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(text = hostname, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                ModeTag(isMulticast = isMulticast)
+                Text(text = ipAddress, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = { onToggleAutoConnect(); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = if (isAutoConnectTarget) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(16.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    tint = if (isAutoConnectTarget) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Divider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = content
-            )
+            Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.connect_button_description), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
         }
     }
 }
@@ -2949,6 +2934,142 @@ fun SettingsCodecSelectorItem(
 }
 
 @Composable
+fun AutoConnectPriorityListManager(
+    autoConnectListString: String,
+    onListChange: (List<AutoConnectEntry>) -> Unit
+) {
+    val list = AutoConnectEntry.parseList(autoConnectListString)
+    val context = LocalContext.current
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = stringResource(R.string.auto_connect_priority_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+
+        list.forEachIndexed { index, entry ->
+            var localIp by remember(entry.ip) { mutableStateOf(entry.ip) }
+            var localSsid by remember(entry.ssid) { mutableStateOf(entry.ssid) }
+            val focusManager = LocalFocusManager.current
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = localIp,
+                            onValueChange = { localIp = it },
+                            label = { Text(stringResource(R.string.auto_connect_ip_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                val newList = list.toMutableList()
+                                newList[index] = entry.copy(ip = localIp, ssid = localSsid)
+                                onListChange(newList)
+                                focusManager.clearFocus()
+                            }),
+                            shape = RoundedCornerShape(16.dp),
+                            leadingIcon = { Icon(Icons.Default.Dns, contentDescription = null) }
+                        )
+                        OutlinedTextField(
+                            value = localSsid,
+                            onValueChange = { localSsid = it },
+                            label = { Text(stringResource(R.string.auto_connect_ssid_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                val newList = list.toMutableList()
+                                newList[index] = entry.copy(ip = localIp, ssid = localSsid)
+                                onListChange(newList)
+                                focusManager.clearFocus()
+                            }),
+                            shape = RoundedCornerShape(16.dp),
+                            leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        Toast.makeText(context, context.getString(R.string.auto_connect_wifi_hint), Toast.LENGTH_SHORT).show()
+                                        val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
+                                        context.startActivity(intent)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Wifi,
+                                        contentDescription = stringResource(R.string.auto_connect_use_current_wifi),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(start = 8.dp)) {
+                        IconButton(
+                            onClick = {
+                                if (index > 0) {
+                                    val newList = list.toMutableList()
+                                    val temp = newList[index]
+                                    newList[index] = newList[index - 1]
+                                    newList[index - 1] = temp
+                                    onListChange(newList)
+                                }
+                            },
+                            enabled = index > 0
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.auto_connect_move_up))
+                        }
+                        IconButton(
+                            onClick = {
+                                if (index < list.size - 1) {
+                                    val newList = list.toMutableList()
+                                    val temp = newList[index]
+                                    newList[index] = newList[index + 1]
+                                    newList[index + 1] = temp
+                                    onListChange(newList)
+                                }
+                            },
+                            enabled = index < list.size - 1
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.auto_connect_move_down))
+                        }
+                        IconButton(
+                            onClick = {
+                                val newList = list.toMutableList()
+                                newList.removeAt(index)
+                                onListChange(newList)
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.auto_connect_remove), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        TextButton(
+            onClick = {
+                val newList = list.toMutableList()
+                newList.add(AutoConnectEntry("", ""))
+                onListChange(newList)
+            },
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.auto_connect_add_button))
+        }
+    }
+}
+
+@Composable
 private fun CodecAnimatedButton(
     text: String,
     selected: Boolean,
@@ -2993,5 +3114,97 @@ private fun CodecAnimatedButton(
             color = contentColor,
             textAlign = TextAlign.Center
         )
+    }
+}
+@Composable
+fun SettingsGroupCard(
+    title: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(modifier = Modifier.padding(vertical = 16.dp)) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+fun ExpressiveHttpBanner(ip: String, port: Int) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    val url = "http://$ip:$port"
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_item_http_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalIconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(url))
+                        copied = true
+                    },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                ) {
+                    Icon(if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy, contentDescription = "Copia URL")
+                }
+                FilledTonalIconButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        try { context.startActivity(intent) } catch (e: Exception) {}
+                    },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                ) {
+                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = "Apri nel Browser")
+                }
+            }
+        }
+    }
+
+    if (copied) {
+        LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); copied = false }
     }
 }

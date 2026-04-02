@@ -53,6 +53,9 @@ object NetworkManager {
     private var rtpJob: Job? = null
 
     @Volatile private var httpPcmQueue: java.util.concurrent.ArrayBlockingQueue<ByteArray>? = null
+
+    @Volatile private var activeInternalRecord: AudioRecord? = null
+    @Volatile private var activeMicRecord: AudioRecord? = null
     private var httpJob: Job? = null
     private var httpServerSocket: java.net.ServerSocket? = null
 
@@ -65,6 +68,8 @@ object NetworkManager {
 
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
+    val isStreamingCurrent = MutableStateFlow(false)
+    var autoConnectOwnsListening = false
 
     @SuppressLint("DefaultLocale")
     fun getLocalIpAddress(context: Context): String {
@@ -217,68 +222,68 @@ object NetworkManager {
     }
 
     fun startListeningForDevices(context: Context, networkInterfaceName: String = "Auto") {
-        if (listeningJob?.isActive == true) return
+        if (isListeningActive()) return
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val multicastLock = wifiManager.createMulticastLock("wifi_audio_streamer_discovery_lock")
         multicastLock.setReferenceCounted(true)
 
         listeningJob = scope.launch {
-            var socket: MulticastSocket? = null
+            multicastLock.acquire()
             try {
-                multicastLock.acquire()
-                val localIps = getAllLocalIpAddresses()
-                val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
-
-                socket = MulticastSocket(NetworkSettings.DISCOVERY_PORT).apply {
-                    getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
-                    joinGroup(groupAddress)
-                    soTimeout = 5000
-                }
-
-                val buffer = ByteArray(1024)
-                val packet = DatagramPacket(buffer, buffer.size)
-
                 while (isActive) {
+                    var socket: MulticastSocket? = null
                     try {
-                        socket.receive(packet)
-                        val remoteIp = packet.address.hostAddress
-                        val message = String(packet.data, 0, packet.length).trim()
+                        val localIps = getAllLocalIpAddresses()
+                        val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
 
-                        if (remoteIp != null && remoteIp !in localIps && message.startsWith(NetworkSettings.DISCOVERY_MESSAGE)) {
-                            val parts = message.split(";")
-                            if (parts.size >= 4) {
-                                val hostname = parts[1]
-                                val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
-                                val port = parts[3].toIntOrNull() ?: continue
+                        socket = MulticastSocket(NetworkSettings.DISCOVERY_PORT).apply {
+                            getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
+                            joinGroup(groupAddress)
+                            soTimeout = 5000
+                        }
 
-                                if (!discoveredDevices.value.containsKey(hostname)) {
-                                    val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
-                                    discoveredDevices.value += (hostname to serverInfo)
-                                    println("Discovered server: $hostname at $remoteIp")
+                        val buffer = ByteArray(1024)
+                        val packet = DatagramPacket(buffer, buffer.size)
+
+                        while (isActive) {
+                            try {
+                                socket.receive(packet)
+                                val remoteIp = packet.address.hostAddress
+                                val message = String(packet.data, 0, packet.length).trim()
+
+                                if (remoteIp != null && remoteIp !in localIps && message.startsWith(NetworkSettings.DISCOVERY_MESSAGE)) {
+                                    val parts = message.split(";")
+                                    if (parts.size >= 4) {
+                                        val hostname = parts[1]
+                                        val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
+                                        val port = parts[3].toIntOrNull() ?: continue
+
+                                        val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
+                                        val currentMap = discoveredDevices.value
+                                        if (currentMap[hostname] != serverInfo) {
+                                            discoveredDevices.value = currentMap + (hostname to serverInfo)
+                                        }
+                                    }
                                 }
+                            } catch (e: SocketTimeoutException) {
+                                continue
+                            } catch (e: Exception) {
+                                if (e !is CancellationException) break
                             }
                         }
-                    } catch (e: SocketTimeoutException) {
-                        continue
+                    } catch (e: Exception) {
+                        delay(5000)
+                    } finally {
+                        try {
+                            socket?.leaveGroup(InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP))
+                            socket?.close()
+                        } catch (e: Exception) {}
                     }
                 }
-            } catch (e: Exception) {
-                if (e !is CancellationException) println("Listening error: ${e.message}")
             } finally {
-                try {
-                    socket?.leaveGroup(InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP))
-                    socket?.close()
-                } catch (e: Exception) {
-                    println("Error closing multicast socket: ${e.message}")
-                }
                 if (multicastLock.isHeld) multicastLock.release()
             }
         }
-    }
-
-    fun stopListeningForDevices() {
-        listeningJob?.cancel()
-        listeningJob = null
     }
 
     fun startBroadcastingPresence(context: Context, isMulticast: Boolean, streamingPort: Int, networkInterfaceName: String = "Auto", rtpEnabled: Boolean = false) {
@@ -442,20 +447,20 @@ object NetworkManager {
                             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                             .addMatchingUsage(AudioAttributes.USAGE_GAME)
                             .build()
-                        internalRecord = AudioRecord.Builder()
+                        activeInternalRecord = AudioRecord.Builder()
                             .setAudioFormat(audioFormat)
                             .setBufferSizeInBytes(bufSize)
                             .setAudioPlaybackCaptureConfig(config)
                             .build()
-                        internalRecord?.startRecording()
+                        activeInternalRecord?.startRecording()
                     }
                     if (streamMic) {
-                        micRecord = AudioRecord.Builder()
+                        activeMicRecord = AudioRecord.Builder()
                             .setAudioSource(MediaRecorder.AudioSource.MIC)
                             .setAudioFormat(audioFormat)
                             .setBufferSizeInBytes(bufSize)
                             .build()
-                        micRecord?.startRecording()
+                        activeMicRecord?.startRecording()
                     }
                 }
 
@@ -469,8 +474,8 @@ object NetworkManager {
                     val mixedBuffer = ByteArray(bufSize)
 
                     while (isActive && clientAlive?.get() != false) {
-                        val internalBytes = internalRecord?.read(internalBuffer!!, 0, internalBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
-                        val micBytes = micRecord?.read(micBuffer!!, 0, micBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
+                        val internalBytes = activeInternalRecord?.read(internalBuffer!!, 0, internalBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
+                        val micBytes = activeMicRecord?.read(micBuffer!!, 0, micBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
 
                         if (internalBytes <= 0 && micBytes <= 0) continue
 
@@ -603,9 +608,9 @@ object NetworkManager {
                         var staleBytesTotal = 0
                         var staleBytes: Int
                         do {
-                            staleBytes = internalRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
+                            staleBytes = activeInternalRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
                             if (staleBytes > 0) staleBytesTotal += staleBytes
-                            val micStale = micRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
+                            val micStale = activeMicRecord?.read(drainBuffer, 0, drainBuffer.size, AudioRecord.READ_NON_BLOCKING) ?: 0
                             if (micStale > 0) staleBytesTotal += micStale
                         } while (staleBytes > 0)
                         println("--- Drained $staleBytesTotal stale bytes ---")
@@ -662,13 +667,13 @@ object NetworkManager {
             } catch (e: Exception) {
                 if (e !is CancellationException) connectionStatus.value = context.getString(R.string.status_server_error, e.message)
             } finally {
-                isServerStreaming = false
-                internalRecord?.stop(); internalRecord?.release()
-                micRecord?.stop(); micRecord?.release()
-                sendSocket?.close()
-                stopBroadcastingPresence()
-                if (isActive) connectionStatus.value = context.getString(R.string.status_server_stopped)
-            }
+            isServerStreaming = false
+            activeInternalRecord?.stop(); activeInternalRecord?.release()
+            activeMicRecord?.stop(); activeMicRecord?.release()
+            sendSocket?.close()
+            stopBroadcastingPresence()
+            if (isActive) connectionStatus.value = context.getString(R.string.status_server_stopped)
+        }
         }
     }
 
@@ -685,6 +690,8 @@ object NetworkManager {
         onServerDisconnected: (() -> Unit)? = null
     ) {
         stopStreaming(context)
+        isServerStreaming = false
+        isStreamingCurrent.value = true
 
         if (sendMicrophone) {
             micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
@@ -699,22 +706,9 @@ object NetworkManager {
                         val selectorManager = SelectorManager(Dispatchers.IO)
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
 
-                        // =========================================================
-                        // FIX 3 — Buffer ridotto da *8 a *2.
-                        // Il valore *8 aggiungeva una latenza strutturale enorme
-                        // (fino a ~700ms con bufferSize=6400 a 48kHz stereo 16bit).
-                        // *2 mantiene abbastanza headroom per il jitter di rete
-                        // senza introdurre un ritardo percepibile.
-                        // =========================================================
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2) // ← FIX 3: era *8
+                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
 
-                        // =========================================================
-                        // FIX 1 — AudioTrack creato e avviato PRIMA di mandare HELLO.
-                        // In origine veniva aperto solo dopo aver ricevuto l'ACK,
-                        // aggiungendo ~50-200ms di inizializzazione hardware
-                        // sul percorso critico della connessione.
-                        // =========================================================
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
                                 AudioAttributes.Builder()
@@ -733,36 +727,39 @@ object NetworkManager {
                             .setTransferMode(AudioTrack.MODE_STREAM)
                             .build()
 
-                        audioTrack.play() // ← FIX 1: la linea audio è pronta prima dell'handshake
+                        audioTrack.play()
 
                         connectionStatus.value = context.getString(R.string.status_contacting_server, serverInfo.ip)
                         socket = aSocket(selectorManager).udp().bind()
                         val remoteAddress = InetSocketAddress(serverInfo.ip, serverInfo.port)
-                        val helloPacket = buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) }
-                        socket.send(Datagram(helloPacket, remoteAddress))
+
+                        val senderJob = launch {
+                            while (isActive) {
+                                val helloPacket = buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) }
+                                try { socket.send(Datagram(helloPacket, remoteAddress)) } catch (e: Exception) {}
+                                delay(500)
+                            }
+                        }
 
                         connectionStatus.value = context.getString(R.string.status_waiting_for_ack)
                         val ackDatagram = withTimeout(15000) { socket.receive() }
+                        senderJob.cancel()
+
                         val ackMsg = ackDatagram.packet.readText().trim()
                         if (ackMsg != "HELLO_ACK") {
                             throw Exception(context.getString(R.string.status_handshake_failed_unexpected_response, ackMsg))
                         }
 
-                        // AudioTrack già pronto — nessun ritardo qui
                         connectionStatus.value = context.getString(R.string.status_streaming)
 
                         val buffer = ByteArray(bufferSize * 2)
                         var lastPingReceived = System.currentTimeMillis()
                         val pingTimeoutMs = 3000L
-                        var serverDisconnected = false  // flag per distinguere disconnect da stop utente
 
-                        // Watchdog: controlla ogni secondo se il server è ancora vivo
                         val watchdogJob = launch {
                             while (isActive) {
                                 delay(1000)
                                 if (System.currentTimeMillis() - lastPingReceived > pingTimeoutMs) {
-                                    println("--- Server timeout: no PING for ${pingTimeoutMs}ms ---")
-                                    serverDisconnected = true
                                     streamingJob?.cancel()
                                     break
                                 }
@@ -780,8 +777,6 @@ object NetworkManager {
                                 when (text) {
                                     "PING" -> lastPingReceived = System.currentTimeMillis()
                                     "BYE"  -> {
-                                        println("--- Received BYE from server ---")
-                                        serverDisconnected = true
                                         streamingJob?.cancel()
                                         break
                                     }
@@ -792,21 +787,13 @@ object NetworkManager {
                             }
                         } finally {
                             watchdogJob.cancel()
-                            // Se è il server ad essersi disconnesso (non l'utente che ha premuto stop)
-                            // invochiamo la callback che fa esattamente come il tasto stop nella UI
-                            if (serverDisconnected) {
-                                scope.launch(Dispatchers.Main) {
-                                    stopStreaming(context)
-                                    onServerDisconnected?.invoke()
-                                }
-                            }
                         }
                     } finally {
-                        audioTrack?.stop(); audioTrack?.release()
+                        audioTrack?.stop()
+                        audioTrack?.release()
                         socket?.close()
                     }
                 } else {
-                    // Multicast — nessuna modifica necessaria, era già ottimale
                     var audioTrack: AudioTrack? = null
                     var multicastSocket: MulticastSocket? = null
                     val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -822,7 +809,6 @@ object NetworkManager {
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        // FIX 3 applicato anche al multicast per consistenza
                         val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
@@ -847,28 +833,18 @@ object NetworkManager {
 
                         val buffer = ByteArray(bufferSize * 2)
                         val packet = DatagramPacket(buffer, buffer.size)
-                        var serverDisconnected = false
                         while (isActive) {
                             multicastSocket.receive(packet)
                             if (packet.length > 0) {
-                                // Controlla se è un BYE prima di scrivere sull'AudioTrack
                                 if (packet.length == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") {
-                                    println("--- Received BYE from multicast server ---")
-                                    serverDisconnected = true
                                     break
                                 }
                                 audioTrack.write(packet.data, 0, packet.length, AudioTrack.WRITE_BLOCKING)
                             }
                         }
-
-                        if (serverDisconnected) {
-                            scope.launch(Dispatchers.Main) {
-                                stopStreaming(context)
-                                onServerDisconnected?.invoke()
-                            }
-                        }
                     } finally {
-                        audioTrack?.stop(); audioTrack?.release()
+                        audioTrack?.stop()
+                        audioTrack?.release()
                         try {
                             val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                             multicastSocket?.leaveGroup(groupAddress)
@@ -889,21 +865,37 @@ object NetworkManager {
                 if (isActive) {
                     connectionStatus.value = context.getString(R.string.status_client_stopped)
                 }
+                if (isStreamingCurrent.value) {
+                    scope.launch(Dispatchers.Main) {
+                        stopStreaming(context)
+                        onServerDisconnected?.invoke()
+                    }
+                }
             }
         }
     }
 
     fun stopStreaming(context: Context) {
+        isServerStreaming = false
         streamingJob?.cancel()
         micStreamingJob?.cancel()
         rtpJob?.cancel()
+        httpJob?.cancel()
+
+        try { activeInternalRecord?.stop() } catch (_: Exception) {}
+        try { activeInternalRecord?.release() } catch (_: Exception) {}
+        activeInternalRecord = null
+
+        try { activeMicRecord?.stop() } catch (_: Exception) {}
+        try { activeMicRecord?.release() } catch (_: Exception) {}
+        activeMicRecord = null
+
         streamingJob = null
         micStreamingJob = null
         rtpJob = null
         httpJob = null
         httpServerSocket = null
 
-        httpJob?.cancel()
         try { httpServerSocket?.close() } catch (_: Exception) {}
 
         originalMediaVolume?.let {
@@ -915,7 +907,15 @@ object NetworkManager {
         stopBroadcastingPresence()
 
         connectionStatus.value = context.getString(R.string.status_idle)
+        isStreamingCurrent.value = false
     }
+
+    fun stopListeningForDevices() {
+        listeningJob?.cancel()
+        listeningJob = null
+    }
+
+    fun isListeningActive(): Boolean = listeningJob?.isActive == true
 
     fun stopAll() {
         stopBroadcastingPresence()
@@ -936,6 +936,12 @@ object NetworkManager {
         packet[4] = ((packetLen and 0x7FF) shr 3).toByte()
         packet[5] = (((packetLen and 7) shl 5) + 0x1F).toByte()
         packet[6] = 0xFC.toByte()
+    }
+
+    fun getCurrentSsid(context: Context): String {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+        val info = wifiManager.connectionInfo
+        return info.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: ""
     }
 
     suspend fun updateWidgetState(context: Context, isStreaming: Boolean, isServer: Boolean) {
