@@ -64,6 +64,8 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("androidx.compose.material:material-icons-extended:1.5.0")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
     // ViewModel per Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
 

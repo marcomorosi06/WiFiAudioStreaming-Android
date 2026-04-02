@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.cuscus.wifiaudiostreaming.NetworkManager.updateWidgetState
 import kotlinx.coroutines.*
 
 class ClientService : Service() {
@@ -30,6 +31,7 @@ class ClientService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        serviceScope.launch { updateWidgetState(this@ClientService, true, false) }
 
         createNotificationChannel()
         startForeground(notificationId, buildNotification("Connecting..."))
@@ -83,6 +85,9 @@ class ClientService : Service() {
     }
 
     override fun onDestroy() {
+        CoroutineScope(Dispatchers.IO).launch {
+            updateWidgetState(this@ClientService, false, false)
+        }
         serviceScope.cancel()
         super.onDestroy()
     }

@@ -148,6 +148,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveHttpSettings(port, safariMode) }
     }
 
+    fun setClientTileIp(ip: String) {
+        viewModelScope.launch { settingsDataStore.saveClientTileIp(ip) }
+    }
+
     // Aggiorna startListening (passando l'interfaccia)
     fun startListening() {
         val currentSettings = appSettings.value

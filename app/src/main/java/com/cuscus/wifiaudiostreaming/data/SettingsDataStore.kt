@@ -26,7 +26,8 @@ data class AppSettings(
     val rtpPort: Int,
     val httpEnabled: Boolean,
     val httpPort: Int,
-    val httpSafariMode: Boolean
+    val httpSafariMode: Boolean,
+    val clientTileIp: String = ""
 )
 
 class SettingsDataStore(context: Context) {
@@ -50,6 +51,7 @@ class SettingsDataStore(context: Context) {
         val HTTP_ENABLED = booleanPreferencesKey("http_enabled")
         val HTTP_PORT = intPreferencesKey("http_port")
         val HTTP_SAFARI_MODE = booleanPreferencesKey("http_safari_mode")
+        val CLIENT_TILE_IP = stringPreferencesKey("client_tile_ip")
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
@@ -69,7 +71,8 @@ class SettingsDataStore(context: Context) {
             rtpPort = preferences[PreferencesKeys.RTP_PORT] ?: 9094,
             httpEnabled = preferences[PreferencesKeys.HTTP_ENABLED] ?: false,
             httpPort = preferences[PreferencesKeys.HTTP_PORT] ?: 8080,
-            httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false
+            httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false,
+            clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: ""
         )
     }
 
@@ -77,6 +80,12 @@ class SettingsDataStore(context: Context) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.STREAM_INTERNAL] = streamInternal
             preferences[PreferencesKeys.STREAM_MIC] = streamMic
+        }
+    }
+
+    suspend fun saveClientTileIp(ip: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CLIENT_TILE_IP] = ip
         }
     }
 

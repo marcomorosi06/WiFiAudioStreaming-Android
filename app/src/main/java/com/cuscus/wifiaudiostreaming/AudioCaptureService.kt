@@ -17,6 +17,7 @@ import android.os.IBinder
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.cuscus.wifiaudiostreaming.NetworkManager.updateWidgetState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +36,7 @@ class AudioCaptureService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 startForegroundWithNotification()
+                serviceScope.launch { updateWidgetState(this@AudioCaptureService, true, true) }
 
                 val streamInternal = intent.getBooleanExtra(EXTRA_STREAM_INTERNAL, false)
                 val streamMic = intent.getBooleanExtra(EXTRA_STREAM_MIC, false)
@@ -85,6 +87,10 @@ class AudioCaptureService : Service() {
         NetworkManager.stopStreaming(this)
         mediaProjection?.stop()
         mediaProjection = null
+
+        CoroutineScope(Dispatchers.IO).launch {
+            updateWidgetState(this@AudioCaptureService, false, true)
+        }
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -162,6 +168,7 @@ class AudioCaptureService : Service() {
     override fun onDestroy() {
         stopCapture()
         serviceScope.cancel()
+        serviceScope.launch { updateWidgetState(this@AudioCaptureService, false, true) }
         super.onDestroy()
     }
 

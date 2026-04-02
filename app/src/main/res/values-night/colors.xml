@@ -1,0 +1,8 @@
+<resources>
+    <color name="widget_preview_bg">#1D1B20</color>
+    <color name="widget_preview_primary">#D0BCFF</color>
+    <color name="widget_preview_on_primary">#381E72</color>
+    <color name="widget_preview_secondary_container">#4A4458</color>
+    <color name="widget_preview_on_surface">#E6E1E5</color>
+    <color name="widget_preview_on_surface_variant">#CAC4D0</color>
+</resources>

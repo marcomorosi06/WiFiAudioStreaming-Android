@@ -169,6 +169,39 @@ class MainActivity : ComponentActivity() {
 
         ClientDiscoveryHandler()
 
+        val intentAction = intent.action
+        val connectClientIp = intent.getStringExtra("CONNECT_CLIENT_IP")
+
+        LaunchedEffect(intentAction) {
+            when (intentAction) {
+                "com.cuscus.wifiaudiostreaming.START_SERVER" -> {
+                    startMediaProjectionRequest()
+                    intent.action = null
+                }
+                "com.cuscus.wifiaudiostreaming.CONNECT_CLIENT" -> {
+                    if (connectClientIp != null) {
+                        viewModel.startClientManually(connectClientIp)
+                    }
+                    intent.action = null
+                }
+                "com.cuscus.wifiaudiostreaming.STOP_STREAMING" -> {
+                    if (isServer) {
+                        val intentStop = Intent(context, AudioCaptureService::class.java).apply {
+                            action = AudioCaptureService.ACTION_STOP
+                        }
+                        context.startService(intentStop)
+                    } else {
+                        viewModel.stopStreaming()
+                    }
+                    intent.action = null
+                }
+            }
+        }
+
+        LaunchedEffect(isStreaming, isServer) {
+            updateWidgetState(context, isStreaming, isServer)
+        }
+
         BackHandler(enabled = showSettingsScreen.value) {
             showSettingsScreen.value = false
         }
@@ -252,7 +285,8 @@ class MainActivity : ComponentActivity() {
             },
             onNetworkInterfaceChange = viewModel::setNetworkInterface,
             onServerProtocolsChange = viewModel::setServerProtocols,
-            onHttpSettingsChange = viewModel::setHttpSettings
+            onHttpSettingsChange = viewModel::setHttpSettings,
+            onClientTileIpChange = viewModel::setClientTileIp
         )
     }
 

@@ -16,6 +16,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
+import androidx.glance.appwidget.state.updateAppWidgetState
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.core.*
@@ -935,6 +936,28 @@ object NetworkManager {
         packet[4] = ((packetLen and 0x7FF) shr 3).toByte()
         packet[5] = (((packetLen and 7) shl 5) + 0x1F).toByte()
         packet[6] = 0xFC.toByte()
+    }
+
+    suspend fun updateWidgetState(context: Context, isStreaming: Boolean, isServer: Boolean) {
+        val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
+
+        // Aggiorna ServerWidget
+        manager.getGlanceIds(ServerWidget::class.java).forEach { id ->
+            updateAppWidgetState(context, id) { prefs ->
+                prefs[WidgetKeys.IS_STREAMING] = isStreaming
+                prefs[WidgetKeys.IS_SERVER] = isServer
+            }
+            ServerWidget().update(context, id)
+        }
+
+        // Aggiorna ClientWidget
+        manager.getGlanceIds(ClientWidget::class.java).forEach { id ->
+            updateAppWidgetState(context, id) { prefs ->
+                prefs[WidgetKeys.IS_STREAMING] = isStreaming
+                prefs[WidgetKeys.IS_SERVER] = isServer
+            }
+            ClientWidget().update(context, id)
+        }
     }
 
     @SuppressLint("MissingPermission")

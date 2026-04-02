@@ -4,19 +4,15 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
-        tools:targetApi="33" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33" />
 
     <application
         android:allowBackup="true"
@@ -35,10 +31,16 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.WiFiAudioStreaming">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <service
@@ -50,6 +52,53 @@
             android:name=".AudioCaptureService"
             android:foregroundServiceType="mediaProjection|microphone"
             android:exported="false" />
+
+        <service
+            android:name=".ServerTileService"
+            android:icon="@drawable/ic_preview_server"
+            android:label="@string/widget_server_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".ClientTileService"
+            android:icon="@drawable/ic_preview_client"
+            android:label="@string/widget_client_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name="com.cuscus.wifiaudiostreaming.ServerWidgetReceiver"
+            android:label="@string/widget_server_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/server_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.cuscus.wifiaudiostreaming.ClientWidgetReceiver"
+            android:label="@string/widget_client_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/client_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

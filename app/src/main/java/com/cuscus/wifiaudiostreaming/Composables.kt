@@ -2,11 +2,15 @@ package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
@@ -22,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,19 +34,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.RoundedPolygon
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.data.AppSettings
+import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
@@ -398,6 +409,7 @@ fun ExpressiveSettingsScreen(
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
     onHttpSettingsChange: (Int, Boolean) -> Unit,
+    onClientTileIpChange: (String) -> Unit
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -424,7 +436,8 @@ fun ExpressiveSettingsScreen(
             onShowOnboarding = onShowOnboarding,
             onNetworkInterfaceChange = onNetworkInterfaceChange,
             onServerProtocolsChange = onServerProtocolsChange,
-            onHttpSettingsChange = onHttpSettingsChange
+            onHttpSettingsChange = onHttpSettingsChange,
+            onClientTileIpChange = onClientTileIpChange
         )
     }
 }
@@ -469,7 +482,8 @@ fun SettingsScreenContent(
     onShowOnboarding: () -> Unit,
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
-    onHttpSettingsChange: (Int, Boolean) -> Unit
+    onHttpSettingsChange: (Int, Boolean) -> Unit,
+    onClientTileIpChange: (String) -> Unit
 ) {
     var showExperimentalWarningDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -486,8 +500,72 @@ fun SettingsScreenContent(
 
     Scaffold(
         topBar = {
+            var fredClickCount by remember { mutableIntStateOf(0) }
+            var showFred by remember { mutableStateOf(false) }
+            var currentToast by remember { mutableStateOf<android.widget.Toast?>(null) }
+
+            if (showFred) {
+                androidx.compose.ui.window.Dialog(onDismissRequest = { showFred = false }) {
+                    Card(
+                        shape = RoundedCornerShape(28.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Image(
+                                painter = androidx.compose.ui.res.painterResource(id = R.drawable.fred),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 400.dp)
+                                    .clip(RoundedCornerShape(20.dp)),
+                                contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
+
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.settings_title), fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            fredClickCount++
+
+                            if (fredClickCount < 7) {
+                                val toastMessage = when (fredClickCount) {
+                                    1 -> context.getString(R.string.fred_hint_1)
+                                    2 -> context.getString(R.string.fred_hint_2)
+                                    3 -> context.getString(R.string.fred_hint_3)
+                                    4 -> context.getString(R.string.fred_hint_4)
+                                    5 -> context.getString(R.string.fred_hint_5)
+                                    else -> context.getString(R.string.fred_hint_6)
+                                }
+
+                                currentToast?.cancel()
+                                val toast = android.widget.Toast.makeText(context, toastMessage, android.widget.Toast.LENGTH_SHORT)
+                                toast.show()
+                                currentToast = toast
+
+                            } else {
+                                currentToast?.cancel()
+                                showFred = true
+                                fredClickCount = 0
+                            }
+                        }
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back_button_description))
@@ -696,6 +774,53 @@ fun SettingsScreenContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+
+            item {
+                var tileIpText by remember(appSettings.clientTileIp) { mutableStateOf(appSettings.clientTileIp) }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_tile_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = tileIpText,
+                        onValueChange = {
+                            tileIpText = it
+                            onClientTileIpChange(it)
+                        },
+                        label = { Text(stringResource(R.string.settings_tile_ip_label)) },
+                        placeholder = { Text(stringResource(R.string.settings_tile_ip_placeholder)) },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Done
+                        ),
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.AddComment,
+                                contentDescription = null
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    Text(
+                        text = stringResource(R.string.settings_tile_ip_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
+                    )
                 }
             }
 
@@ -2694,7 +2819,7 @@ fun ExpressiveRtpSdpBanner(
     channels: Int
 ) {
     val context = LocalContext.current
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
     val sdpContent = """
@@ -2707,8 +2832,8 @@ fun ExpressiveRtpSdpBanner(
         a=rtpmap:96 L16/$sampleRate/$channels
     """.trimIndent()
 
-    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/sdp")
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/sdp")
     ) { uri ->
         uri?.let {
             context.contentResolver.openOutputStream(it)?.use { out ->
@@ -2738,7 +2863,7 @@ fun ExpressiveRtpSdpBanner(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalIconButton(
                     onClick = {
-                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(sdpContent))
+                        clipboardManager.setText(AnnotatedString(sdpContent))
                         copied = true
                     },
                     colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)
@@ -2757,7 +2882,7 @@ fun ExpressiveRtpSdpBanner(
 
     if (copied) {
         LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(2000)
+            delay(2000)
             copied = false
         }
     }
@@ -2841,7 +2966,7 @@ private fun CodecAnimatedButton(
     )
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         animationSpec = spring(),
         label = "button_bg"
     )
