@@ -11,7 +11,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -22,7 +21,7 @@ class ClientService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val notificationId = 201
-    private val channelId = "client_service_channel"
+    private val channelId = "client_service_channel_v2"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -59,8 +58,8 @@ class ClientService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Client Service",
-                NotificationManager.IMPORTANCE_LOW
+                "Audio Reception Client",
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -68,7 +67,9 @@ class ClientService : Service() {
     }
 
     private fun buildNotification(status: String): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java)
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -76,13 +77,28 @@ class ClientService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Audio reception")
+        val stopIntent = Intent(this, StreamingActionReceiver::class.java).apply {
+            action = "com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING"
+        }
+        val stopPendingIntent = PendingIntent.getBroadcast(
+            this, 1, stopIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Ricezione Audio")
             .setContentText(status)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
-            .build()
+
+        if (Build.VERSION.SDK_INT >= 36) {
+            builder.extras.putBoolean("android.app.extra.REQUEST_PROMOTED_ONGOING", true)
+        }
+
+        return builder.build()
     }
 
     override fun onDestroy() {

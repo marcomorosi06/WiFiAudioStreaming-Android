@@ -51,6 +51,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isServer.value = isServerMode
         if (isServerMode) {
             NetworkManager.stopListeningForDevices()
+            clearDiscoveredDevices()
         }
     }
 

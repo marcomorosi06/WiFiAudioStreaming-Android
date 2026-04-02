@@ -70,6 +70,7 @@ object NetworkManager {
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
     val isStreamingCurrent = MutableStateFlow(false)
     var autoConnectOwnsListening = false
+    val lastSeenDevices = mutableMapOf<String, Pair<ServerInfo, Long>>()
 
     @SuppressLint("DefaultLocale")
     fun getLocalIpAddress(context: Context): String {
@@ -223,9 +224,22 @@ object NetworkManager {
 
     fun startListeningForDevices(context: Context, networkInterfaceName: String = "Auto") {
         if (isListeningActive()) return
+        discoveredDevices.value = emptyMap()
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val multicastLock = wifiManager.createMulticastLock("wifi_audio_streamer_discovery_lock")
         multicastLock.setReferenceCounted(true)
+
+        scope.launch {
+            while (isActive) {
+                delay(5000)
+                val currentTime = System.currentTimeMillis()
+                val currentMap = discoveredDevices.value
+
+                val filteredMap = currentMap.filter { (hostname, info) ->
+                    true
+                }
+            }
+        }
 
         listeningJob = scope.launch {
             multicastLock.acquire()
@@ -255,13 +269,18 @@ object NetworkManager {
                                     val parts = message.split(";")
                                     if (parts.size >= 4) {
                                         val hostname = parts[1]
-                                        val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
-                                        val port = parts[3].toIntOrNull() ?: continue
 
-                                        val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
-                                        val currentMap = discoveredDevices.value
-                                        if (currentMap[hostname] != serverInfo) {
-                                            discoveredDevices.value = currentMap + (hostname to serverInfo)
+                                        if (message.contains("BYE")) {
+                                            discoveredDevices.value = discoveredDevices.value - hostname
+                                        } else {
+                                            val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
+                                            val port = parts[3].toIntOrNull() ?: continue
+                                            val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
+
+                                            val currentMap = discoveredDevices.value
+                                            if (currentMap[hostname] != serverInfo) {
+                                                discoveredDevices.value = currentMap + (hostname to serverInfo)
+                                            }
                                         }
                                     }
                                 }
@@ -667,13 +686,21 @@ object NetworkManager {
             } catch (e: Exception) {
                 if (e !is CancellationException) connectionStatus.value = context.getString(R.string.status_server_error, e.message)
             } finally {
-            isServerStreaming = false
-            activeInternalRecord?.stop(); activeInternalRecord?.release()
-            activeMicRecord?.stop(); activeMicRecord?.release()
-            sendSocket?.close()
-            stopBroadcastingPresence()
-            if (isActive) connectionStatus.value = context.getString(R.string.status_server_stopped)
-        }
+                isServerStreaming = false
+
+                try { activeInternalRecord?.stop() } catch (_: Exception) {}
+                try { activeInternalRecord?.release() } catch (_: Exception) {}
+                activeInternalRecord = null
+
+                try { activeMicRecord?.stop() } catch (_: Exception) {}
+                try { activeMicRecord?.release() } catch (_: Exception) {}
+                activeMicRecord = null
+
+                try { sendSocket?.close() } catch (_: Exception) {}
+
+                stopBroadcastingPresence()
+                if (isActive) connectionStatus.value = context.getString(R.string.status_server_stopped)
+            }
         }
     }
 

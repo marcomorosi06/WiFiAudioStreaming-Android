@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -43,6 +44,14 @@
                 android:resource="@xml/shortcuts" />
 
         </activity>
+
+        <receiver
+            android:name=".StreamingActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".ClientService"

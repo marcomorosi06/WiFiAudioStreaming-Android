@@ -103,12 +103,11 @@ class AudioCaptureService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Audio Streaming",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Notifiche per il servizio di streaming audio" }
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
             manager.createNotificationChannel(channel)
         }
 
-        // Avvio con stato iniziale
         val initialNotification = buildNotification("Avvio del servizio...")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -120,7 +119,6 @@ class AudioCaptureService : Service() {
             startForeground(SERVICE_ID, initialNotification)
         }
 
-        // Aggiorna dinamicamente la notifica con lo stato di NetworkManager
         serviceScope.launch {
             NetworkManager.connectionStatus.collect { status ->
                 val updatedNotification = buildNotification(status)
@@ -131,7 +129,6 @@ class AudioCaptureService : Service() {
     }
 
     private fun buildNotification(statusText: String): Notification {
-        // Intent per aprire l’app
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -140,36 +137,28 @@ class AudioCaptureService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Intent per fermare lo streaming
-        val stopIntent = Intent(this, AudioCaptureService::class.java).apply { action = ACTION_STOP }
-        val stopPendingIntent = PendingIntent.getService(
+        val stopIntent = Intent(this, StreamingActionReceiver::class.java).apply {
+            action = "com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING"
+        }
+        val stopPendingIntent = PendingIntent.getBroadcast(
             this, 1, stopIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Audio Streaming")
+            .setContentTitle("Server Audio")
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(openAppPendingIntent)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
 
-        // Se il server è "in attesa", mostri progress indeterminato
-        if (statusText.contains("attesa", ignoreCase = true)) {
-            builder.setProgress(0, 0, true)
-        } else {
-            builder.setProgress(0, 0, false)
+        if (Build.VERSION.SDK_INT >= 36) {
+            builder.extras.putBoolean("android.app.extra.REQUEST_PROMOTED_ONGOING", true)
         }
 
         return builder.build()
-    }
-
-    override fun onDestroy() {
-        stopCapture()
-        serviceScope.cancel()
-        serviceScope.launch { updateWidgetState(this@AudioCaptureService, false, true) }
-        super.onDestroy()
     }
 
     companion object {
@@ -181,6 +170,13 @@ class AudioCaptureService : Service() {
         const val EXTRA_STREAM_MIC = "stream_mic"
         const val EXTRA_IS_MULTICAST = "is_multicast"
         private const val SERVICE_ID = 101
-        private const val CHANNEL_ID = "audio_stream_channel"
+        private const val CHANNEL_ID = "audio_stream_channel_v2"
+    }
+
+    override fun onDestroy() {
+        stopCapture()
+        serviceScope.cancel()
+        serviceScope.launch { updateWidgetState(this@AudioCaptureService, false, true) }
+        super.onDestroy()
     }
 }
