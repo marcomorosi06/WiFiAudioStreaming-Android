@@ -63,6 +63,7 @@ import kotlin.random.Random
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val allMaterialShapes = listOf(
@@ -2743,6 +2744,7 @@ private fun OnboardingNavigation(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
