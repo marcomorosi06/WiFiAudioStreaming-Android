@@ -17,8 +17,8 @@ android {
         applicationId = "com.cuscus.wifiaudiostreaming"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.3.3-beta"
+        versionCode = 7
+        versionName = "0.4.0-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
