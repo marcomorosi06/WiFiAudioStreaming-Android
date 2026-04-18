@@ -44,7 +44,10 @@ data class AppSettings(
     val httpSafariMode: Boolean,
     val clientTileIp: String = "",
     val autoConnectEnabled: Boolean = false,
-    val autoConnectList: String = ""
+    val autoConnectList: String = "",
+    val connectionSoundEnabled: Boolean = true,
+    val disconnectionSoundEnabled: Boolean = true,
+    val connectionSoundUri: String = ""
 )
 
 class SettingsDataStore(context: Context) {
@@ -70,6 +73,9 @@ class SettingsDataStore(context: Context) {
         val CLIENT_TILE_IP = stringPreferencesKey("client_tile_ip")
         val AUTO_CONNECT_ENABLED = booleanPreferencesKey("auto_connect_enabled")
         val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
+        val CONNECTION_SOUND_ENABLED = booleanPreferencesKey("connection_sound_enabled")
+        val DISCONNECTION_SOUND_ENABLED = booleanPreferencesKey("disconnection_sound_enabled")
+        val CONNECTION_SOUND_URI = stringPreferencesKey("connection_sound_uri")
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
@@ -92,7 +98,10 @@ class SettingsDataStore(context: Context) {
             httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false,
             clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: "",
             autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
-            autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: ""
+            autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: "",
+            connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
+            disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
+            connectionSoundUri = preferences[PreferencesKeys.CONNECTION_SOUND_URI] ?: ""
         )
     }
 
@@ -196,6 +205,24 @@ class SettingsDataStore(context: Context) {
     suspend fun saveAutoConnectList(list: List<AutoConnectEntry>) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.AUTO_CONNECT_LIST] = AutoConnectEntry.serializeList(list)
+        }
+    }
+
+    suspend fun saveConnectionSoundEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveDisconnectionSoundEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveConnectionSoundUri(uri: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CONNECTION_SOUND_URI] = uri
         }
     }
 }

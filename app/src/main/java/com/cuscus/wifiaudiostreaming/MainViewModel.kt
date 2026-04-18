@@ -170,6 +170,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveAutoConnectList(list) }
     }
 
+    fun setConnectionSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveConnectionSoundEnabled(enabled) }
+    }
+
+    fun setDisconnectionSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveDisconnectionSoundEnabled(enabled) }
+    }
+
+    fun setConnectionSoundUri(uri: String) {
+        viewModelScope.launch { settingsDataStore.saveConnectionSoundUri(uri) }
+    }
+
     // Aggiorna startListening (passando l'interfaccia)
     fun startListening() {
         val currentSettings = appSettings.value
@@ -194,6 +206,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sendMicrophone = currentSettings.sendClientMicrophone,
                 micPort = currentSettings.micPort,
                 networkInterfaceName = currentSettings.networkInterface,
+                connectionSoundEnabled = currentSettings.connectionSoundEnabled,
+                disconnectionSoundEnabled = currentSettings.disconnectionSoundEnabled,
+                connectionSoundUri = currentSettings.connectionSoundUri,
                 onServerDisconnected = {
                     setIsStreaming(false)
                     val stopIntent = Intent(getApplication(), ClientService::class.java)

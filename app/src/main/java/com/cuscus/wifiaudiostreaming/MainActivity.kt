@@ -307,7 +307,10 @@ class MainActivity : ComponentActivity() {
             onHttpSettingsChange = viewModel::setHttpSettings,
             onClientTileIpChange = viewModel::setClientTileIp,
             onAutoConnectEnabledChange = viewModel::setAutoConnectEnabled,
-            onSaveAutoConnectList = viewModel::saveAutoConnectList
+            onSaveAutoConnectList = viewModel::saveAutoConnectList,
+            onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
+            onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
+            onConnectionSoundUriChange = viewModel::setConnectionSoundUri
         )
     }
 
@@ -330,6 +333,14 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startMediaProjectionRequest() {
         val settings = viewModel.appSettings.value ?: return
+
+        if (settings.streamInternal && !hasRecordAudioPermission()) {
+            onMicPermissionGranted = { startMediaProjectionRequest() }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            return
+        }
 
         if (!settings.streamInternal && settings.streamMic) {
             val intent = Intent(this, AudioCaptureService::class.java).apply {

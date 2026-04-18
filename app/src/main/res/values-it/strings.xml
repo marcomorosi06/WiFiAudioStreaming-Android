@@ -202,4 +202,13 @@
     <string name="auto_connect_wifi_hint">Leggi il nome della rete e scrivilo qui</string>
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">L\'app rimarrà attiva in background per connettersi ai server con la stella.</string>
+
+    <string name="settings_group_sounds">Suoni</string>
+    <string name="settings_item_connection_sound_title">Suono di connessione</string>
+    <string name="settings_item_connection_sound_desc">Riproduci un suono quando il client si connette a un server</string>
+    <string name="settings_item_custom_sound_title">Suono di connessione personalizzato</string>
+    <string name="settings_item_custom_sound_none">Nessun file selezionato (usa il predefinito)</string>
+    <string name="settings_item_custom_sound_browse">Scegli file</string>
+    <string name="settings_item_disconnection_sound_title">Suono di disconnessione</string>
+    <string name="settings_item_disconnection_sound_desc">Riproduci un suono quando il client si disconnette da un server</string>
 </resources>

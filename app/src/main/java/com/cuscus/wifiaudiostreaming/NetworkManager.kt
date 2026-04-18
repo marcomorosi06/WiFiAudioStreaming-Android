@@ -471,7 +471,12 @@ object NetworkManager {
                             .setBufferSizeInBytes(bufSize)
                             .setAudioPlaybackCaptureConfig(config)
                             .build()
-                        activeInternalRecord?.startRecording()
+                        if (activeInternalRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                            activeInternalRecord?.release()
+                            activeInternalRecord = null
+                        } else {
+                            activeInternalRecord?.startRecording()
+                        }
                     }
                     if (streamMic) {
                         activeMicRecord = AudioRecord.Builder()
@@ -479,7 +484,12 @@ object NetworkManager {
                             .setAudioFormat(audioFormat)
                             .setBufferSizeInBytes(bufSize)
                             .build()
-                        activeMicRecord?.startRecording()
+                        if (activeMicRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                            activeMicRecord?.release()
+                            activeMicRecord = null
+                        } else {
+                            activeMicRecord?.startRecording()
+                        }
                     }
                 }
 
@@ -491,6 +501,15 @@ object NetworkManager {
                     val internalBuffer = if (streamInternal) ByteArray(bufSize) else null
                     val micBuffer = if (streamMic) ByteArray(bufSize) else null
                     val mixedBuffer = ByteArray(bufSize)
+
+                    val channelsOut = if (channelConfig == "STEREO") 2 else 1
+                    val frameSize = channelsOut * 2
+                    val safeMtuSize = 1400
+                    val headerSize = 10
+                    var maxBytesPerPacket = safeMtuSize - headerSize
+                    maxBytesPerPacket -= (maxBytesPerPacket % frameSize)
+
+                    var seqNumber = 0
 
                     while (isActive && clientAlive?.get() != false) {
                         val internalBytes = activeInternalRecord?.read(internalBuffer!!, 0, internalBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
@@ -531,10 +550,8 @@ object NetworkManager {
                                     bufferToSend[2 * i + 1] = ((sample shr 8) and 0xff).toByte()
                                 }
                             }
-                            val packet = buildPacket { writeFully(bufferToSend, 0, bytesToProcess) }
-                            try {
-                                sendSocket?.send(Datagram(packet, targetAddress))
 
+                            try {
                                 rtpPcmQueue?.let { queue ->
                                     if (queue.remainingCapacity() > 0) {
                                         queue.offer(bufferToSend.copyOf(bytesToProcess))
@@ -545,6 +562,26 @@ object NetworkManager {
                                     if (queue.remainingCapacity() > 0) {
                                         queue.offer(bufferToSend.copyOf(bytesToProcess))
                                     }
+                                }
+
+                                var offset = 0
+                                while (offset < bytesToProcess) {
+                                    val chunkSize = minOf(maxBytesPerPacket, bytesToProcess - offset)
+
+                                    val packet = buildPacket {
+                                        writeByte(0x57.toByte())
+                                        writeByte(0x46.toByte())
+                                        writeByte(0x00.toByte())
+                                        writeByte(0x00.toByte())
+                                        writeByte((seqNumber shr 8).toByte())
+                                        writeByte(seqNumber.toByte())
+                                        writeInt(0)
+                                        writeFully(bufferToSend, offset, chunkSize)
+                                    }
+
+                                    sendSocket?.send(Datagram(packet, targetAddress))
+                                    seqNumber = (seqNumber + 1) and 0xFFFF
+                                    offset += chunkSize
                                 }
                             } catch (_: Exception) {
                                 clientAlive?.set(false)
@@ -714,6 +751,9 @@ object NetworkManager {
         sendMicrophone: Boolean,
         micPort: Int,
         networkInterfaceName: String = "Auto",
+        connectionSoundEnabled: Boolean = true,
+        disconnectionSoundEnabled: Boolean = true,
+        connectionSoundUri: String = "",
         onServerDisconnected: (() -> Unit)? = null
     ) {
         stopStreaming(context)
@@ -734,7 +774,7 @@ object NetworkManager {
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
 
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
+                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 10)
 
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
@@ -778,10 +818,17 @@ object NetworkManager {
                         }
 
                         connectionStatus.value = context.getString(R.string.status_streaming)
+                        if (connectionSoundEnabled) playConnectionSound(context, connectionSoundUri)
 
-                        val buffer = ByteArray(bufferSize * 2)
                         var lastPingReceived = System.currentTimeMillis()
                         val pingTimeoutMs = 3000L
+
+                        val MAGIC_0: Byte = 0x57
+                        val MAGIC_1: Byte = 0x46
+                        val HEADER_SIZE = 10
+
+                        var expectedSeq = -1
+                        var lastGoodPcm: ByteArray? = null
 
                         val watchdogJob = launch {
                             while (isActive) {
@@ -799,16 +846,61 @@ object NetworkManager {
                                 val packet = datagram.packet
                                 val bytes = ByteArray(packet.remaining.toInt())
                                 packet.readFully(bytes)
-                                val text = bytes.toString(Charsets.UTF_8).trim()
 
-                                when (text) {
-                                    "PING" -> lastPingReceived = System.currentTimeMillis()
-                                    "BYE"  -> {
-                                        streamingJob?.cancel()
-                                        break
+                                if (bytes.size >= 2 && bytes[0] == MAGIC_0 && bytes[1] == MAGIC_1) {
+                                    if (bytes.size < HEADER_SIZE) continue
+
+                                    val flags     = bytes[3].toInt() and 0xFF
+                                    val seq       = ((bytes[4].toInt() and 0xFF) shl 8) or (bytes[5].toInt() and 0xFF)
+                                    val isSilence = (flags and 0x01) != 0
+
+                                    if (expectedSeq == -1) {
+                                        expectedSeq = seq
+                                    } else {
+                                        val gap = (seq - expectedSeq) and 0xFFFF
+                                        if (gap in 1..8) {
+                                            val ref = lastGoodPcm
+                                            if (ref != null) {
+                                                var step = 0
+                                                repeat(gap.coerceAtMost(3)) {
+                                                    val factor = 1.0f - step * 0.35f
+                                                    step++
+                                                    val fade = ByteArray(ref.size)
+                                                    val bb  = ByteBuffer.wrap(ref).order(ByteOrder.LITTLE_ENDIAN)
+                                                    val out = ByteBuffer.wrap(fade).order(ByteOrder.LITTLE_ENDIAN)
+                                                    while (bb.remaining() >= 2) {
+                                                        val s = (bb.short * factor).toInt()
+                                                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                                                        out.putShort(s.toShort())
+                                                    }
+                                                    audioTrack.write(fade, 0, fade.size, AudioTrack.WRITE_BLOCKING)
+                                                }
+                                            }
+                                        }
                                     }
-                                    else -> if (bytes.isNotEmpty()) {
-                                        audioTrack.write(bytes, 0, bytes.size, AudioTrack.WRITE_BLOCKING)
+
+                                    expectedSeq = (seq + 1) and 0xFFFF
+
+                                    if (isSilence || bytes.size <= HEADER_SIZE) {
+                                        val silenceLen = lastGoodPcm?.size ?: 3840
+                                        val silenceBuffer = ByteArray(silenceLen)
+                                        audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
+                                    } else {
+                                        val pcmLen = bytes.size - HEADER_SIZE
+                                        audioTrack.write(bytes, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                        if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
+                                            lastGoodPcm = ByteArray(pcmLen)
+                                        }
+                                        bytes.copyInto(lastGoodPcm!!, 0, HEADER_SIZE, HEADER_SIZE + pcmLen)
+                                    }
+                                } else {
+                                    val text = bytes.toString(Charsets.UTF_8).trim()
+                                    when (text) {
+                                        "PING" -> lastPingReceived = System.currentTimeMillis()
+                                        "BYE"  -> {
+                                            streamingJob?.cancel()
+                                            break
+                                        }
                                     }
                                 }
                             }
@@ -857,16 +949,27 @@ object NetworkManager {
 
                         audioTrack.play()
                         connectionStatus.value = context.getString(R.string.status_streaming)
+                        if (connectionSoundEnabled) playConnectionSound(context, connectionSoundUri)
 
-                        val buffer = ByteArray(bufferSize * 2)
+                        val buffer = ByteArray(65536)
                         val packet = DatagramPacket(buffer, buffer.size)
+
+                        val MC_MAGIC_0: Byte = 0x57
+                        val MC_MAGIC_1: Byte = 0x46
+                        val MC_HEADER_SIZE = 10
+
                         while (isActive) {
                             multicastSocket.receive(packet)
-                            if (packet.length > 0) {
-                                if (packet.length == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") {
-                                    break
+                            val len = packet.length
+                            if (len <= 0) continue
+                            if (len == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") break
+                            if (len >= 2 && packet.data[0] == MC_MAGIC_0 && packet.data[1] == MC_MAGIC_1) {
+                                val pcmLen = len - MC_HEADER_SIZE
+                                if (pcmLen > 0) {
+                                    audioTrack.write(packet.data, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
                                 }
-                                audioTrack.write(packet.data, 0, packet.length, AudioTrack.WRITE_BLOCKING)
+                            } else {
+                                audioTrack.write(packet.data, 0, len, AudioTrack.WRITE_BLOCKING)
                             }
                         }
                     } finally {
@@ -891,6 +994,7 @@ object NetworkManager {
                 micStreamingJob = null
                 if (isActive) {
                     connectionStatus.value = context.getString(R.string.status_client_stopped)
+                    if (disconnectionSoundEnabled) playDisconnectionSound(context)
                 }
                 if (isStreamingCurrent.value) {
                     scope.launch(Dispatchers.Main) {
@@ -935,6 +1039,31 @@ object NetworkManager {
 
         connectionStatus.value = context.getString(R.string.status_idle)
         isStreamingCurrent.value = false
+    }
+
+    fun playConnectionSound(context: Context, soundUri: String = "") {
+        try {
+            if (soundUri.isNotEmpty()) {
+                val uri = android.net.Uri.parse(soundUri)
+                val player = android.media.MediaPlayer()
+                player.setDataSource(context, uri)
+                player.prepare()
+                player.setOnCompletionListener { it.release() }
+                player.start()
+                return
+            }
+            val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = android.media.RingtoneManager.getRingtone(context, uri)
+            ringtone?.play()
+        } catch (_: Exception) {}
+    }
+
+    fun playDisconnectionSound(context: Context) {
+        try {
+            val uri = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
+            val ringtone = android.media.RingtoneManager.getRingtone(context, uri)
+            ringtone?.play()
+        } catch (_: Exception) {}
     }
 
     fun stopListeningForDevices() {

@@ -409,6 +409,9 @@ fun ExpressiveSettingsScreen(
     onClientTileIpChange: (String) -> Unit,
     onAutoConnectEnabledChange: (Boolean) -> Unit,
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
+    onConnectionSoundChange: (Boolean) -> Unit,
+    onDisconnectionSoundChange: (Boolean) -> Unit,
+    onConnectionSoundUriChange: (String) -> Unit,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -438,7 +441,10 @@ fun ExpressiveSettingsScreen(
             onHttpSettingsChange = onHttpSettingsChange,
             onClientTileIpChange = onClientTileIpChange,
             onSaveAutoConnectList = onSaveAutoConnectList,
-            onAutoConnectEnabledChange = onAutoConnectEnabledChange
+            onAutoConnectEnabledChange = onAutoConnectEnabledChange,
+            onConnectionSoundChange = onConnectionSoundChange,
+            onDisconnectionSoundChange = onDisconnectionSoundChange,
+            onConnectionSoundUriChange = onConnectionSoundUriChange
         )
     }
 }
@@ -487,6 +493,9 @@ fun SettingsScreenContent(
     onClientTileIpChange: (String) -> Unit,
     onAutoConnectEnabledChange: (Boolean) -> Unit,
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
+    onConnectionSoundChange: (Boolean) -> Unit,
+    onDisconnectionSoundChange: (Boolean) -> Unit,
+    onConnectionSoundUriChange: (String) -> Unit,
 ) {
     var showExperimentalWarningDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -843,6 +852,79 @@ fun SettingsScreenContent(
                             modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
                         )
                     }
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_sounds),
+                    icon = Icons.Outlined.VolumeUp
+                ) {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_connection_sound_title),
+                        description = stringResource(R.string.settings_item_connection_sound_desc),
+                        icon = Icons.Outlined.VolumeUp,
+                        isChecked = appSettings.connectionSoundEnabled,
+                        onCheckedChange = onConnectionSoundChange
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    val audioPickerLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri: Uri? ->
+                        if (uri != null) {
+                            onConnectionSoundUriChange(uri.toString())
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_item_custom_sound_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (appSettings.connectionSoundUri.isNotEmpty()) {
+                                    Uri.parse(appSettings.connectionSoundUri).lastPathSegment
+                                        ?: appSettings.connectionSoundUri
+                                } else {
+                                    stringResource(R.string.settings_item_custom_sound_none)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                        if (appSettings.connectionSoundUri.isNotEmpty()) {
+                            IconButton(onClick = { onConnectionSoundUriChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = null)
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { audioPickerLauncher.launch("audio/*") }
+                        ) {
+                            Text(stringResource(R.string.settings_item_custom_sound_browse))
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_disconnection_sound_title),
+                        description = stringResource(R.string.settings_item_disconnection_sound_desc),
+                        icon = Icons.Outlined.VolumeOff,
+                        isChecked = appSettings.disconnectionSoundEnabled,
+                        onCheckedChange = onDisconnectionSoundChange
+                    )
                 }
             }
 
@@ -2940,7 +3022,7 @@ fun AutoConnectPriorityListManager(
     autoConnectListString: String,
     onListChange: (List<AutoConnectEntry>) -> Unit
 ) {
-    val list = AutoConnectEntry.parseList(autoConnectListString)
+    var localList by remember(autoConnectListString) { mutableStateOf(AutoConnectEntry.parseList(autoConnectListString)) }
     val context = LocalContext.current
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -2951,9 +3033,9 @@ fun AutoConnectPriorityListManager(
             modifier = Modifier.padding(horizontal = 20.dp)
         )
 
-        list.forEachIndexed { index, entry ->
-            var localIp by remember(entry.ip) { mutableStateOf(entry.ip) }
-            var localSsid by remember(entry.ssid) { mutableStateOf(entry.ssid) }
+        localList.forEachIndexed { index, entry ->
+            var localIp by remember(index) { mutableStateOf(entry.ip) }
+            var localSsid by remember(index) { mutableStateOf(entry.ssid) }
             val focusManager = LocalFocusManager.current
 
             ElevatedCard(
@@ -2968,14 +3050,15 @@ fun AutoConnectPriorityListManager(
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = localIp,
-                            onValueChange = { localIp = it },
+                            onValueChange = {
+                                localIp = it
+                                localList = localList.toMutableList().also { l -> l[index] = entry.copy(ip = it, ssid = localSsid) }
+                            },
                             label = { Text(stringResource(R.string.auto_connect_ip_label)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
-                                val newList = list.toMutableList()
-                                newList[index] = entry.copy(ip = localIp, ssid = localSsid)
-                                onListChange(newList)
+                                onListChange(localList)
                                 focusManager.clearFocus()
                             }),
                             shape = RoundedCornerShape(16.dp),
@@ -2983,14 +3066,15 @@ fun AutoConnectPriorityListManager(
                         )
                         OutlinedTextField(
                             value = localSsid,
-                            onValueChange = { localSsid = it },
+                            onValueChange = {
+                                localSsid = it
+                                localList = localList.toMutableList().also { l -> l[index] = entry.copy(ip = localIp, ssid = it) }
+                            },
                             label = { Text(stringResource(R.string.auto_connect_ssid_label)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
-                                val newList = list.toMutableList()
-                                newList[index] = entry.copy(ip = localIp, ssid = localSsid)
-                                onListChange(newList)
+                                onListChange(localList)
                                 focusManager.clearFocus()
                             }),
                             shape = RoundedCornerShape(16.dp),
@@ -3017,10 +3101,11 @@ fun AutoConnectPriorityListManager(
                         IconButton(
                             onClick = {
                                 if (index > 0) {
-                                    val newList = list.toMutableList()
+                                    val newList = localList.toMutableList()
                                     val temp = newList[index]
                                     newList[index] = newList[index - 1]
                                     newList[index - 1] = temp
+                                    localList = newList
                                     onListChange(newList)
                                 }
                             },
@@ -3030,22 +3115,24 @@ fun AutoConnectPriorityListManager(
                         }
                         IconButton(
                             onClick = {
-                                if (index < list.size - 1) {
-                                    val newList = list.toMutableList()
+                                if (index < localList.size - 1) {
+                                    val newList = localList.toMutableList()
                                     val temp = newList[index]
                                     newList[index] = newList[index + 1]
                                     newList[index + 1] = temp
+                                    localList = newList
                                     onListChange(newList)
                                 }
                             },
-                            enabled = index < list.size - 1
+                            enabled = index < localList.size - 1
                         ) {
                             Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.auto_connect_move_down))
                         }
                         IconButton(
                             onClick = {
-                                val newList = list.toMutableList()
+                                val newList = localList.toMutableList()
                                 newList.removeAt(index)
+                                localList = newList
                                 onListChange(newList)
                             }
                         ) {
@@ -3058,8 +3145,9 @@ fun AutoConnectPriorityListManager(
 
         TextButton(
             onClick = {
-                val newList = list.toMutableList()
+                val newList = localList.toMutableList()
                 newList.add(AutoConnectEntry("", ""))
+                localList = newList
                 onListChange(newList)
             },
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)

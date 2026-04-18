@@ -147,11 +147,12 @@ class AutoConnectService : Service() {
 
                                     val currentSsid = NetworkManager.getCurrentSsid(applicationContext).trim().removePrefix("\"").removeSuffix("\"")
                                     val priorityList = AutoConnectEntry.parseList(prefs.autoConnectList)
+                                    val validEntries = priorityList.filter { it.ip.isNotBlank() }
 
-                                    val isMatch = if (priorityList.isEmpty()) {
+                                    val isMatch = if (validEntries.isEmpty()) {
                                         true
                                     } else {
-                                        priorityList.any { entry ->
+                                        validEntries.any { entry ->
                                             val cleanIp = entry.ip.trim()
                                             val cleanSsid = entry.ssid.trim().removePrefix("\"").removeSuffix("\"")
                                             val isSsidUnknown = currentSsid == "<unknown ssid>" || currentSsid.isEmpty()
@@ -211,6 +212,8 @@ class AutoConnectService : Service() {
                             sendMicrophone = prefs.sendClientMicrophone,
                             micPort = prefs.micPort,
                             networkInterfaceName = prefs.networkInterface,
+                            connectionSoundEnabled = prefs.connectionSoundEnabled,
+                            disconnectionSoundEnabled = prefs.disconnectionSoundEnabled,
                             onServerDisconnected = {
                                 Log.d("AutoConnect", "Callback disconnessione ricevuta. Reset dello stato.")
                                 NetworkManager.isStreamingCurrent.value = false

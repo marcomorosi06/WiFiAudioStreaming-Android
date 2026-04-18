@@ -201,4 +201,13 @@
     <string name="auto_connect_wifi_hint">Read the network name and type it here</string>
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
+
+    <string name="settings_group_sounds">Sounds</string>
+    <string name="settings_item_connection_sound_title">Connection Sound</string>
+    <string name="settings_item_connection_sound_desc">Play a sound when the client connects to a server</string>
+    <string name="settings_item_custom_sound_title">Custom Connection Sound</string>
+    <string name="settings_item_custom_sound_none">No file selected (using default)</string>
+    <string name="settings_item_custom_sound_browse">Choose file</string>
+    <string name="settings_item_disconnection_sound_title">Disconnection Sound</string>
+    <string name="settings_item_disconnection_sound_desc">Play a sound when the client disconnects from a server</string>
 </resources>
