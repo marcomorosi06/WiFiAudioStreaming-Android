@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.content.Context
@@ -126,7 +143,6 @@ object WidgetKeys {
 }
 
 suspend fun updateWidgetState(context: Context, isStreaming: Boolean, isServer: Boolean) {
-    // 1. Aggiorna i Widget
     val manager = GlanceAppWidgetManager(context)
     manager.getGlanceIds(ServerWidget::class.java).forEach { id ->
         updateAppWidgetState(context, id) { prefs ->
@@ -143,14 +159,12 @@ suspend fun updateWidgetState(context: Context, isStreaming: Boolean, isServer: 
         ClientWidget().update(context, id)
     }
 
-    // 2. Salva lo stato veloce per le Tile
     val prefs = context.getSharedPreferences("TileState", Context.MODE_PRIVATE)
     prefs.edit()
         .putBoolean("is_streaming", isStreaming)
         .putBoolean("is_server", isServer)
         .apply()
 
-    // 3. Chiedi al sistema di aggiornare la UI delle Tile
     try {
         android.service.quicksettings.TileService.requestListeningState(context, android.content.ComponentName(context, ServerTileService::class.java))
         android.service.quicksettings.TileService.requestListeningState(context, android.content.ComponentName(context, ClientTileService::class.java))
@@ -543,27 +557,20 @@ class RefreshDiscoveryAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        // NON SVUOTIAMO PIÙ LA MAPPA ALL'INIZIO!
-
-        // 1. Controlliamo se l'App o l'AutoConnect stanno già ascoltando la rete
         val wasActive = NetworkManager.isListeningActive()
 
         if (!wasActive) {
             NetworkManager.startListeningForDevices(context, "Auto")
         }
 
-        // 2. Diamo 3.5 secondi ai server per rispondere al ping
         delay(3500)
 
-        // 3. Leggiamo i dispositivi trovati
         val devices = NetworkManager.discoveredDevices.value
 
-        // 4. Spegniamo la rete SOLO se l'avevamo accesa noi
         if (!wasActive) {
             NetworkManager.stopListeningForDevices()
         }
 
-        // 5. Aggiorniamo la grafica del widget
         val serialized = devices.entries.joinToString(";;") {
             "${it.key}::${it.value.ip}::${it.value.isMulticast}::${it.value.port}"
         }

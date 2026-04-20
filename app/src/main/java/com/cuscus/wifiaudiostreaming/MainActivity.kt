@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
@@ -16,6 +33,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +42,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,11 +53,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
+import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
 
@@ -91,7 +113,6 @@ class MainActivity : ComponentActivity() {
             onMicPermissionGranted = null
         }
 
-    // ## NUOVO: LAUNCHER PER IL PERMESSO DELLE NOTIFICHE ##
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
@@ -104,48 +125,54 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        actionBar?.hide()
+
         setContent {
             WiFiAudioStreamingTheme {
                 val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
-                if (appSettings == null) {
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background))
-                } else {
-                    if (appSettings!!.onboardingCompleted) {
-                        MainAppContent()
-
-                        // ## NUOVO: LOGICA DI GESTIONE DEL DIALOGO ##
-                        var showNotificationPermissionDialog by remember { mutableStateOf(false) }
-
-                        // Questo `LaunchedEffect` viene eseguito solo una volta all'avvio dell'app.
-                        LaunchedEffect(Unit) {
-                            // Controlla il permesso solo su Android 13 (TIRAMISU) o superiori.
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
-                                showNotificationPermissionDialog = true
-                            }
-                        }
-
-                        if (showNotificationPermissionDialog) {
-                            NotificationPermissionDialog(
-                                onConfirm = {
-                                    showNotificationPermissionDialog = false
-                                    // Lancia la richiesta di sistema per il permesso
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                },
-                                onDismiss = {
-                                    showNotificationPermissionDialog = false
-                                }
-                            )
-                        }
-
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    if (appSettings == null) {
+                        Box(modifier = Modifier.fillMaxSize())
                     } else {
-                        OnboardingScreen(
-                            onOnboardingFinished = {
-                                viewModel.setOnboardingCompleted()
+                        Crossfade(
+                            targetState = appSettings!!.onboardingCompleted,
+                            label = "OnboardingTransition"
+                        ) { isCompleted ->
+                            if (isCompleted) {
+                                MainAppContent()
+
+                                var showNotificationPermissionDialog by remember { mutableStateOf(false) }
+
+                                LaunchedEffect(Unit) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
+                                        showNotificationPermissionDialog = true
+                                    }
+                                }
+
+                                if (showNotificationPermissionDialog) {
+                                    NotificationPermissionDialog(
+                                        onConfirm = {
+                                            showNotificationPermissionDialog = false
+                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        },
+                                        onDismiss = {
+                                            showNotificationPermissionDialog = false
+                                        }
+                                    )
+                                }
+                            } else {
+                                OnboardingScreen(
+                                    onOnboardingFinished = {
+                                        viewModel.setOnboardingCompleted()
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -296,7 +323,6 @@ class MainActivity : ComponentActivity() {
             onBufferSizeChange = viewModel::setBufferSize,
             onStreamingPortChange = viewModel::setStreamingPort,
             onMicPortChange = viewModel::setMicPort,
-            onExperimentalFeaturesChange = viewModel::setExperimentalFeatures,
             onClose = { showSettingsScreen.value = false },
             onShowOnboarding = {
                 showSettingsScreen.value = false
@@ -309,8 +335,7 @@ class MainActivity : ComponentActivity() {
             onAutoConnectEnabledChange = viewModel::setAutoConnectEnabled,
             onSaveAutoConnectList = viewModel::saveAutoConnectList,
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
-            onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
-            onConnectionSoundUriChange = viewModel::setConnectionSoundUri
+            onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled
         )
     }
 
@@ -414,7 +439,7 @@ fun ClientDiscoveryHandler() {
     }
 }
 
-// ## NUOVO: COMPOSABLE PER L'ALERT DIALOG PERSONALIZZATO ##
+
 @Composable
 fun NotificationPermissionDialog(
     onConfirm: () -> Unit,

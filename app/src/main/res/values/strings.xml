@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">WiFi Audio Streaming</string>
+    <string name="splash_tagline" translatable="false">AUDIO STREAMING OVER WIFI</string>
     <string name="connection_status_connected">Connected</string>
     <string name="connection_status_error">Connection error</string>
     <string name="connection_status_waiting">Waiting…</string>
@@ -62,8 +63,8 @@
     <string name="experimental_warning_confirm">Enable Anyway</string>
     <string name="cancel">Cancel</string>
     <string name="client_options_title">Client Options</string>
-    <string name="send_mic_to_server_title">Send Microphone to Server</string>
-    <string name="send_mic_to_server_subtitle">Broadcasts your microphone audio</string>
+    <string name="send_mic_to_server_title">Share Microphone</string>
+    <string name="send_mic_to_server_subtitle">Speak through the desktop (Discord, Zoom, games...)</string>
 
     <string name="main_audio_port_title">Main Audio Port</string>
     <string name="main_audio_port_desc">Port to receive audio from the server</string>
@@ -210,4 +211,6 @@
     <string name="settings_item_custom_sound_browse">Choose file</string>
     <string name="settings_item_disconnection_sound_title">Disconnection Sound</string>
     <string name="settings_item_disconnection_sound_desc">Play a sound when the client disconnects from a server</string>
+    <string name="mic_muted">Microphone Muted</string>
+    <string name="mic_active">Microphone Active</string>
 </resources>

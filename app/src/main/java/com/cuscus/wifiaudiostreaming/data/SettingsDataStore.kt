@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming.data
 
 import android.content.Context
@@ -34,7 +51,6 @@ data class AppSettings(
     val streamingPort: Int,
     val sendClientMicrophone: Boolean,
     val micPort: Int,
-    val experimentalFeaturesEnabled: Boolean,
     val onboardingCompleted: Boolean,
     val networkInterface: String,
     val rtpEnabled: Boolean,
@@ -42,12 +58,12 @@ data class AppSettings(
     val httpEnabled: Boolean,
     val httpPort: Int,
     val httpSafariMode: Boolean,
+    val lastMulticastMode: Boolean = false,
     val clientTileIp: String = "",
     val autoConnectEnabled: Boolean = false,
     val autoConnectList: String = "",
     val connectionSoundEnabled: Boolean = true,
-    val disconnectionSoundEnabled: Boolean = true,
-    val connectionSoundUri: String = ""
+    val disconnectionSoundEnabled: Boolean = true
 )
 
 class SettingsDataStore(context: Context) {
@@ -62,8 +78,8 @@ class SettingsDataStore(context: Context) {
         val STREAMING_PORT = intPreferencesKey("streaming_port")
         val SEND_CLIENT_MICROPHONE = booleanPreferencesKey("send_client_microphone")
         val MIC_PORT = intPreferencesKey("mic_port")
-        val EXPERIMENTAL_FEATURES_ENABLED = booleanPreferencesKey("experimental_features_enabled")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val LAST_MULTICAST_MODE = booleanPreferencesKey("last_multicast_mode")
         val NETWORK_INTERFACE = stringPreferencesKey("network_interface")
         val RTP_ENABLED = booleanPreferencesKey("rtp_enabled")
         val RTP_PORT = intPreferencesKey("rtp_port")
@@ -75,7 +91,6 @@ class SettingsDataStore(context: Context) {
         val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
         val CONNECTION_SOUND_ENABLED = booleanPreferencesKey("connection_sound_enabled")
         val DISCONNECTION_SOUND_ENABLED = booleanPreferencesKey("disconnection_sound_enabled")
-        val CONNECTION_SOUND_URI = stringPreferencesKey("connection_sound_uri")
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
@@ -88,8 +103,8 @@ class SettingsDataStore(context: Context) {
             streamingPort = preferences[PreferencesKeys.STREAMING_PORT] ?: 9090,
             sendClientMicrophone = preferences[PreferencesKeys.SEND_CLIENT_MICROPHONE] ?: false,
             micPort = preferences[PreferencesKeys.MIC_PORT] ?: 9092,
-            experimentalFeaturesEnabled = preferences[PreferencesKeys.EXPERIMENTAL_FEATURES_ENABLED] ?: false,
             onboardingCompleted = preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false,
+            lastMulticastMode = preferences[PreferencesKeys.LAST_MULTICAST_MODE] ?: false,
             networkInterface = preferences[PreferencesKeys.NETWORK_INTERFACE] ?: "Auto",
             rtpEnabled = preferences[PreferencesKeys.RTP_ENABLED] ?: false,
             rtpPort = preferences[PreferencesKeys.RTP_PORT] ?: 9094,
@@ -100,8 +115,7 @@ class SettingsDataStore(context: Context) {
             autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
             autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: "",
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
-            disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
-            connectionSoundUri = preferences[PreferencesKeys.CONNECTION_SOUND_URI] ?: ""
+            disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true
         )
     }
 
@@ -149,9 +163,9 @@ class SettingsDataStore(context: Context) {
         }
     }
 
-    suspend fun saveExperimentalFeatures(enabled: Boolean) {
+    suspend fun saveLastMulticastMode(isMulticast: Boolean) {
         dataStore.edit { preferences ->
-            preferences[PreferencesKeys.EXPERIMENTAL_FEATURES_ENABLED] = enabled
+            preferences[PreferencesKeys.LAST_MULTICAST_MODE] = isMulticast
         }
     }
 
@@ -220,9 +234,4 @@ class SettingsDataStore(context: Context) {
         }
     }
 
-    suspend fun saveConnectionSoundUri(uri: String) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.CONNECTION_SOUND_URI] = uri
-        }
-    }
 }

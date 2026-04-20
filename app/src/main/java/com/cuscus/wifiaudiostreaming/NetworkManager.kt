@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
@@ -69,6 +86,7 @@ object NetworkManager {
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
     val isStreamingCurrent = MutableStateFlow(false)
+    val isMicMuted = MutableStateFlow(false)
     var autoConnectOwnsListening = false
     val lastSeenDevices = mutableMapOf<String, Pair<ServerInfo, Long>>()
 
@@ -375,7 +393,12 @@ object NetworkManager {
         try {
             val channelConfigIn = if (channelConfig == "STEREO") AudioFormat.CHANNEL_IN_STEREO else AudioFormat.CHANNEL_IN_MONO
             val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, AudioFormat.ENCODING_PCM_16BIT)
-            val micBufferSize = bufferSize.coerceAtLeast(minBufferSize)
+            var micBufferSize = bufferSize.coerceAtLeast(minBufferSize)
+
+            val frameSize = if (channelConfig == "STEREO") 4 else 2
+            if (micBufferSize % frameSize != 0) {
+                micBufferSize += frameSize - (micBufferSize % frameSize)
+            }
 
             micRecord = AudioRecord(
                 MediaRecorder.AudioSource.MIC,
@@ -385,18 +408,29 @@ object NetworkManager {
                 micBufferSize
             )
 
-            socket = DatagramSocket()
+            socket = DatagramSocket().apply { sendBufferSize = 1 shl 20 }
             val destinationAddress = InetAddress.getByName(serverInfo.ip)
 
             micRecord.startRecording()
             println("Invio microfono a ${serverInfo.ip}:$micPort")
 
+            val chunkBytes = 1200
             val buffer = ByteArray(micBufferSize)
+            val silenceBuffer = ByteArray(micBufferSize)
             while (isActive) {
                 val bytesRead = micRecord.read(buffer, 0, buffer.size)
                 if (bytesRead > 0) {
-                    val packet = DatagramPacket(buffer, bytesRead, destinationAddress, micPort)
-                    socket.send(packet)
+                    val dataToSend = if (isMicMuted.value) silenceBuffer else buffer
+                    var offset = 0
+                    while (offset < bytesRead) {
+                        val remaining = bytesRead - offset
+                        var chunk = if (remaining > chunkBytes) chunkBytes else remaining
+                        chunk -= chunk % 2
+                        if (chunk <= 0) break
+                        val packet = DatagramPacket(dataToSend, offset, chunk, destinationAddress, micPort)
+                        socket.send(packet)
+                        offset += chunk
+                    }
                 }
             }
         } catch (e: SecurityException) {
@@ -450,6 +484,7 @@ object NetworkManager {
             var internalRecord: AudioRecord? = null
             var micRecord: AudioRecord? = null
             var sendSocket: BoundDatagramSocket? = null
+            var hasError = false
 
             try {
                 val selectorManager = SelectorManager(Dispatchers.IO)
@@ -459,6 +494,13 @@ object NetworkManager {
                     .setSampleRate(sampleRate)
                     .setChannelMask(channelConfigIn)
                     .build()
+
+                val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfigIn, AudioFormat.ENCODING_PCM_16BIT)
+                var safeBufferSize = bufferSize.coerceAtLeast(minBufferSize)
+                val frameSize = if (channelConfig == "STEREO") 4 else 2
+                if (safeBufferSize % frameSize != 0) {
+                    safeBufferSize += frameSize - (safeBufferSize % frameSize)
+                }
 
                 fun setupAudioRecorders(bufSize: Int) {
                     if (streamInternal && projection != null) {
@@ -595,23 +637,19 @@ object NetworkManager {
                 val wifiIface = getWifiNetworkInterface(networkInterfaceName)
 
                 httpJob?.cancel()
-                try { httpServerSocket?.close() } catch (_: Exception) {}
                 httpPcmQueue?.clear()
                 httpPcmQueue = null
+                try { httpServerSocket?.close() } catch (_: Exception) {}
+                httpServerSocket = null
 
                 if (httpEnabled) {
-                    httpJob = scope.launchHttpSidecar(sampleRate, channels, httpPort)
-                }
-
-                if (httpEnabled) {
-                    httpJob?.cancel()
                     httpJob = scope.launchHttpSidecar(sampleRate, channels, httpPort)
                 }
 
                 if (isMulticast) {
                     val targetAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, streamingPort)
                     sendSocket = aSocket(selectorManager).udp().bind()
-                    setupAudioRecorders(bufferSize)
+                    setupAudioRecorders(safeBufferSize)
 
                     if (rtpEnabled) {
                         rtpJob = scope.launchRtpSidecar(
@@ -625,7 +663,7 @@ object NetworkManager {
                     }
 
                     try {
-                        streamingLoop(targetAddress, bufferSize)
+                        streamingLoop(targetAddress, safeBufferSize)
                     } finally {
                         // BYE al gruppo multicast: tutti i client si disconnettono
                         try {
@@ -637,7 +675,7 @@ object NetworkManager {
                 } else {
                     // Loop esterno: il server torna in waiting dopo ogni disconnect
                     connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
-                    setupAudioRecorders(bufferSize)
+                    setupAudioRecorders(safeBufferSize)
 
                     val localAddress = InetSocketAddress("0.0.0.0", streamingPort)
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
@@ -660,7 +698,7 @@ object NetworkManager {
                         connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
 
                         // Drain AudioRecord
-                        val drainBuffer = ByteArray(bufferSize)
+                        val drainBuffer = ByteArray(safeBufferSize)
                         var staleBytesTotal = 0
                         var staleBytes: Int
                         do {
@@ -706,7 +744,7 @@ object NetworkManager {
                         }
 
                         try {
-                            streamingLoop(clientAddress, bufferSize, clientAlive)
+                            streamingLoop(clientAddress, safeBufferSize, clientAlive)
                         } finally {
                             pingJob.cancel()
                             // BYE solo se è il server a chiudersi (client ancora vivo)
@@ -721,7 +759,10 @@ object NetworkManager {
                     }
                 }
             } catch (e: Exception) {
-                if (e !is CancellationException) connectionStatus.value = context.getString(R.string.status_server_error, e.message)
+                if (e !is CancellationException) {
+                    hasError = true
+                    connectionStatus.value = context.getString(R.string.status_server_error, e.message)
+                }
             } finally {
                 isServerStreaming = false
 
@@ -736,7 +777,7 @@ object NetworkManager {
                 try { sendSocket?.close() } catch (_: Exception) {}
 
                 stopBroadcastingPresence()
-                if (isActive) connectionStatus.value = context.getString(R.string.status_server_stopped)
+                if (isActive && !hasError) connectionStatus.value = context.getString(R.string.status_server_stopped)
             }
         }
     }
@@ -753,7 +794,6 @@ object NetworkManager {
         networkInterfaceName: String = "Auto",
         connectionSoundEnabled: Boolean = true,
         disconnectionSoundEnabled: Boolean = true,
-        connectionSoundUri: String = "",
         onServerDisconnected: (() -> Unit)? = null
     ) {
         stopStreaming(context)
@@ -765,6 +805,8 @@ object NetworkManager {
         }
 
         streamingJob = scope.launch {
+            var connectedSuccessfully = false
+            var disconnectionSoundPlayed = false
             try {
                 if (!serverInfo.isMulticast) {
                     var audioTrack: AudioTrack? = null
@@ -772,9 +814,13 @@ object NetworkManager {
                     try {
                         val selectorManager = SelectorManager(Dispatchers.IO)
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
-
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 10)
+                        var playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 10)
+
+                        val frameSize = if (channelConfig == "STEREO") 4 else 2
+                        if (playbackBufferSize % frameSize != 0) {
+                            playbackBufferSize += frameSize - (playbackBufferSize % frameSize)
+                        }
 
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
@@ -818,7 +864,8 @@ object NetworkManager {
                         }
 
                         connectionStatus.value = context.getString(R.string.status_streaming)
-                        if (connectionSoundEnabled) playConnectionSound(context, connectionSoundUri)
+                        if (connectionSoundEnabled) playConnectionSound(context)
+                        connectedSuccessfully = true
 
                         var lastPingReceived = System.currentTimeMillis()
                         val pingTimeoutMs = 3000L
@@ -834,6 +881,7 @@ object NetworkManager {
                             while (isActive) {
                                 delay(1000)
                                 if (System.currentTimeMillis() - lastPingReceived > pingTimeoutMs) {
+                                    if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
                                     streamingJob?.cancel()
                                     break
                                 }
@@ -898,6 +946,7 @@ object NetworkManager {
                                     when (text) {
                                         "PING" -> lastPingReceived = System.currentTimeMillis()
                                         "BYE"  -> {
+                                            if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
                                             streamingJob?.cancel()
                                             break
                                         }
@@ -928,7 +977,13 @@ object NetworkManager {
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        val playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
+                        var playbackBufferSize = minBuffer.coerceAtLeast(bufferSize * 2)
+
+                        val frameSize = if (channelConfig == "STEREO") 4 else 2
+                        if (playbackBufferSize % frameSize != 0) {
+                            playbackBufferSize += frameSize - (playbackBufferSize % frameSize)
+                        }
+
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
                                 AudioAttributes.Builder()
@@ -949,7 +1004,8 @@ object NetworkManager {
 
                         audioTrack.play()
                         connectionStatus.value = context.getString(R.string.status_streaming)
-                        if (connectionSoundEnabled) playConnectionSound(context, connectionSoundUri)
+                        if (connectionSoundEnabled) playConnectionSound(context)
+                        connectedSuccessfully = true
 
                         val buffer = ByteArray(65536)
                         val packet = DatagramPacket(buffer, buffer.size)
@@ -962,7 +1018,10 @@ object NetworkManager {
                             multicastSocket.receive(packet)
                             val len = packet.length
                             if (len <= 0) continue
-                            if (len == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") break
+                            if (len == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") {
+                                if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
+                                break
+                            }
                             if (len >= 2 && packet.data[0] == MC_MAGIC_0 && packet.data[1] == MC_MAGIC_1) {
                                 val pcmLen = len - MC_HEADER_SIZE
                                 if (pcmLen > 0) {
@@ -986,19 +1045,37 @@ object NetworkManager {
             } catch (e: BindException) {
                 connectionStatus.value = context.getString(R.string.status_port_in_use)
             } catch (e: Exception) {
-                if (e !is CancellationException) {
+                if (e is TimeoutCancellationException) {
+                    connectionStatus.value = "Timeout connessione al server"
+                } else if (e !is CancellationException) {
                     connectionStatus.value = context.getString(R.string.status_client_error, e.message)
                 }
             } finally {
                 micStreamingJob?.cancel()
                 micStreamingJob = null
-                if (isActive) {
-                    connectionStatus.value = context.getString(R.string.status_client_stopped)
-                    if (disconnectionSoundEnabled) playDisconnectionSound(context)
+                isMicMuted.value = false
+                if (connectedSuccessfully && !disconnectionSoundPlayed && disconnectionSoundEnabled) {
+                    playDisconnectionSound(context)
                 }
                 if (isStreamingCurrent.value) {
                     scope.launch(Dispatchers.Main) {
+                        val currentStatus = connectionStatus.value
                         stopStreaming(context)
+
+                        val contactingPrefix = context.getString(R.string.status_contacting_server, "").substringBefore("%")
+                        val waitingClientPrefix = context.getString(R.string.status_waiting_for_client, 0).substringBefore("%")
+                        val joiningPrefix = context.getString(R.string.status_joining_multicast)
+                        val waitingAckPrefix = context.getString(R.string.status_waiting_for_ack)
+
+                        if (currentStatus != context.getString(R.string.status_idle) &&
+                            currentStatus != context.getString(R.string.status_streaming) &&
+                            !currentStatus.startsWith(contactingPrefix) &&
+                            !currentStatus.startsWith(waitingClientPrefix) &&
+                            !currentStatus.startsWith(joiningPrefix) &&
+                            !currentStatus.startsWith(waitingAckPrefix)
+                        ) {
+                            connectionStatus.value = currentStatus
+                        }
                         onServerDisconnected?.invoke()
                     }
                 }
@@ -1025,9 +1102,8 @@ object NetworkManager {
         micStreamingJob = null
         rtpJob = null
         httpJob = null
-        httpServerSocket = null
-
         try { httpServerSocket?.close() } catch (_: Exception) {}
+        httpServerSocket = null
 
         originalMediaVolume?.let {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -1041,28 +1117,19 @@ object NetworkManager {
         isStreamingCurrent.value = false
     }
 
-    fun playConnectionSound(context: Context, soundUri: String = "") {
+    fun playConnectionSound(context: Context) {
         try {
-            if (soundUri.isNotEmpty()) {
-                val uri = android.net.Uri.parse(soundUri)
-                val player = android.media.MediaPlayer()
-                player.setDataSource(context, uri)
-                player.prepare()
-                player.setOnCompletionListener { it.release() }
-                player.start()
-                return
-            }
-            val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-            val ringtone = android.media.RingtoneManager.getRingtone(context, uri)
-            ringtone?.play()
+            val player = android.media.MediaPlayer.create(context, R.raw.connection_sound)
+            player?.setOnCompletionListener { it.release() }
+            player?.start()
         } catch (_: Exception) {}
     }
 
     fun playDisconnectionSound(context: Context) {
         try {
-            val uri = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
-            val ringtone = android.media.RingtoneManager.getRingtone(context, uri)
-            ringtone?.play()
+            val player = android.media.MediaPlayer.create(context, R.raw.disconnection_sound)
+            player?.setOnCompletionListener { it.release() }
+            player?.start()
         } catch (_: Exception) {}
     }
 
@@ -1275,7 +1342,9 @@ object NetworkManager {
             if (e !is CancellationException) println("HTTP Server error: ${e.message}")
         } finally {
             serverSocket?.close()
-            httpPcmQueue = null
+            if (httpPcmQueue == queue) {
+                httpPcmQueue = null
+            }
         }
     }
 }

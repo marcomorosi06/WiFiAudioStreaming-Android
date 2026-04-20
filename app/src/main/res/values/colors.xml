@@ -13,4 +13,9 @@
     <color name="widget_preview_secondary_container">#E8DEF8</color>
     <color name="widget_preview_on_surface">#1D1B20</color>
     <color name="widget_preview_on_surface_variant">#49454F</color>
+    <color name="splash_background">#1A1329</color>
+    <color name="splash_background_top">#2A1C4A</color>
+    <color name="splash_background_bottom">#0F0A1E</color>
+    <color name="splash_accent">#B49DE8</color>
+    <color name="splash_icon_bg">#1A1329</color>
 </resources>

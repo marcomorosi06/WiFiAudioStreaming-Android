@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
@@ -26,7 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isStreaming: StateFlow<Boolean> = NetworkManager.isStreamingCurrent.asStateFlow()
 
-    private val _isMulticastMode = MutableStateFlow(true)
+    private val _isMulticastMode = MutableStateFlow(false)
     val isMulticastMode: StateFlow<Boolean> = _isMulticastMode.asStateFlow()
 
     // ## SOLUZIONE APPLICATA QUI ##
@@ -47,6 +64,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val discoveredDevices: StateFlow<Map<String, ServerInfo>> = NetworkManager.discoveredDevices
 
+    init {
+        viewModelScope.launch {
+            settingsDataStore.settingsFlow.first().let { settings ->
+                if (!NetworkManager.isStreamingCurrent.value) {
+                    _isMulticastMode.value = settings.lastMulticastMode
+                }
+            }
+        }
+    }
+
     fun toggleMode(isServerMode: Boolean) {
         _isServer.value = isServerMode
         if (isServerMode) {
@@ -57,6 +84,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMulticastMode(isMulticast: Boolean) {
         _isMulticastMode.value = isMulticast
+        viewModelScope.launch {
+            settingsDataStore.saveLastMulticastMode(isMulticast)
+        }
     }
 
     fun setStreamInternal(enabled: Boolean) {
@@ -119,12 +149,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setExperimentalFeatures(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsDataStore.saveExperimentalFeatures(enabled)
-        }
-    }
-
     fun setOnboardingCompleted() {
         viewModelScope.launch {
             settingsDataStore.setOnboardingCompleted(true)
@@ -178,10 +202,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveDisconnectionSoundEnabled(enabled) }
     }
 
-    fun setConnectionSoundUri(uri: String) {
-        viewModelScope.launch { settingsDataStore.saveConnectionSoundUri(uri) }
-    }
-
     // Aggiorna startListening (passando l'interfaccia)
     fun startListening() {
         val currentSettings = appSettings.value
@@ -208,7 +228,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 networkInterfaceName = currentSettings.networkInterface,
                 connectionSoundEnabled = currentSettings.connectionSoundEnabled,
                 disconnectionSoundEnabled = currentSettings.disconnectionSoundEnabled,
-                connectionSoundUri = currentSettings.connectionSoundUri,
                 onServerDisconnected = {
                     setIsStreaming(false)
                     val stopIntent = Intent(getApplication(), ClientService::class.java)
@@ -256,3 +275,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
     }
 }
+

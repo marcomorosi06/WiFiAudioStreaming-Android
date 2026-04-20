@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
@@ -64,6 +81,10 @@ import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.vectorResource
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val allMaterialShapes = listOf(
@@ -208,7 +229,6 @@ fun WiFiAudioStreamingApp(
                 ExpressiveAudioSourceSelector(
                     streamInternal = appSettings.streamInternal,
                     streamMic = appSettings.streamMic,
-                    experimentalFeaturesEnabled = appSettings.experimentalFeaturesEnabled,
                     isMulticast = isMulticastMode,
                     rtpEnabled = appSettings.rtpEnabled,
                     onStreamInternalChange = onStreamInternalChange,
@@ -226,7 +246,8 @@ fun WiFiAudioStreamingApp(
                 localIp = localIp,
                 modifier = Modifier.fillMaxWidth(),
                 onStartServer = onStartServer,
-                onStopServer = onStopServer
+                onStopServer = onStopServer,
+                sendClientMicrophone = appSettings.sendClientMicrophone
             )
 
             AnimatedVisibility(
@@ -265,6 +286,12 @@ fun WiFiAudioStreamingApp(
                 ) + fadeOut() + scaleOut(targetScale = 0.8f)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ExpressiveClientSettingsPanel(
+                        sendMicrophone = appSettings.sendClientMicrophone,
+                        onSendMicrophoneChange = onSendClientMicrophoneChange,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     var manualIp by remember { mutableStateOf("") }
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -312,7 +339,6 @@ fun WiFiAudioStreamingApp(
 @Composable
 fun ExpressiveClientSettingsPanel(
     sendMicrophone: Boolean,
-    experimentalFeaturesEnabled: Boolean,
     onSendMicrophoneChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -341,16 +367,14 @@ fun ExpressiveClientSettingsPanel(
                 )
             }
 
-            AnimatedVisibility(visible = experimentalFeaturesEnabled) {
-                ExpressiveAudioSourceToggle(
-                    icon = Icons.Outlined.MicOff,
-                    checkedIcon = Icons.Filled.Mic,
-                    title = stringResource(R.string.send_mic_to_server_title),
-                    subtitle = stringResource(R.string.send_mic_to_server_subtitle),
-                    checked = sendMicrophone,
-                    onCheckedChange = onSendMicrophoneChange
-                )
-            }
+            ExpressiveAudioSourceToggle(
+                icon = Icons.Outlined.MicOff,
+                checkedIcon = Icons.Filled.Mic,
+                title = stringResource(R.string.send_mic_to_server_title),
+                subtitle = stringResource(R.string.send_mic_to_server_subtitle),
+                checked = sendMicrophone,
+                onCheckedChange = onSendMicrophoneChange
+            )
         }
     }
 }
@@ -400,7 +424,6 @@ fun ExpressiveSettingsScreen(
     onBufferSizeChange: (Int) -> Unit,
     onStreamingPortChange: (Int) -> Unit,
     onMicPortChange: (Int) -> Unit,
-    onExperimentalFeaturesChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onShowOnboarding: () -> Unit,
     onNetworkInterfaceChange: (String) -> Unit,
@@ -411,7 +434,6 @@ fun ExpressiveSettingsScreen(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
-    onConnectionSoundUriChange: (String) -> Unit,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -433,7 +455,6 @@ fun ExpressiveSettingsScreen(
             onBufferSizeChange = onBufferSizeChange,
             onStreamingPortChange = onStreamingPortChange,
             onMicPortChange = onMicPortChange,
-            onExperimentalFeaturesChange = onExperimentalFeaturesChange,
             onClose = onClose,
             onShowOnboarding = onShowOnboarding,
             onNetworkInterfaceChange = onNetworkInterfaceChange,
@@ -443,34 +464,9 @@ fun ExpressiveSettingsScreen(
             onSaveAutoConnectList = onSaveAutoConnectList,
             onAutoConnectEnabledChange = onAutoConnectEnabledChange,
             onConnectionSoundChange = onConnectionSoundChange,
-            onDisconnectionSoundChange = onDisconnectionSoundChange,
-            onConnectionSoundUriChange = onConnectionSoundUriChange
+            onDisconnectionSoundChange = onDisconnectionSoundChange
         )
     }
-}
-
-// NUOVO: AlertDialog per avviso funzioni sperimentali
-@Composable
-fun ExperimentalFeaturesWarningDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Science, contentDescription = null) },
-        title = { Text(stringResource(R.string.experimental_warning_title)) },
-        text = { Text(stringResource(R.string.experimental_warning_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.experimental_warning_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -484,7 +480,6 @@ fun SettingsScreenContent(
     onBufferSizeChange: (Int) -> Unit,
     onStreamingPortChange: (Int) -> Unit,
     onMicPortChange: (Int) -> Unit,
-    onExperimentalFeaturesChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onShowOnboarding: () -> Unit,
     onNetworkInterfaceChange: (String) -> Unit,
@@ -495,20 +490,8 @@ fun SettingsScreenContent(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
-    onConnectionSoundUriChange: (String) -> Unit,
 ) {
-    var showExperimentalWarningDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-
-    if (showExperimentalWarningDialog) {
-        ExperimentalFeaturesWarningDialog(
-            onDismiss = { showExperimentalWarningDialog = false },
-            onConfirm = {
-                onExperimentalFeaturesChange(true)
-                showExperimentalWarningDialog = false
-            }
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -609,15 +592,13 @@ fun SettingsScreenContent(
                         isChecked = appSettings.streamInternal,
                         onCheckedChange = onStreamInternalChange
                     )
-                    AnimatedVisibility(visible = appSettings.experimentalFeaturesEnabled) {
-                        SettingsSwitchItem(
-                            title = stringResource(R.string.settings_item_mic_title),
-                            description = stringResource(R.string.settings_item_mic_desc),
-                            icon = Icons.Outlined.Mic,
-                            isChecked = appSettings.streamMic,
-                            onCheckedChange = onStreamMicChange
-                        )
-                    }
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_mic_title),
+                        description = stringResource(R.string.settings_item_mic_desc),
+                        icon = Icons.Outlined.Mic,
+                        isChecked = appSettings.streamMic,
+                        onCheckedChange = onStreamMicChange
+                    )
                 }
             }
 
@@ -683,17 +664,15 @@ fun SettingsScreenContent(
                             it.toIntOrNull()?.let(onStreamingPortChange)
                         }
                     )
-                    AnimatedVisibility(visible = appSettings.experimentalFeaturesEnabled) {
-                        SettingsTextFieldItem(
-                            title = stringResource(R.string.client_mic_port_title),
-                            description = stringResource(R.string.client_mic_port_desc),
-                            icon = Icons.Outlined.Podcasts,
-                            value = appSettings.micPort.toString(),
-                            onValueChange = {
-                                it.toIntOrNull()?.let(onMicPortChange)
-                            }
-                        )
-                    }
+                    SettingsTextFieldItem(
+                        title = stringResource(R.string.client_mic_port_title),
+                        description = stringResource(R.string.client_mic_port_desc),
+                        icon = Icons.Outlined.Podcasts,
+                        value = appSettings.micPort.toString(),
+                        onValueChange = {
+                            it.toIntOrNull()?.let(onMicPortChange)
+                        }
+                    )
                     val interfaces = remember {
                         val map = mutableMapOf<String, String>("Auto" to "Auto")
                         try {
@@ -725,7 +704,7 @@ fun SettingsScreenContent(
                     SettingsInfoItem(
                         title = stringResource(R.string.settings_item_wfas_title),
                         description = stringResource(R.string.settings_item_wfas_desc),
-                        icon = Icons.Outlined.WifiTethering
+                        painter = painterResource(id = R.drawable.wfas_protocol)
                     )
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_rtp_title),
@@ -868,83 +847,12 @@ fun SettingsScreenContent(
                         onCheckedChange = onConnectionSoundChange
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    val audioPickerLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
-                    ) { uri: Uri? ->
-                        if (uri != null) {
-                            onConnectionSoundUriChange(uri.toString())
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.settings_item_custom_sound_title),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = if (appSettings.connectionSoundUri.isNotEmpty()) {
-                                    Uri.parse(appSettings.connectionSoundUri).lastPathSegment
-                                        ?: appSettings.connectionSoundUri
-                                } else {
-                                    stringResource(R.string.settings_item_custom_sound_none)
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
-                        if (appSettings.connectionSoundUri.isNotEmpty()) {
-                            IconButton(onClick = { onConnectionSoundUriChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = null)
-                            }
-                        }
-                        OutlinedButton(
-                            onClick = { audioPickerLauncher.launch("audio/*") }
-                        ) {
-                            Text(stringResource(R.string.settings_item_custom_sound_browse))
-                        }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_disconnection_sound_title),
                         description = stringResource(R.string.settings_item_disconnection_sound_desc),
                         icon = Icons.Outlined.VolumeOff,
                         isChecked = appSettings.disconnectionSoundEnabled,
                         onCheckedChange = onDisconnectionSoundChange
-                    )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_experimental),
-                    icon = Icons.Outlined.Science
-                ) {
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_experimental_title),
-                        description = stringResource(R.string.settings_item_experimental_desc),
-                        icon = Icons.Outlined.Warning,
-                        isChecked = appSettings.experimentalFeaturesEnabled,
-                        onCheckedChange = { isEnabled ->
-                            if (isEnabled) {
-                                showExperimentalWarningDialog = true
-                            } else {
-                                onExperimentalFeaturesChange(false)
-                            }
-                        }
                     )
                 }
             }
@@ -1434,52 +1342,44 @@ fun ExpressiveTopAppBar(
         else -> stringResource(R.string.settings_title)
     }
 
-    LargeTopAppBar(
+    TopAppBar(
         title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(top = 8.dp)
-                ) {
-                    val titleScale by animateFloatAsState(
-                        targetValue = if (isStreaming) 1.05f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ),
-                        label = "Title Scale"
-                    )
+            Column {
+                val titleScale by animateFloatAsState(
+                    targetValue = if (isStreaming) 1.05f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "Title Scale"
+                )
 
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.scale(titleScale)
-                    )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.scale(titleScale)
+                )
 
-                    AnimatedContent(
-                        targetState = subtitle,
-                        transitionSpec = {
-                            (slideInVertically { height -> height } + fadeIn(
-                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
-                            )).togetherWith(
-                                slideOutVertically { height -> -height } + fadeOut()
-                            )
-                        },
-                        label = "Subtitle Animation"
-                    ) { status ->
-                        Text(
-                            text = status,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isStreaming) FontWeight.Medium else FontWeight.Normal,
-                            modifier = Modifier.padding(top = 2.dp)
+                AnimatedContent(
+                    targetState = subtitle,
+                    transitionSpec = {
+                        (slideInVertically { height -> height } + fadeIn(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                        )).togetherWith(
+                            slideOutVertically { height -> -height } + fadeOut()
                         )
-                    }
+                    },
+                    label = "Subtitle Animation"
+                ) { status ->
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isStreaming) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1
+                    )
                 }
             }
         },
@@ -1493,7 +1393,29 @@ fun ExpressiveTopAppBar(
                 label = "Status Icon Scale"
             )
 
-            val isSettingsButton = statusIcon == Icons.Default.Settings
+            val isStatusSameAsSettings = statusIcon == Icons.Default.Settings
+
+            if (!isStatusSameAsSettings) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            indicatorColor.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        )
+                        .scale(iconScale),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = statusText,
+                        tint = indicatorColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
 
             Box(
                 modifier = Modifier
@@ -1501,24 +1423,21 @@ fun ExpressiveTopAppBar(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(
-                        indicatorColor.copy(alpha = 0.2f),
+                        MaterialTheme.colorScheme.primaryContainer,
                         shape = CircleShape
                     )
-                    .scale(iconScale)
-                    .then(
-                        if (isSettingsButton) Modifier.clickable(onClick = onSettingsClick) else Modifier
-                    ),
+                    .clickable(onClick = onSettingsClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = statusIcon,
-                    contentDescription = statusText,
-                    tint = indicatorColor,
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.settings_title),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(24.dp)
                 )
             }
         },
-        colors = TopAppBarDefaults.largeTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = containerColor,
             scrolledContainerColor = containerColor.copy(alpha = 0.95f)
         )
@@ -1705,7 +1624,6 @@ fun ExpressiveModeButton(
 fun ExpressiveAudioSourceSelector(
     streamInternal: Boolean,
     streamMic: Boolean,
-    experimentalFeaturesEnabled: Boolean,
     isMulticast: Boolean,
     rtpEnabled: Boolean, // <-- NUOVO PARAMETRO AGGIUNTO
     onStreamInternalChange: (Boolean) -> Unit,
@@ -1749,16 +1667,14 @@ fun ExpressiveAudioSourceSelector(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            AnimatedVisibility(visible = experimentalFeaturesEnabled) {
-                ExpressiveAudioSourceToggle(
-                    icon = Icons.Outlined.Mic,
-                    checkedIcon = Icons.Filled.Mic,
-                    title = stringResource(R.string.microphone_title),
-                    subtitle = stringResource(R.string.microphone_subtitle),
-                    checked = streamMic,
-                    onCheckedChange = onStreamMicChange
-                )
-            }
+            ExpressiveAudioSourceToggle(
+                icon = Icons.Outlined.Mic,
+                checkedIcon = Icons.Filled.Mic,
+                title = stringResource(R.string.microphone_title),
+                subtitle = stringResource(R.string.microphone_subtitle),
+                checked = streamMic,
+                onCheckedChange = onStreamMicChange
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 20.dp, horizontal = 16.dp))
 
@@ -1996,7 +1912,8 @@ fun ExpressiveStreamingControlCenter(
     localIp: String,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    sendClientMicrophone: Boolean = false
 ) {
     val cardColor by animateColorAsState(
         targetValue = if (isStreaming)
@@ -2048,6 +1965,26 @@ fun ExpressiveStreamingControlCenter(
             if (streaming) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ExpressiveStreamingActiveIndicator(onStopServer = onStopServer)
+
+                    if (!isServer && sendClientMicrophone) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        val isMicMuted by NetworkManager.isMicMuted.collectAsState()
+                        FilledTonalButton(
+                            onClick = { NetworkManager.isMicMuted.value = !isMicMuted },
+                            colors = if (isMicMuted) ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            ) else ButtonDefaults.filledTonalButtonColors(),
+                            shape = RoundedCornerShape(28.dp)
+                        ) {
+                            Icon(
+                                if (isMicMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(if (isMicMuted) R.string.mic_muted else R.string.mic_active))
+                        }
+                    }
 
                     // --- NUOVO SLIDER VOLUME SU ANDROID ---
                     if (isServer) {
@@ -2509,6 +2446,19 @@ fun SettingsInfoItem(
     description: String,
     icon: ImageVector
 ) {
+    SettingsInfoItem(
+        title = title,
+        description = description,
+        painter = rememberVectorPainter(icon)
+    )
+}
+
+@Composable
+fun SettingsInfoItem(
+    title: String,
+    description: String,
+    painter: Painter
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2516,21 +2466,26 @@ fun SettingsInfoItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = icon,
+            painter = painter,
             contentDescription = null,
             modifier = Modifier.size(28.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.width(20.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
-
-
-
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -3281,20 +3236,21 @@ fun ExpressiveHttpBanner(ip: String, port: Int) {
                 }
                 FilledTonalIconButton(
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        try { context.startActivity(intent) } catch (e: Exception) {}
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
                     },
                     colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
                 ) {
-                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = "Apri nel Browser")
+                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = "Apri nel browser")
                 }
             }
         }
     }
 
     if (copied) {
-        LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); copied = false }
+        LaunchedEffect(Unit) {
+            delay(2000)
+            copied = false
+        }
     }
 }

@@ -71,8 +71,8 @@
     <string name="mode_multicast">Multicast</string>
     <string name="mode_unicast">Unicast</string>
     <string name="client_options_title">Opzioni Client</string>
-    <string name="send_mic_to_server_title">Invia Microfono al Server</string>
-    <string name="send_mic_to_server_subtitle">Trasmette l\'audio del tuo microfono</string>
+    <string name="send_mic_to_server_title">Condividi microfono</string>
+    <string name="send_mic_to_server_subtitle">Parla attraverso il desktop (Discord, Zoom, giochi...)</string>
 
     <string name="capture_permission_denied">Permesso di cattura negato.</string>
     <string name="mic_permission_denied">Permesso microfono negato.</string>
@@ -211,4 +211,6 @@
     <string name="settings_item_custom_sound_browse">Scegli file</string>
     <string name="settings_item_disconnection_sound_title">Suono di disconnessione</string>
     <string name="settings_item_disconnection_sound_desc">Riproduci un suono quando il client si disconnette da un server</string>
+    <string name="mic_muted">Microfono Mutato</string>
+    <string name="mic_active">Microfono Attivo</string>
 </resources>
