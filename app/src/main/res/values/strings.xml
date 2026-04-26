@@ -126,6 +126,9 @@
     <string name="server_ip_format">Server IP: %1$s</string>
     <string name="settings_item_network_interface_title">Network Interface</string>
     <string name="settings_item_network_interface_desc">Select VPN adapter (e.g. tun0) for remote streaming</string>
+    <string name="vpn_note_title">Using a VPN?</string>
+    <string name="vpn_note_desc">Device discovery does not work over VPN — multicast packets cannot travel through a tunnel. If you are connected only via VPN (not on the same Wi-Fi), select Unicast mode and enter the server IP manually. Multicast requires the same local network.</string>
+    <string name="server_ip_active">Your IP: %1$s</string>
     <string name="settings_group_server_protocols">Server Protocols</string>
     <string name="settings_item_wfas_title">WFAS (Native)</string>
     <string name="settings_item_wfas_desc">Low-latency custom protocol. Always on.</string>

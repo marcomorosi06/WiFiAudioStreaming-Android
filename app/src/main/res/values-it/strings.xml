@@ -126,6 +126,9 @@
     <string name="server_ip_format">IP Server: %1$s</string>
     <string name="settings_item_network_interface_title">Scheda di Rete</string>
     <string name="settings_item_network_interface_desc">Seleziona la VPN (es. tun0) per lo streaming remoto</string>
+    <string name="vpn_note_title">Stai usando una VPN?</string>
+    <string name="vpn_note_desc">La discovery dei dispositivi non funziona tramite VPN — i pacchetti multicast non attraversano un tunnel. Se sei connesso solo via VPN (non sulla stessa rete Wi-Fi), seleziona la modalità Unicast e inserisci l\'IP del server manualmente. Il multicast richiede la stessa rete locale.</string>
+    <string name="server_ip_active">Il tuo IP: %1$s</string>
     <string name="settings_group_server_protocols">Protocolli Server</string>
     <string name="settings_item_wfas_title">WFAS (Nativo)</string>
     <string name="settings_item_wfas_desc">Protocollo custom a bassa latenza. Sempre attivo.</string>
