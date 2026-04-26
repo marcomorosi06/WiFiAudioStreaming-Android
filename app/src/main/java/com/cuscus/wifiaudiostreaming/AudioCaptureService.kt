@@ -74,6 +74,13 @@ class AudioCaptureService : Service() {
                 if (streamInternal && data != null) {
                     val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                     mediaProjection = projectionManager.getMediaProjection(resultCode, data)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                            override fun onStop() {
+                                stopCapture()
+                            }
+                        }, android.os.Handler(android.os.Looper.getMainLooper()))
+                    }
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -91,7 +98,8 @@ class AudioCaptureService : Service() {
                         rtpEnabled = rtpEnabled,
                         rtpPort = rtpPort,
                         httpEnabled = httpEnabled,
-                        httpPort = httpPort
+                        httpPort = httpPort,
+                        onClientDisconnected = { stopCapture() }
                     )
                 }
             }

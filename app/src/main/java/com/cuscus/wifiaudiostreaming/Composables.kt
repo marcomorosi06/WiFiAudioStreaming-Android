@@ -693,6 +693,11 @@ fun SettingsScreenContent(
                         options = interfaces,
                         onOptionSelected = { onNetworkInterfaceChange(it) }
                     )
+                    SettingsInfoItem(
+                        title = stringResource(R.string.vpn_note_title),
+                        description = stringResource(R.string.vpn_note_desc),
+                        icon = Icons.Outlined.Info
+                    )
                 }
             }
 
@@ -1965,6 +1970,46 @@ fun ExpressiveStreamingControlCenter(
             if (streaming) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ExpressiveStreamingActiveIndicator(onStopServer = onStopServer)
+
+                    if (isServer && localIp.isNotEmpty() && localIp != "0.0.0.0") {
+                        val clipboardManager = LocalClipboardManager.current
+                        val haptic = LocalHapticFeedback.current
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            modifier = Modifier.clickable {
+                                clipboardManager.setText(AnnotatedString(localIp))
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Wifi,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.server_ip_active, localIp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
 
                     if (!isServer && sendClientMicrophone) {
                         Spacer(modifier = Modifier.height(16.dp))
