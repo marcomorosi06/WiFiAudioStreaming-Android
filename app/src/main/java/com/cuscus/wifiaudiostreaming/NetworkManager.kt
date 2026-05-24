@@ -33,6 +33,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.glance.appwidget.state.updateAppWidgetState
@@ -56,6 +57,8 @@ data class ServerInfo(val ip: String, val isMulticast: Boolean, val port: Int)
 
 @SuppressLint("MissingPermission")
 object NetworkManager {
+
+    private const val TAG = "WFAS_DBG"
 
     // --- GESTIONE VOLUME SERVER ANDROID ---
     val serverVolume = MutableStateFlow(1.0f)
@@ -338,16 +341,19 @@ object NetworkManager {
                                 val message = String(packet.data, 0, packet.length).trim()
 
                                 if (remoteIp != null && remoteIp !in localIps && message.startsWith(NetworkSettings.DISCOVERY_MESSAGE)) {
+                                    Log.d(TAG, "[DISCOVERY] Received from $remoteIp: $message")
                                     val parts = message.split(";")
                                     if (parts.size >= 4) {
                                         val hostname = parts[1]
 
                                         if (message.contains("BYE")) {
+                                            Log.d(TAG, "[DISCOVERY] BYE from $hostname, removing from list")
                                             discoveredDevices.value = discoveredDevices.value - hostname
                                         } else {
                                             val isMulticast = parts[2].equals("MULTICAST", ignoreCase = true)
                                             val port = parts[3].toIntOrNull() ?: continue
                                             val serverInfo = ServerInfo(ip = remoteIp, isMulticast = isMulticast, port = port)
+                                            Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
 
                                             val currentMap = discoveredDevices.value
                                             if (currentMap[hostname] != serverInfo) {
@@ -379,6 +385,7 @@ object NetworkManager {
 
     fun startBroadcastingPresence(context: Context, isMulticast: Boolean, streamingPort: Int, networkInterfaceName: String = "Auto", rtpEnabled: Boolean = false) {
         if (broadcastingJob?.isActive == true) return
+        Log.d(TAG, "[BROADCAST] startBroadcastingPresence: isMulticast=$isMulticast port=$streamingPort iface=$networkInterfaceName rtp=$rtpEnabled")
         broadcastingJob = scope.launch {
             val deviceName = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
@@ -413,6 +420,7 @@ object NetworkManager {
                             NetworkSettings.DISCOVERY_PORT
                         )
                         socket.send(packet)
+                        Log.d(TAG, "[BROADCAST] Sent: $message  iface=${wifiIface?.name ?: "default"}")
                         println("Broadcasting presence: $message on iface ${wifiIface?.name ?: "default"}")
                     } catch (e: Exception) {
                         if (e !is CancellationException) println("Broadcasting error: ${e.message}")
@@ -526,6 +534,7 @@ object NetworkManager {
         onClientDisconnected: (() -> Unit)? = null
     ) {
         if (streamingJob?.isActive == true) return
+        Log.d(TAG, "[SERVER] startServerAudio: isMulticast=$isMulticast port=$streamingPort sr=$sampleRate ch=$channelConfig buf=$bufferSize streamInternal=$streamInternal streamMic=$streamMic")
         startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled)
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -536,6 +545,7 @@ object NetworkManager {
 
         streamingJob = scope.launch {
             isServerStreaming = true
+            Log.d(TAG, "[SERVER] streamingJob started")
             var internalRecord: AudioRecord? = null
             var micRecord: AudioRecord? = null
             var sendSocket: BoundDatagramSocket? = null
@@ -558,6 +568,7 @@ object NetworkManager {
                 }
 
                 fun setupAudioRecorders(bufSize: Int) {
+                    Log.d(TAG, "[SERVER] setupAudioRecorders: bufSize=$bufSize streamInternal=$streamInternal streamMic=$streamMic projectionNull=${projection == null}")
                     if (streamInternal && projection != null) {
                         val config = AudioPlaybackCaptureConfiguration.Builder(projection)
                             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
@@ -570,6 +581,7 @@ object NetworkManager {
                             .setAudioPlaybackCaptureConfig(config)
                             .build()
                         activeInternalRecord?.startRecording()
+                        Log.d(TAG, "[SERVER] internalRecord state=${activeInternalRecord?.state} recordingState=${activeInternalRecord?.recordingState}")
                     }
                     if (streamMic) {
                         activeMicRecord = AudioRecord.Builder()
@@ -578,6 +590,10 @@ object NetworkManager {
                             .setBufferSizeInBytes(bufSize)
                             .build()
                         activeMicRecord?.startRecording()
+                        Log.d(TAG, "[SERVER] micRecord state=${activeMicRecord?.state} recordingState=${activeMicRecord?.recordingState}")
+                    }
+                    if (!streamInternal && !streamMic) {
+                        Log.w(TAG, "[SERVER] ATTENZIONE: nessuna sorgente audio abilitata!")
                     }
                 }
 
@@ -587,27 +603,35 @@ object NetworkManager {
                 // ── Queue: producer → UDP sender ───────────────────────────────────────
                 val udpAudioQueue = java.util.concurrent.ArrayBlockingQueue<Pair<ByteArray, Int>>(30)
 
-                // ── PRODUCER ──────────────────────────────────────────────────────────
-                // Starts immediately. Feeds httpPcmQueue, rtpPcmQueue, udpAudioQueue.
-                // READ_NON_BLOCKING per AudioPlaybackCapture: evita il deadlock quando
-                // non c'è nessun audio in riproduzione (altrimenti il read blocca per
-                // sempre, congelando l'intera coroutine incluso il microfono).
-                // READ_BLOCKING per il microfono: fornisce il pacing naturale (~20ms/frame).
                 fun launchAudioProducer(): Job = launch {
                     val internalBuf = if (streamInternal) ByteArray(safeBufferSize) else null
                     val micBuf      = if (streamMic)      ByteArray(safeBufferSize) else null
                     val mixedBuf    = ByteArray(safeBufferSize)
                     val fSize       = frameSize
                     val bufMs       = (safeBufferSize.toLong() * 1000L) / (sampleRate.toLong() * channels * 2)
+                    var producerLoopCount = 0L
+                    var producerTotalBytes = 0L
+
+                    Log.d(TAG, "[PRODUCER] avviato: streamInternal=$streamInternal projNull=${projection == null} internalRecordState=${activeInternalRecord?.state} micRecordState=${activeMicRecord?.state} safeBufferSize=$safeBufferSize bufMs=$bufMs")
+                    println("DEBUG_WFAS: streamInternal=$streamInternal")
+                    println("DEBUG_WFAS: projectionIsNull=${projection == null}")
+                    println("DEBUG_WFAS: internalRecordState=${activeInternalRecord?.state}")
 
                     while (isActive) {
                         val iBytes = activeInternalRecord?.read(internalBuf!!, 0, internalBuf.size, AudioRecord.READ_NON_BLOCKING) ?: 0
-                        val mBytes = activeMicRecord?.read(micBuf!!, 0, micBuf.size, AudioRecord.READ_BLOCKING) ?: 0
+                        val mBytes = activeMicRecord?.read(micBuf!!, 0, micBuf.size, AudioRecord.READ_NON_BLOCKING) ?: 0
+
+                        if (iBytes < 0) {
+                            Log.e(TAG, "[PRODUCER] iBytes ERROR=$iBytes (AudioRecord error code)")
+                            println("DEBUG_WFAS: iBytes ERROR = $iBytes")
+                        }
+                        if (mBytes < 0) Log.e(TAG, "[PRODUCER] mBytes ERROR=$mBytes (AudioRecord error code)")
+                        if (iBytes == 0 && streamInternal) println("DEBUG_WFAS: iBytes è 0")
 
                         val ei = iBytes.coerceAtLeast(0)
                         val em = mBytes.coerceAtLeast(0)
                         if (ei == 0 && em == 0) {
-                            if (streamInternal && !streamMic) delay(bufMs.coerceAtLeast(10L))
+                            delay(bufMs.coerceAtLeast(10L))
                             continue
                         }
 
@@ -648,8 +672,16 @@ object NetworkManager {
                         val chunk = raw.copyOf(aligned)
                         httpPcmQueue?.let { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         rtpPcmQueue?.let  { if (it.remainingCapacity() > 0) it.offer(chunk) }
-                        if (udpAudioQueue.remainingCapacity() > 0) udpAudioQueue.offer(Pair(chunk, aligned))
+                        val offered = udpAudioQueue.remainingCapacity() > 0
+                        if (offered) udpAudioQueue.offer(Pair(chunk, aligned))
+
+                        producerLoopCount++
+                        producerTotalBytes += aligned
+                        if (producerLoopCount == 1L || producerLoopCount % 300L == 0L) {
+                            Log.d(TAG, "[PRODUCER] loop #$producerLoopCount iBytes=$ei mBytes=$em aligned=$aligned offered=$offered queueSize=${udpAudioQueue.size} totalBytes=$producerTotalBytes")
+                        }
                     }
+                    Log.d(TAG, "[PRODUCER] loop terminato dopo $producerLoopCount iterazioni, totalBytes=$producerTotalBytes")
                 }
 
                 // ── UDP SENDER ────────────────────────────────────────────────────────
@@ -665,9 +697,14 @@ object NetworkManager {
                     var maxBytesPerPacket = safeMtuSize - headerSize
                     maxBytesPerPacket -= (maxBytesPerPacket % fSz)
                     var seqNumber = 0
+                    var loopCount = 0L
+                    var sentPackets = 0L
+
+                    Log.d(TAG, "[UDP_SENDER] streamingLoop avviato verso $targetAddress maxBytesPerPacket=$maxBytesPerPacket")
 
                     while (isActive && clientAlive?.get() != false) {
                         val (pcmData, pcmLen) = udpAudioQueue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
+                        loopCount++
                         try {
                             var offset = 0
                             while (offset < pcmLen) {
@@ -683,14 +720,22 @@ object NetworkManager {
                                     writeFully(pcmData, offset, chunkSize)
                                 }
                                 sendSocket?.send(Datagram(packet, targetAddress))
+                                sentPackets++
+                                if (sentPackets == 1L || sentPackets % 500L == 0L) {
+                                    Log.d(TAG, "[UDP_SENDER] pkt #$sentPackets seq=$seqNumber chunkSize=$chunkSize verso $targetAddress")
+                                }
                                 seqNumber = (seqNumber + 1) and 0xFFFF
                                 offset += chunkSize
                             }
-                        } catch (_: Exception) {
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[UDP_SENDER] eccezione inviando a $targetAddress: ${e.message}")
                             clientAlive?.set(false)
                             break
                         }
                     }
+                    Log.d(TAG, "[UDP_SENDER] streamingLoop terminato: sentPackets=$sentPackets loopCount=$loopCount clientAlive=${clientAlive?.get()}")
                 }
 
                 httpJob?.cancel()
@@ -709,8 +754,15 @@ object NetworkManager {
 
                 if (isMulticast) {
                     val targetAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, streamingPort)
+                    Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress vpnActive=$vpnActive wifiNet=$wifiNet")
                     if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
-                    sendSocket = aSocket(selectorManager).udp().bind(InetSocketAddress("0.0.0.0", 0))
+                    val wifiLocalIp = wifiIface?.inetAddresses?.toList()
+                        ?.filterIsInstance<java.net.Inet4Address>()
+                        ?.firstOrNull()?.hostAddress ?: "0.0.0.0"
+                    Log.d(TAG, "[SERVER][MULTICAST] bindando socket su $wifiLocalIp:0")
+                    sendSocket = aSocket(selectorManager).udp().bind(InetSocketAddress(wifiLocalIp, 0))
+                    Log.d(TAG, "[SERVER][MULTICAST] socket bound, setupAudioRecorders...")
+                    delay(500)
                     setupAudioRecorders(safeBufferSize)
 
                     if (rtpEnabled) {
@@ -740,12 +792,15 @@ object NetworkManager {
                         }
                     }
                 } else {
+                    Log.d(TAG, "[SERVER][UNICAST] modalità unicast, in ascolto su porta $streamingPort")
                     connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                    delay(500)
                     setupAudioRecorders(safeBufferSize)
 
                     val localAddress = InetSocketAddress("0.0.0.0", streamingPort)
                     if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
+                    Log.d(TAG, "[SERVER][UNICAST] socket UDP bound su $localAddress, vpnActive=$vpnActive wifiNet=$wifiNet")
 
                     // Il producer parte subito: HTTP/RTP ricevono audio anche prima che
                     // arrivi qualsiasi client UDP.
@@ -758,14 +813,20 @@ object NetworkManager {
                         val clientDatagram = sendSocket.receive()
                         val clientAddress = clientDatagram.address
                         val message = clientDatagram.packet.readText().trim()
+                        Log.d(TAG, "[SERVER][UNICAST] datagram ricevuto da $clientAddress: '$message'")
 
                         if (message == "MODE_PROBE") {
+                            Log.d(TAG, "[SERVER][UNICAST] rispondo UNICAST a MODE_PROBE da $clientAddress")
                             sendSocket.send(Datagram(buildPacket { writeText("UNICAST") }, clientAddress))
                             continue
                         }
 
-                        if (message != NetworkSettings.CLIENT_HELLO_MESSAGE) continue
+                        if (message != NetworkSettings.CLIENT_HELLO_MESSAGE) {
+                            Log.w(TAG, "[SERVER][UNICAST] messaggio ignorato (non HELLO): '$message'")
+                            continue
+                        }
 
+                        Log.d(TAG, "[SERVER][UNICAST] HELLO ricevuto da $clientAddress, invio HELLO_ACK")
                         connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
 
                         // Svuota la coda: il client riceve solo audio fresco
@@ -773,6 +834,7 @@ object NetworkManager {
 
                         val ackPacket = buildPacket { writeText("HELLO_ACK") }
                         sendSocket.send(Datagram(ackPacket, clientAddress))
+                        Log.d(TAG, "[SERVER][UNICAST] HELLO_ACK inviato a $clientAddress")
 
                         val clientAlive = java.util.concurrent.atomic.AtomicBoolean(true)
 
@@ -793,13 +855,20 @@ object NetworkManager {
 
                         val pingJob = launch {
                             var failures = 0
+                            var pingCount = 0L
                             while (isActive && clientAlive.get()) {
                                 delay(1000)
                                 try {
                                     sendSocket.send(Datagram(buildPacket { writeText("PING") }, clientAddress))
+                                    pingCount++
+                                    if (pingCount == 1L || pingCount % 10L == 0L) {
+                                        Log.d(TAG, "[SERVER][UNICAST] PING #$pingCount inviato a $clientAddress failures=$failures")
+                                    }
                                     failures = 0
-                                } catch (_: Exception) {
-                                    if (++failures >= 3) { clientAlive.set(false) }
+                                } catch (e: Exception) {
+                                    failures++
+                                    Log.w(TAG, "[SERVER][UNICAST] PING fallito ($failures/3): ${e.message}")
+                                    if (failures >= 3) { clientAlive.set(false) }
                                 }
                             }
                         }
@@ -809,13 +878,17 @@ object NetworkManager {
                                 while (isActive && clientAlive.get()) {
                                     val datagram = sendSocket.receive()
                                     val msg = datagram.packet.readText().trim()
+                                    Log.d(TAG, "[SERVER][UNICAST] byeJob ricevuto: '$msg' da ${datagram.address}")
                                     if (msg == "CLIENT_BYE") {
+                                        Log.d(TAG, "[SERVER][UNICAST] CLIENT_BYE ricevuto, disconnessione pulita")
                                         println("--- Received CLIENT_BYE from $clientAddress ---")
                                         clientAlive.set(false)
                                         break
                                     }
                                 }
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {
+                                Log.w(TAG, "[SERVER][UNICAST] clientByeJob eccezione: ${e.message}")
+                            }
                         }
 
                         var clientDisconnectedUnexpectedly = false
@@ -827,7 +900,9 @@ object NetworkManager {
                             if (clientAlive.get()) {
                                 withContext(NonCancellable) {
                                     try {
-                                        sendSocket.send(Datagram(buildPacket { writeText("BYE") }, clientAddress))
+                                        repeat(3) {
+                                            sendSocket.send(Datagram(buildPacket { writeText("BYE") }, clientAddress))
+                                        }
                                         println("--- Sent BYE to $clientAddress ---")
                                     } catch (_: Exception) {}
                                 }
@@ -845,9 +920,11 @@ object NetworkManager {
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     hasError = true
+                    Log.e(TAG, "[SERVER] ECCEZIONE FATALE: ${e.message}", e)
                     connectionStatus.value = context.getString(R.string.status_server_error, e.message)
                 }
             } finally {
+                Log.d(TAG, "[SERVER] finally: cleanup, hasError=$hasError isServerStreaming=$isServerStreaming")
                 isServerStreaming = false
                 runCatching {
                     (context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).bindProcessToNetwork(null)
@@ -862,6 +939,12 @@ object NetworkManager {
                 activeMicRecord = null
 
                 try { sendSocket?.close() } catch (_: Exception) {}
+
+                originalMediaVolume?.let {
+                    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, it, 0)
+                    originalMediaVolume = null
+                }
 
                 stopBroadcastingPresence()
                 if (isActive && !hasError) connectionStatus.value = context.getString(R.string.status_server_stopped)
@@ -1185,16 +1268,18 @@ object NetworkManager {
 
     fun stopStreaming(context: Context) {
         isServerStreaming = false
+
+        try { activeInternalRecord?.stop() } catch (_: Exception) {}
+        try { activeMicRecord?.stop() } catch (_: Exception) {}
+
         streamingJob?.cancel()
         micStreamingJob?.cancel()
         rtpJob?.cancel()
         httpJob?.cancel()
 
-        try { activeInternalRecord?.stop() } catch (_: Exception) {}
         try { activeInternalRecord?.release() } catch (_: Exception) {}
         activeInternalRecord = null
 
-        try { activeMicRecord?.stop() } catch (_: Exception) {}
         try { activeMicRecord?.release() } catch (_: Exception) {}
         activeMicRecord = null
 
@@ -1202,8 +1287,9 @@ object NetworkManager {
         micStreamingJob = null
         rtpJob = null
         httpJob = null
-        try { httpServerSocket?.close() } catch (_: Exception) {}
         httpServerSocket = null
+
+        try { httpServerSocket?.close() } catch (_: Exception) {}
 
         originalMediaVolume?.let {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

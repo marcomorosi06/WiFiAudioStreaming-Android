@@ -151,6 +151,15 @@
     <string name="rtp_description">Copy or save the SDP file to listen with VLC or FFplay</string>
     <string name="support_kofi_title">Buy me a coffee</string>
     <string name="support_kofi_desc">If you like the app, buy me a coffee! ☕</string>
+    <string name="source_code_android">Android Source Code</string>
+    <string name="source_code_desktop">Desktop Source Code</string>
+    <string name="source_code_view_on_github">View on GitHub</string>
+    <string name="app_version_label">Version</string>
+    <string name="settings_group_license">License</string>
+    <string name="license_info_title">EUPL v1.2 — © Marco Morosi</string>
+    <string name="license_info_desc">This project is licensed under the European Union Public Licence v1.2. All intellectual property belongs to Marco Morosi. The licence grants you the right to use, study, modify and redistribute the software, even in modified form, provided you keep the same licence.</string>
+    <string name="license_read_full_title">Read the full EUPL v1.2 text</string>
+    <string name="license_read_full_desc">Opens eupl.eu in your browser</string>
     <string name="onboarding_protocols_title">Multiple Protocols</string>
     <string name="onboarding_protocols_subtitle">Choose the best way to stream audio based on your setup.</string>
 
@@ -216,4 +225,9 @@
     <string name="settings_item_disconnection_sound_desc">Play a sound when the client disconnects from a server</string>
     <string name="mic_muted">Microphone Muted</string>
     <string name="mic_active">Microphone Active</string>
+    <string name="mic_permission_required">Microphone permission is required.</string>
+    <string name="mic_permission_why_button">Why?</string>
+    <string name="mic_permission_explanation_title">Why is microphone permission needed?</string>
+    <string name="mic_permission_explanation_body">Starting from Android 10, capturing internal audio requires the MediaProjection API, which always requires the RECORD_AUDIO permission — even if you only intend to capture system audio and not the microphone. This is a precautionary measure enforced by the OS: the audio pipeline is initialized as a single unit, and the system requests the permission upfront without knowing in advance which source will be used. Additionally, some OEM implementations (Samsung, Xiaomi, and others) enforce this requirement more strictly than stock Android, making the permission effectively mandatory in all cases.</string>
+    <string name="server_audio_restart_hint">No audio on the other device? Try restarting this phone.</string>
 </resources>

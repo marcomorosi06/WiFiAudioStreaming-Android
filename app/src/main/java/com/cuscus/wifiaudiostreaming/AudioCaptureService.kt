@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2026 Marco Morosi
- *
- * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
- * the European Commission - subsequent versions of the EUPL (the "Licence");
- * You may not use this work except in compliance with the Licence.
- * You may obtain a copy of the Licence at:
- *
- * https://joinup.ec.europa.eu/software/page/eupl
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the Licence is distributed on an "AS IS" basis,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing permissions and
- * limitations under the Licence.
- */
-
 package com.cuscus.wifiaudiostreaming
 
 import android.Manifest
@@ -25,12 +8,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -45,6 +31,8 @@ class AudioCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -52,6 +40,7 @@ class AudioCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                acquireLocks()
                 startForegroundWithNotification()
                 serviceScope.launch { updateWidgetState(this@AudioCaptureService, true, true) }
 
@@ -108,10 +97,39 @@ class AudioCaptureService : Service() {
         return START_STICKY
     }
 
+    @SuppressLint("WakelockTimeout")
+    private fun acquireLocks() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiFiAudioStreamer::ServerWakeLock").apply {
+            acquire()
+        }
+
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val lockType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+        } else {
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+        }
+        wifiLock = wifiManager.createWifiLock(lockType, "WiFiAudioStreamer::ServerWifiLock").apply {
+            acquire()
+        }
+    }
+
+    private fun releaseLocks() {
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
+        wifiLock?.let {
+            if (it.isHeld) it.release()
+        }
+    }
+
     private fun stopCapture() {
         NetworkManager.stopStreaming(this)
         mediaProjection?.stop()
         mediaProjection = null
+
+        releaseLocks()
 
         CoroutineScope(Dispatchers.IO).launch {
             updateWidgetState(this@AudioCaptureService, false, true)

@@ -151,6 +151,15 @@
     <string name="rtp_description">Copia o salva il file SDP per ascoltare con VLC o FFplay</string>
     <string name="support_kofi_title">Offrimi un caffè</string>
     <string name="support_kofi_desc">Se l\'app ti è utile, offrimi un caffè! ☕</string>
+    <string name="source_code_android">Codice sorgente Android</string>
+    <string name="source_code_desktop">Codice sorgente Desktop</string>
+    <string name="source_code_view_on_github">Visualizza su GitHub</string>
+    <string name="app_version_label">Versione</string>
+    <string name="settings_group_license">Licenza</string>
+    <string name="license_info_title">EUPL v1.2 — © Marco Morosi</string>
+    <string name="license_info_desc">Questo progetto è sotto la licenza European Union Public Licence v1.2. Tutta la proprietà intellettuale è di Marco Morosi. La licenza ti dà il diritto di usare, studiare, modificare e ridistribuire il software, anche in forma modificata, a condizione di mantenere la stessa licenza.</string>
+    <string name="license_read_full_title">Leggi il testo completo della EUPL v1.2</string>
+    <string name="license_read_full_desc">Apre eupl.eu nel tuo browser</string>
     <string name="onboarding_protocols_title">Protocolli Multipli</string>
     <string name="onboarding_protocols_subtitle">Scegli il modo migliore per trasmettere l\'audio in base alla tua configurazione.</string>
 
@@ -216,4 +225,9 @@
     <string name="settings_item_disconnection_sound_desc">Riproduci un suono quando il client si disconnette da un server</string>
     <string name="mic_muted">Microfono Mutato</string>
     <string name="mic_active">Microfono Attivo</string>
+    <string name="mic_permission_required">È necessario dare l\'accesso al microfono.</string>
+    <string name="mic_permission_why_button">Perché?</string>
+    <string name="mic_permission_explanation_title">Perché serve il permesso del microfono?</string>
+    <string name="mic_permission_explanation_body">A partire da Android 10, la cattura dell\'audio interno richiede la MediaProjection API, che a sua volta richiede sempre il permesso RECORD_AUDIO — anche se si intende catturare solo l\'audio di sistema e non il microfono. Si tratta di una misura cautelare imposta dal sistema operativo: la pipeline audio viene inizializzata come un\'unica unità, e il sistema richiede il permesso preventivamente senza sapere in anticipo quale sorgente verrà usata. Inoltre, alcune implementazioni OEM (Samsung, Xiaomi e altri) applicano questo requisito in modo più rigido rispetto ad Android stock, rendendo il permesso di fatto obbligatorio in tutti i casi.</string>
+    <string name="server_audio_restart_hint">Non si sente niente dall\'altra parte? Prova a riavviare questo dispositivo.</string>
 </resources>

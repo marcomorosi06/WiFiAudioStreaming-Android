@@ -46,11 +46,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -61,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -81,7 +86,7 @@ class MainActivity : ComponentActivity() {
                         putExtra("sample_rate", settings.sampleRate)
                         putExtra("channel_config", settings.channelConfig)
                         putExtra("buffer_size", settings.bufferSize)
-                        putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value)
+                        putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled)
                         putExtra("streaming_port", settings.streamingPort)
                         putExtra("network_interface", settings.networkInterface)
                         putExtra("rtp_enabled", settings.rtpEnabled)
@@ -124,6 +129,7 @@ class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         actionBar?.hide()
@@ -194,6 +200,18 @@ class MainActivity : ComponentActivity() {
         val isMulticastMode by viewModel.isMulticastMode.collectAsStateWithLifecycle()
         val context = LocalContext.current
         val localIp = remember { NetworkManager.getLocalIpAddress(context) }
+
+        var hasMicPermission by remember { mutableStateOf(hasRecordAudioPermission()) }
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    hasMicPermission = hasRecordAudioPermission()
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
 
         ClientDiscoveryHandler()
 
@@ -310,7 +328,8 @@ class MainActivity : ComponentActivity() {
             onNetworkInterfaceChange = viewModel::setNetworkInterface,
             onServerProtocolsChange = viewModel::setServerProtocols,
             onHttpSettingsChange = viewModel::setHttpSettings,
-            onToggleAutoConnectIp = viewModel::toggleAutoConnectIp
+            onToggleAutoConnectIp = viewModel::toggleAutoConnectIp,
+            hasMicPermission = hasMicPermission
         )
 
         ExpressiveSettingsScreen(
@@ -375,7 +394,7 @@ class MainActivity : ComponentActivity() {
                 putExtra("sample_rate", settings.sampleRate)
                 putExtra("channel_config", settings.channelConfig)
                 putExtra("buffer_size", settings.bufferSize)
-                putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value)
+                putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled)
                 putExtra("streaming_port", settings.streamingPort)
                 putExtra("network_interface", settings.networkInterface)
                 putExtra("rtp_enabled", settings.rtpEnabled)

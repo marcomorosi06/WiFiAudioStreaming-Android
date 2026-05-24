@@ -168,7 +168,8 @@ fun WiFiAudioStreamingApp(
     onNetworkInterfaceChange: (String) -> Unit,
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
     onHttpSettingsChange: (Int, Boolean) -> Unit,
-    onToggleAutoConnectIp: (String) -> Unit
+    onToggleAutoConnectIp: (String) -> Unit,
+    hasMicPermission: Boolean = true
 ) {
     val backgroundGradient by animateColorAsState(
         targetValue = if (isStreaming) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
@@ -244,6 +245,7 @@ fun WiFiAudioStreamingApp(
                 streamInternal = appSettings.streamInternal,
                 streamMic = appSettings.streamMic,
                 localIp = localIp,
+                hasMicPermission = hasMicPermission,
                 modifier = Modifier.fillMaxWidth(),
                 onStartServer = onStartServer,
                 onStopServer = onStopServer,
@@ -864,6 +866,29 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_license),
+                    icon = Icons.Outlined.Gavel
+                ) {
+                    SettingsInfoItem(
+                        title = stringResource(R.string.license_info_title),
+                        description = stringResource(R.string.license_info_desc),
+                        icon = Icons.Outlined.VerifiedUser
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    SettingsClickableItem(
+                        title = stringResource(R.string.license_read_full_title),
+                        description = stringResource(R.string.license_read_full_desc),
+                        icon = Icons.Outlined.OpenInBrowser,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://eupl.eu/"))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
                     title = stringResource(R.string.settings_group_about),
                     icon = Icons.Outlined.Info
                 ) {
@@ -887,6 +912,44 @@ fun SettingsScreenContent(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi"))
                             context.startActivity(intent)
                         }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    SettingsClickableItem(
+                        title = stringResource(R.string.source_code_android),
+                        description = stringResource(R.string.source_code_view_on_github),
+                        icon = Icons.Outlined.Code,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/marcomorosi06/WiFiAudioStreaming-Android/"))
+                            context.startActivity(intent)
+                        }
+                    )
+                    SettingsClickableItem(
+                        title = stringResource(R.string.source_code_desktop),
+                        description = stringResource(R.string.source_code_view_on_github),
+                        icon = Icons.Outlined.Code,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop"))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+
+            item {
+                val versionName = remember {
+                    try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" }
+                    catch (e: Exception) { "?" }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.app_version_label)} $versionName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1915,6 +1978,7 @@ fun ExpressiveStreamingControlCenter(
     streamInternal: Boolean,
     streamMic: Boolean,
     localIp: String,
+    hasMicPermission: Boolean,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
     modifier: Modifier,
@@ -2048,6 +2112,13 @@ fun ExpressiveStreamingControlCenter(
                             valueRange = 0f..2f, // Da Muto a 200%
                             modifier = Modifier.fillMaxWidth(0.8f)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.server_audio_restart_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
                     }
                     // --------------------------------------
                 }
@@ -2056,6 +2127,7 @@ fun ExpressiveStreamingControlCenter(
                     streamInternal = streamInternal,
                     streamMic = streamMic,
                     localIp = localIp,
+                    hasMicPermission = hasMicPermission,
                     onStartServer = onStartServer
                 )
             } else {
@@ -2152,10 +2224,12 @@ fun ExpressiveServerControls(
     streamInternal: Boolean,
     streamMic: Boolean,
     localIp: String,
+    hasMicPermission: Boolean,
     onStartServer: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val isReady = streamInternal || streamMic
+    var showMicPermissionExplanation by remember { mutableStateOf(false) }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2226,6 +2300,59 @@ fun ExpressiveServerControls(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        AnimatedVisibility(
+            visible = isReady && !hasMicPermission,
+            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = stringResource(R.string.mic_permission_required),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { showMicPermissionExplanation = true }) {
+                        Text(
+                            text = stringResource(R.string.mic_permission_why_button),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showMicPermissionExplanation) {
+            AlertDialog(
+                onDismissRequest = { showMicPermissionExplanation = false },
+                title = { Text(stringResource(R.string.mic_permission_explanation_title)) },
+                text = { Text(stringResource(R.string.mic_permission_explanation_body)) },
+                confirmButton = {
+                    TextButton(onClick = { showMicPermissionExplanation = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
 
         Button(
             onClick = {
@@ -2532,6 +2659,13 @@ fun SettingsInfoItem(
     }
 }
 
+private data class FeatureItem(
+    val imageVector: ImageVector? = null,
+    val drawableRes: Int? = null,
+    val titleRes: Int,
+    val descRes: Int
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
@@ -2576,240 +2710,354 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
 fun WelcomePage() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" //TODO link github
+    val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop"
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
+    val infiniteTransition = rememberInfiniteTransition(label = "heroPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
 
-        Icon(
-            imageVector = Icons.Default.ImportantDevices,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
-        Text(
-            text = stringResource(R.string.onboarding_welcome_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = stringResource(R.string.onboarding_welcome_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        ElevatedCard(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                    context.startActivity(intent)
-                },
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            ),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QrCode2,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.onboarding_download_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                .fillMaxHeight(0.5f)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                            MaterialTheme.colorScheme.surface
+                        )
                     )
-                    Text(
-                        text = stringResource(R.string.onboarding_download_link, link),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(52.dp))
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(152.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(152.dp)
+                        .scale(pulseScale)
+                        .clip(RoundedCornerShape(38.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(108.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.size(108.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.weight(2f))
+            Spacer(modifier = Modifier.height(40.dp))
+
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(600, delayMillis = 80)) + slideInVertically(tween(600, delayMillis = 80)) { it / 3 }
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_welcome_title),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = stringResource(R.string.onboarding_welcome_subtitle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(700, delayMillis = 280)) + slideInVertically(tween(700, delayMillis = 280)) { it / 2 }
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            context.startActivity(intent)
+                        },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(13.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.onboarding_download_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = link,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
 
 @Composable
 fun FeaturesPage() {
-    val haptic = LocalHapticFeedback.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Icon(
-            imageVector = Icons.Default.SwapHoriz,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+    OnboardingFeaturePage(
+        icon = Icons.Default.SwapHoriz,
+        titleRes = R.string.onboarding_features_title,
+        subtitleRes = R.string.onboarding_features_subtitle,
+        features = listOf(
+            FeatureItem(imageVector = Icons.Default.Download, titleRes = R.string.onboarding_feature1_title, descRes = R.string.onboarding_feature1_desc),
+            FeatureItem(imageVector = Icons.Default.Upload, titleRes = R.string.onboarding_feature2_title, descRes = R.string.onboarding_feature2_desc),
+            FeatureItem(imageVector = Icons.Default.Tune, titleRes = R.string.onboarding_feature3_title, descRes = R.string.onboarding_feature3_desc)
         )
-
-        Text(
-            text = stringResource(R.string.onboarding_features_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = stringResource(R.string.onboarding_features_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            FeatureRow(
-                icon = Icons.Default.Download,
-                title = stringResource(R.string.onboarding_feature1_title),
-                description = stringResource(R.string.onboarding_feature1_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
-            FeatureRow(
-                icon = Icons.Default.Upload,
-                title = stringResource(R.string.onboarding_feature2_title),
-                description = stringResource(R.string.onboarding_feature2_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
-            FeatureRow(
-                icon = Icons.Default.Tune,
-                title = stringResource(R.string.onboarding_feature3_title),
-                description = stringResource(R.string.onboarding_feature3_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
-        }
-    }
+    )
 }
 
 @Composable
 fun ProtocolsPage() {
+    OnboardingFeaturePage(
+        icon = Icons.Default.Hub,
+        titleRes = R.string.onboarding_protocols_title,
+        subtitleRes = R.string.onboarding_protocols_subtitle,
+        features = listOf(
+            FeatureItem(drawableRes = R.drawable.wfas_protocol, titleRes = R.string.onboarding_proto1_title, descRes = R.string.onboarding_proto1_desc),
+            FeatureItem(imageVector = Icons.Default.Radio, titleRes = R.string.onboarding_proto2_title, descRes = R.string.onboarding_proto2_desc),
+            FeatureItem(imageVector = Icons.Default.Language, titleRes = R.string.onboarding_proto3_title, descRes = R.string.onboarding_proto3_desc)
+        )
+    )
+}
+
+@Composable
+private fun OnboardingFeaturePage(
+    icon: ImageVector,
+    titleRes: Int,
+    subtitleRes: Int,
+    features: List<FeatureItem>
+) {
     val haptic = LocalHapticFeedback.current
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Icon(
-            imageVector = Icons.Default.Hub,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.38f)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
         )
 
-        Text(
-            text = stringResource(R.string.onboarding_protocols_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
+        ) {
+            Spacer(modifier = Modifier.height(36.dp))
 
-        Text(
-            text = stringResource(R.string.onboarding_protocols_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(500)) + scaleIn(tween(500), initialScale = 0.75f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(44.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(600, delayMillis = 80)) + slideInVertically(tween(600, delayMillis = 80)) { it / 3 }
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(titleRes),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = stringResource(subtitleRes),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FeatureRow(
-                icon = Icons.Default.Speed,
-                title = stringResource(R.string.onboarding_proto1_title),
-                description = stringResource(R.string.onboarding_proto1_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
-            FeatureRow(
-                icon = Icons.Default.Radio,
-                title = stringResource(R.string.onboarding_proto2_title),
-                description = stringResource(R.string.onboarding_proto2_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
-            FeatureRow(
-                icon = Icons.Default.Language,
-                title = stringResource(R.string.onboarding_proto3_title),
-                description = stringResource(R.string.onboarding_proto3_desc),
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            features.forEachIndexed { index, item ->
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(500, delayMillis = 180 + index * 90)) +
+                            slideInVertically(tween(500, delayMillis = 180 + index * 90)) { it / 2 }
+                ) {
+                    OnboardingFeatureCard(
+                        item = item,
+                        title = stringResource(item.titleRes),
+                        description = stringResource(item.descRes),
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun FeatureRow(
-    icon: ImageVector,
+private fun OnboardingFeatureCard(
+    item: FeatureItem,
     title: String,
     description: String,
     onClick: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier.clickable { onClick() },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (item.imageVector != null) {
+                    Icon(
+                        imageVector = item.imageVector,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                } else if (item.drawableRes != null) {
+                    Icon(
+                        painter = painterResource(item.drawableRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -2843,16 +3091,29 @@ private fun OnboardingNavigation(
             }
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             repeat(pagerState.pageCount) { iteration ->
-                val color =
-                    if (pagerState.currentPage == iteration) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outlineVariant
+                val isActive = pagerState.currentPage == iteration
+                val width by animateDpAsState(
+                    targetValue = if (isActive) 24.dp else 8.dp,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    label = "pillWidth"
+                )
+                val color by animateColorAsState(
+                    targetValue = if (isActive) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant,
+                    animationSpec = tween(300),
+                    label = "pillColor"
+                )
                 Box(
                     modifier = Modifier
+                        .height(8.dp)
+                        .width(width)
                         .clip(CircleShape)
                         .background(color)
-                        .size(10.dp)
                 )
             }
         }

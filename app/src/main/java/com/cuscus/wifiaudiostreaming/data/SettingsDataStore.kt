@@ -99,7 +99,7 @@ class SettingsDataStore(context: Context) {
             streamMic = preferences[PreferencesKeys.STREAM_MIC] ?: false,
             sampleRate = preferences[PreferencesKeys.SAMPLE_RATE] ?: 48000,
             channelConfig = preferences[PreferencesKeys.CHANNEL_CONFIG] ?: "STEREO",
-            bufferSize = preferences[PreferencesKeys.BUFFER_SIZE] ?: 6400,
+            bufferSize = preferences[PreferencesKeys.BUFFER_SIZE] ?: 512,
             streamingPort = preferences[PreferencesKeys.STREAMING_PORT] ?: 9090,
             sendClientMicrophone = preferences[PreferencesKeys.SEND_CLIENT_MICROPHONE] ?: false,
             micPort = preferences[PreferencesKeys.MIC_PORT] ?: 9092,
