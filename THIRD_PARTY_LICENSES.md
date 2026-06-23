@@ -5,10 +5,6 @@ It uses the third-party open-source components listed below. Each remains the
 property of its respective authors and is distributed under its own licence.
 We are grateful to all of these projects.
 
-> **Note:** the Android app performs AAC encoding through the platform's built-in
-> `MediaCodec` API, so — unlike the desktop app — it does **not** bundle FFmpeg
-> or any other native media codec library.
-
 ---
 
 ## Summary table
