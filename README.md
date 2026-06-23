@@ -135,3 +135,19 @@ You are free to:
 - **No Warranty**: The software is provided **"as is"**, without any warranties.
 
 For the full legal text, see the `LICENSE.md` file included in this repository or visit the [official EUPL website](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+
+---
+
+# 🧩 Third-Party Software & Licenses
+
+This app uses several open-source components, each under its own licence. The
+complete attribution list is in **[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)**
+and is also available inside the app (Settings → *Open-source licenses*).
+
+Components include the AndroidX libraries and Jetpack Compose (© The Android Open
+Source Project / Google LLC), Kotlin and kotlinx.coroutines, Ktor (© JetBrains)
+and Bouncy Castle — all under the Apache License 2.0 except Bouncy Castle (MIT-style
+Bouncy Castle Licence). See the full list for versions and copyrights.
+
+> Unlike the desktop app, the Android app does **not** bundle FFmpeg: AAC
+> encoding is performed by the platform's built-in `MediaCodec` API.

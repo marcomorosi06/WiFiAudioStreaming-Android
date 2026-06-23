@@ -509,6 +509,34 @@ fun SettingsScreenContent(
 ) {
     val context = LocalContext.current
 
+    var showLicensesDialog by remember { mutableStateOf(false) }
+    val licensesText = remember {
+        runCatching {
+            context.resources.openRawResource(R.raw.third_party_licenses)
+                .bufferedReader().use { it.readText() }
+        }.getOrDefault("See THIRD_PARTY_LICENSES.md in the project repository.")
+    }
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            icon = { Icon(Icons.Outlined.Gavel, contentDescription = null) },
+            title = { Text(stringResource(R.string.licenses_dialog_title)) },
+            text = {
+                Text(
+                    text = licensesText,
+                    modifier = Modifier
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState())
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) {
+                    Text(stringResource(R.string.licenses_close))
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             var fredClickCount by remember { mutableIntStateOf(0) }
@@ -911,6 +939,13 @@ fun SettingsScreenContent(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://eupl.eu/"))
                             context.startActivity(intent)
                         }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    SettingsClickableItem(
+                        title = stringResource(R.string.licenses_open_source),
+                        description = stringResource(R.string.licenses_open_source_desc),
+                        icon = Icons.Outlined.Description,
+                        onClick = { showLicensesDialog = true }
                     )
                 }
             }

@@ -160,6 +160,10 @@
     <string name="license_info_desc">Questo progetto è sotto la licenza European Union Public Licence v1.2. Tutta la proprietà intellettuale è di Marco Morosi. La licenza ti dà il diritto di usare, studiare, modificare e ridistribuire il software, anche in forma modificata, a condizione di mantenere la stessa licenza.</string>
     <string name="license_read_full_title">Leggi il testo completo della EUPL v1.2</string>
     <string name="license_read_full_desc">Apre eupl.eu nel tuo browser</string>
+    <string name="licenses_open_source">Licenze open source</string>
+    <string name="licenses_open_source_desc">Software di terze parti e relative licenze</string>
+    <string name="licenses_dialog_title">Licenze open source</string>
+    <string name="licenses_close">Chiudi</string>
     <string name="onboarding_protocols_title">Protocolli Multipli</string>
     <string name="onboarding_protocols_subtitle">Scegli il modo migliore per trasmettere l\'audio in base alla tua configurazione.</string>
 

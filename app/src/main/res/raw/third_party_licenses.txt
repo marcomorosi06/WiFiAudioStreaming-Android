@@ -1,0 +1,30 @@
+WiFi Audio Streaming (Android) — Third-Party Software & Licenses
+===============================================================
+
+This application is licensed under the EUPL v1.2.
+It uses the open-source components below, each under its own licence.
+Full details: THIRD_PARTY_LICENSES.md in the project repository.
+
+Note: AAC encoding uses Android's built-in MediaCodec API, so this app does
+NOT bundle any third-party native media codec.
+
+Apache License 2.0  (https://www.apache.org/licenses/LICENSE-2.0)
+  AndroidX libraries and Jetpack Compose
+      (c) The Android Open Source Project / Google LLC
+    - Core KTX, Activity, Activity Compose
+    - Lifecycle (runtime-ktx, viewmodel-compose)
+    - Compose UI, Graphics, Tooling Preview, Material 3
+    - Material Icons Extended
+    - DataStore Preferences
+    - Glance (App Widget, Material 3)
+    - Core SplashScreen
+  Kotlin standard library              (c) JetBrains s.r.o.
+  kotlinx.coroutines (Android)         (c) JetBrains s.r.o.
+  Ktor (client/server core + CIO, network)  (c) JetBrains s.r.o.
+
+Bouncy Castle Licence (MIT-style)
+  bcprov / bctls / bcpkix (jdk15on)
+  Copyright (c) 2000-2021 The Legion of the Bouncy Castle Inc.
+  https://www.bouncycastle.org
+
+Each component remains the property of its respective authors. We thank them.
