@@ -27,6 +27,9 @@ import android.media.AudioPlaybackCaptureConfiguration
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.media.projection.MediaProjection
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -93,6 +96,20 @@ object NetworkManager {
     }
 
     const val WFAS_PROTOCOL_VERSION = 2
+
+    private const val MIC_HEADER_SIZE = 10
+    private const val MIC_MAGIC_0: Byte = 0x57
+    private const val MIC_MAGIC_1: Byte = 0x46
+
+    private fun writeMicHeader(dst: ByteArray, seq: Int, silence: Boolean) {
+        dst[0] = MIC_MAGIC_0
+        dst[1] = MIC_MAGIC_1
+        dst[2] = WFAS_PROTOCOL_VERSION.toByte()
+        dst[3] = if (silence) 0x01 else 0x00
+        dst[4] = ((seq shr 8) and 0xFF).toByte()
+        dst[5] = (seq and 0xFF).toByte()
+        dst[6] = 0; dst[7] = 0; dst[8] = 0; dst[9] = 0
+    }
 
     val protocolMismatch = MutableStateFlow<ProtocolMismatch?>(null)
 
@@ -475,6 +492,9 @@ object NetworkManager {
     ) = launch {
         var micRecord: AudioRecord? = null
         var socket: DatagramSocket? = null
+        var aec: AcousticEchoCanceler? = null
+        var ns: NoiseSuppressor? = null
+        var agc: AutomaticGainControl? = null
 
         try {
             val channelConfigIn = if (channelConfig == "STEREO") AudioFormat.CHANNEL_IN_STEREO else AudioFormat.CHANNEL_IN_MONO
@@ -486,13 +506,27 @@ object NetworkManager {
                 micBufferSize += frameSize - (micBufferSize % frameSize)
             }
 
-            micRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                channelConfigIn,
-                AudioFormat.ENCODING_PCM_16BIT,
-                micBufferSize
-            )
+            fun buildRecord(source: Int): AudioRecord? = runCatching {
+                val rec = AudioRecord(source, sampleRate, channelConfigIn, AudioFormat.ENCODING_PCM_16BIT, micBufferSize)
+                if (rec.state == AudioRecord.STATE_INITIALIZED) rec
+                else { runCatching { rec.release() }; null }
+            }.getOrNull()
+
+            micRecord = buildRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                ?: buildRecord(MediaRecorder.AudioSource.MIC)
+                ?: throw IllegalStateException("AudioRecord init failed")
+
+            val sessionId = micRecord.audioSessionId
+            if (AcousticEchoCanceler.isAvailable()) {
+                aec = runCatching { AcousticEchoCanceler.create(sessionId)?.apply { enabled = true } }.getOrNull()
+            }
+            if (NoiseSuppressor.isAvailable()) {
+                ns = runCatching { NoiseSuppressor.create(sessionId)?.apply { enabled = true } }.getOrNull()
+            }
+            if (AutomaticGainControl.isAvailable()) {
+                agc = runCatching { AutomaticGainControl.create(sessionId)?.apply { enabled = true } }.getOrNull()
+            }
+            Log.d(TAG, "[MIC_SEND] session=$sessionId aec=${aec?.enabled} ns=${ns?.enabled} agc=${agc?.enabled}")
 
             socket = DatagramSocket().apply { sendBufferSize = 1 shl 20 }
             val destinationAddress = InetAddress.getByName(serverInfo.ip)
@@ -502,19 +536,33 @@ object NetworkManager {
 
             val chunkBytes = 1200
             val buffer = ByteArray(micBufferSize)
-            val silenceBuffer = ByteArray(micBufferSize)
+            val packetBuffer = ByteArray(MIC_HEADER_SIZE + chunkBytes)
+            var seq = 0
+            var lastMutedSent = false
             while (isActive) {
+                if (isMicMuted.value) {
+                    if (!lastMutedSent) {
+                        writeMicHeader(packetBuffer, seq, silence = true)
+                        seq = (seq + 1) and 0xFFFF
+                        runCatching { socket!!.send(DatagramPacket(packetBuffer, MIC_HEADER_SIZE, destinationAddress, micPort)) }
+                        lastMutedSent = true
+                    }
+                    micRecord.read(buffer, 0, buffer.size)
+                    continue
+                }
+                lastMutedSent = false
                 val bytesRead = micRecord.read(buffer, 0, buffer.size)
                 if (bytesRead > 0) {
-                    val dataToSend = if (isMicMuted.value) silenceBuffer else buffer
                     var offset = 0
                     while (offset < bytesRead) {
                         val remaining = bytesRead - offset
                         var chunk = if (remaining > chunkBytes) chunkBytes else remaining
                         chunk -= chunk % 2
                         if (chunk <= 0) break
-                        val packet = DatagramPacket(dataToSend, offset, chunk, destinationAddress, micPort)
-                        socket.send(packet)
+                        writeMicHeader(packetBuffer, seq, silence = false)
+                        seq = (seq + 1) and 0xFFFF
+                        System.arraycopy(buffer, offset, packetBuffer, MIC_HEADER_SIZE, chunk)
+                        runCatching { socket!!.send(DatagramPacket(packetBuffer, MIC_HEADER_SIZE + chunk, destinationAddress, micPort)) }
                         offset += chunk
                     }
                 }
@@ -527,8 +575,11 @@ object NetworkManager {
             }
         } finally {
             println("Invio microfono terminato.")
-            micRecord?.stop()
-            micRecord?.release()
+            runCatching { aec?.release() }
+            runCatching { ns?.release() }
+            runCatching { agc?.release() }
+            runCatching { micRecord?.stop() }
+            runCatching { micRecord?.release() }
             socket?.close()
         }
     }
