@@ -91,6 +91,17 @@ class SettingsDataStore(context: Context) {
         val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
         val CONNECTION_SOUND_ENABLED = booleanPreferencesKey("connection_sound_enabled")
         val DISCONNECTION_SOUND_ENABLED = booleanPreferencesKey("disconnection_sound_enabled")
+        val AUTOMATION_SCRIPTS = stringPreferencesKey("automation_scripts")
+    }
+
+    val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
+        AppScript.parseList(preferences[PreferencesKeys.AUTOMATION_SCRIPTS] ?: "")
+    }
+
+    suspend fun saveScripts(list: List<AppScript>) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.AUTOMATION_SCRIPTS] = AppScript.serializeList(list)
+        }
     }
 
     val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->

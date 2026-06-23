@@ -55,6 +55,8 @@ import kotlin.coroutines.cancellation.CancellationException
 
 data class ServerInfo(val ip: String, val isMulticast: Boolean, val port: Int)
 
+data class ProtocolMismatch(val localVersion: Int, val remoteVersion: Int)
+
 @SuppressLint("MissingPermission")
 object NetworkManager {
 
@@ -86,7 +88,29 @@ object NetworkManager {
         const val DISCOVERY_MESSAGE = "WIFI_AUDIO_STREAMER_DISCOVERY"
         const val CLIENT_HELLO_MESSAGE = "HELLO_FROM_CLIENT"
         const val MULTICAST_GROUP_IP = "239.255.0.1"
+        const val INCOMPATIBLE_PREFIX = "WFAS_INCOMPATIBLE"
+        const val HELLO_ACK_PREFIX = "HELLO_ACK"
     }
+
+    const val WFAS_PROTOCOL_VERSION = 2
+
+    val protocolMismatch = MutableStateFlow<ProtocolMismatch?>(null)
+
+    private fun clientHelloMessage(): String = "${NetworkSettings.CLIENT_HELLO_MESSAGE};v=$WFAS_PROTOCOL_VERSION"
+    private fun helloAckMessage(): String = "${NetworkSettings.HELLO_ACK_PREFIX};v=$WFAS_PROTOCOL_VERSION"
+    private fun incompatibleMessage(): String = "${NetworkSettings.INCOMPATIBLE_PREFIX};v=$WFAS_PROTOCOL_VERSION"
+
+    private fun parseProtocolVersion(message: String): Int =
+        message.split(";").firstOrNull { it.startsWith("v=") }
+            ?.removePrefix("v=")?.trim()?.toIntOrNull() ?: 0
+
+    private fun signalProtocolMismatch(remoteVersion: Int) {
+        if (protocolMismatch.value == null) {
+            protocolMismatch.value = ProtocolMismatch(WFAS_PROTOCOL_VERSION, remoteVersion)
+        }
+    }
+
+    fun clearProtocolMismatch() { protocolMismatch.value = null }
 
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
@@ -712,7 +736,7 @@ object NetworkManager {
                                 val packet = buildPacket {
                                     writeByte(0x57.toByte())
                                     writeByte(0x46.toByte())
-                                    writeByte(0x00.toByte())
+                                    writeByte(WFAS_PROTOCOL_VERSION.toByte())
                                     writeByte(0x00.toByte())
                                     writeByte((seqNumber shr 8).toByte())
                                     writeByte(seqNumber.toByte())
@@ -821,8 +845,16 @@ object NetworkManager {
                             continue
                         }
 
-                        if (message != NetworkSettings.CLIENT_HELLO_MESSAGE) {
+                        if (!message.startsWith(NetworkSettings.CLIENT_HELLO_MESSAGE)) {
                             Log.w(TAG, "[SERVER][UNICAST] messaggio ignorato (non HELLO): '$message'")
+                            continue
+                        }
+
+                        val clientVersion = parseProtocolVersion(message)
+                        if (clientVersion != WFAS_PROTOCOL_VERSION) {
+                            Log.w(TAG, "[SERVER][UNICAST] client incompatibile v=$clientVersion (mio v=$WFAS_PROTOCOL_VERSION), rifiuto $clientAddress")
+                            sendSocket.send(Datagram(buildPacket { writeText(incompatibleMessage()) }, clientAddress))
+                            signalProtocolMismatch(clientVersion)
                             continue
                         }
 
@@ -832,7 +864,7 @@ object NetworkManager {
                         // Svuota la coda: il client riceve solo audio fresco
                         udpAudioQueue.clear()
 
-                        val ackPacket = buildPacket { writeText("HELLO_ACK") }
+                        val ackPacket = buildPacket { writeText(helloAckMessage()) }
                         sendSocket.send(Datagram(ackPacket, clientAddress))
                         Log.d(TAG, "[SERVER][UNICAST] HELLO_ACK inviato a $clientAddress")
 
@@ -1018,7 +1050,7 @@ object NetworkManager {
 
                         val senderJob = launch {
                             while (isActive) {
-                                val helloPacket = buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) }
+                                val helloPacket = buildPacket { writeText(clientHelloMessage()) }
                                 try { socket.send(Datagram(helloPacket, remoteAddress)) } catch (e: Exception) {}
                                 delay(500)
                             }
@@ -1029,8 +1061,21 @@ object NetworkManager {
                         senderJob.cancel()
 
                         val ackMsg = ackDatagram.packet.readText().trim()
-                        if (ackMsg != "HELLO_ACK") {
-                            throw Exception(context.getString(R.string.status_handshake_failed_unexpected_response, ackMsg))
+                        when {
+                            ackMsg.startsWith(NetworkSettings.INCOMPATIBLE_PREFIX) -> {
+                                signalProtocolMismatch(parseProtocolVersion(ackMsg))
+                                connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                return@launch
+                            }
+                            ackMsg.startsWith(NetworkSettings.HELLO_ACK_PREFIX) -> {
+                                val serverVersion = parseProtocolVersion(ackMsg)
+                                if (serverVersion != WFAS_PROTOCOL_VERSION) {
+                                    signalProtocolMismatch(serverVersion)
+                                    connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                    return@launch
+                                }
+                            }
+                            else -> throw Exception(context.getString(R.string.status_handshake_failed_unexpected_response, ackMsg))
                         }
 
                         connectionStatus.value = context.getString(R.string.status_streaming)
@@ -1046,6 +1091,7 @@ object NetworkManager {
 
                         var expectedSeq = -1
                         var lastGoodPcm: ByteArray? = null
+                        var versionChecked = false
 
                         val watchdogJob = launch {
                             while (isActive) {
@@ -1067,6 +1113,17 @@ object NetworkManager {
 
                                 if (bytes.size >= 2 && bytes[0] == MAGIC_0 && bytes[1] == MAGIC_1) {
                                     if (bytes.size < HEADER_SIZE) continue
+
+                                    if (!versionChecked) {
+                                        versionChecked = true
+                                        val packetVersion = bytes[2].toInt() and 0xFF
+                                        if (packetVersion != WFAS_PROTOCOL_VERSION) {
+                                            signalProtocolMismatch(packetVersion)
+                                            connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                            streamingJob?.cancel()
+                                            break
+                                        }
+                                    }
 
                                     val flags     = bytes[3].toInt() and 0xFF
                                     val seq       = ((bytes[4].toInt() and 0xFF) shl 8) or (bytes[5].toInt() and 0xFF)
@@ -1192,6 +1249,7 @@ object NetworkManager {
                         val MC_MAGIC_0: Byte = 0x57
                         val MC_MAGIC_1: Byte = 0x46
                         val MC_HEADER_SIZE = 10
+                        var mcVersionChecked = false
 
                         while (isActive) {
                             try {
@@ -1205,7 +1263,16 @@ object NetworkManager {
                                 if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
                                 break
                             }
-                            if (len >= 2 && packet.data[0] == MC_MAGIC_0 && packet.data[1] == MC_MAGIC_1) {
+                            if (len >= MC_HEADER_SIZE && packet.data[0] == MC_MAGIC_0 && packet.data[1] == MC_MAGIC_1) {
+                                if (!mcVersionChecked) {
+                                    mcVersionChecked = true
+                                    val packetVersion = packet.data[2].toInt() and 0xFF
+                                    if (packetVersion != WFAS_PROTOCOL_VERSION) {
+                                        signalProtocolMismatch(packetVersion)
+                                        connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                        break
+                                    }
+                                }
                                 val pcmLen = len - MC_HEADER_SIZE
                                 if (pcmLen > 0) {
                                     audioTrack.write(packet.data, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)

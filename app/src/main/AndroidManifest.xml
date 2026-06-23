@@ -39,6 +39,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="wifiaudio" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -50,6 +57,18 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".scripting.ScriptCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.cuscus.wifiaudiostreaming.action.START_SERVER" />
+                <action android:name="com.cuscus.wifiaudiostreaming.action.CONNECT" />
+                <action android:name="com.cuscus.wifiaudiostreaming.action.STOP" />
+                <action android:name="com.cuscus.wifiaudiostreaming.action.TOGGLE" />
+                <action android:name="com.cuscus.wifiaudiostreaming.action.SET" />
             </intent-filter>
         </receiver>
 

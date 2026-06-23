@@ -24,6 +24,7 @@ import android.content.Intent
 import androidx.annotation.RequiresPermission
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.cuscus.wifiaudiostreaming.data.AppScript
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import com.cuscus.wifiaudiostreaming.data.AutoConnectEntry
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
@@ -62,7 +63,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = application.getString(R.string.status_idle)
     )
 
+    val protocolMismatch: StateFlow<ProtocolMismatch?> = NetworkManager.protocolMismatch
+
+    fun clearProtocolMismatch() = NetworkManager.clearProtocolMismatch()
+
     val discoveredDevices: StateFlow<Map<String, ServerInfo>> = NetworkManager.discoveredDevices
+
+    val scripts: StateFlow<List<AppScript>> = settingsDataStore.scriptsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    fun saveScript(script: AppScript) {
+        viewModelScope.launch {
+            val current = settingsDataStore.scriptsFlow.first().toMutableList()
+            val index = current.indexOfFirst { it.id == script.id }
+            if (index >= 0) current[index] = script else current.add(script)
+            settingsDataStore.saveScripts(current)
+        }
+    }
+
+    fun deleteScript(id: String) {
+        viewModelScope.launch {
+            val current = settingsDataStore.scriptsFlow.first().filterNot { it.id == id }
+            settingsDataStore.saveScripts(current)
+        }
+    }
 
     init {
         viewModelScope.launch {

@@ -26,12 +26,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -73,8 +79,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cuscus.wifiaudiostreaming.data.AppScript
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import com.cuscus.wifiaudiostreaming.data.AutoConnectEntry
+import com.cuscus.wifiaudiostreaming.scripting.ScriptActionType
+import com.cuscus.wifiaudiostreaming.scripting.ScriptCommand
+import com.cuscus.wifiaudiostreaming.scripting.ScriptParams
+import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlinx.coroutines.launch
@@ -436,6 +447,7 @@ fun ExpressiveSettingsScreen(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
+    onOpenScripting: () -> Unit = {},
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -466,7 +478,8 @@ fun ExpressiveSettingsScreen(
             onSaveAutoConnectList = onSaveAutoConnectList,
             onAutoConnectEnabledChange = onAutoConnectEnabledChange,
             onConnectionSoundChange = onConnectionSoundChange,
-            onDisconnectionSoundChange = onDisconnectionSoundChange
+            onDisconnectionSoundChange = onDisconnectionSoundChange,
+            onOpenScripting = onOpenScripting
         )
     }
 }
@@ -492,6 +505,7 @@ fun SettingsScreenContent(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
+    onOpenScripting: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -860,6 +874,20 @@ fun SettingsScreenContent(
                         icon = Icons.Outlined.VolumeOff,
                         isChecked = appSettings.disconnectionSoundEnabled,
                         onCheckedChange = onDisconnectionSoundChange
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_automation),
+                    icon = Icons.Outlined.Bolt
+                ) {
+                    SettingsClickableItem(
+                        title = stringResource(R.string.settings_item_scripting_title),
+                        description = stringResource(R.string.settings_item_scripting_desc),
+                        icon = Icons.Outlined.Link,
+                        onClick = onOpenScripting
                     )
                 }
             }
@@ -2712,84 +2740,42 @@ fun WelcomePage() {
     val haptic = LocalHapticFeedback.current
     val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop"
 
-    val infiniteTransition = rememberInfiniteTransition(label = "heroPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.28f,
-        targetValue = 0.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.5f)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(52.dp))
+            Spacer(modifier = Modifier.height(72.dp))
 
             Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(152.dp)
+                modifier = Modifier
+                    .size(104.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(152.dp)
-                        .scale(pulseScale)
-                        .clip(RoundedCornerShape(38.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                Icon(
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(104.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
-                Box(
-                    modifier = Modifier
-                        .size(108.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        modifier = Modifier.size(108.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+
+            AudioOverWifiMotif()
+
+            Spacer(modifier = Modifier.height(36.dp))
 
             AnimatedVisibility(
                 visible = visible,
-                enter = fadeIn(tween(600, delayMillis = 80)) + slideInVertically(tween(600, delayMillis = 80)) { it / 3 }
+                enter = fadeIn(tween(500, easing = LinearEasing)) + slideInVertically(tween(500, easing = LinearEasing)) { it / 4 }
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -2814,7 +2800,7 @@ fun WelcomePage() {
 
             AnimatedVisibility(
                 visible = visible,
-                enter = fadeIn(tween(700, delayMillis = 280)) + slideInVertically(tween(700, delayMillis = 280)) { it / 2 }
+                enter = fadeIn(tween(500, delayMillis = 200, easing = LinearEasing)) + slideInVertically(tween(500, delayMillis = 200, easing = LinearEasing)) { it / 4 }
             ) {
                 Surface(
                     modifier = Modifier
@@ -2877,6 +2863,66 @@ fun WelcomePage() {
 }
 
 @Composable
+private fun AudioOverWifiMotif() {
+    val primary = MaterialTheme.colorScheme.primary
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+
+    val transition = rememberInfiniteTransition(label = "flow")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Wifi,
+            contentDescription = null,
+            tint = primary,
+            modifier = Modifier.size(34.dp)
+        )
+        Canvas(
+            modifier = Modifier
+                .width(104.dp)
+                .height(20.dp)
+        ) {
+            val count = 4
+            val w = size.width
+            val cy = size.height / 2f
+            val radius = 3.5.dp.toPx()
+            drawLine(
+                color = muted,
+                start = Offset(0f, cy),
+                end = Offset(w, cy),
+                strokeWidth = 2f
+            )
+            for (i in 0 until count) {
+                val t = (phase + i.toFloat() / count) % 1f
+                val alpha = (1f - kotlin.math.abs(t - 0.5f) * 2f).coerceIn(0f, 1f)
+                drawCircle(
+                    color = primary.copy(alpha = alpha),
+                    radius = radius,
+                    center = Offset(t * w, cy)
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Default.GraphicEq,
+            contentDescription = null,
+            tint = primary,
+            modifier = Modifier.size(34.dp)
+        )
+    }
+}
+
+@Composable
 fun FeaturesPage() {
     OnboardingFeaturePage(
         icon = Icons.Default.SwapHoriz,
@@ -2916,20 +2962,6 @@ private fun OnboardingFeaturePage(
     LaunchedEffect(Unit) { visible = true }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.38f)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -3557,6 +3589,472 @@ fun ExpressiveHttpBanner(ip: String, port: Int) {
         LaunchedEffect(Unit) {
             delay(2000)
             copied = false
+        }
+    }
+}
+
+private enum class ScriptFieldType { BOOL, INT, TEXT, SAMPLERATE, CHANNELS }
+
+private data class ScriptField(val key: String, val type: ScriptFieldType)
+
+private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when (action) {
+    ScriptActionType.START_SERVER, ScriptActionType.TOGGLE -> listOf(
+        ScriptField(ScriptParams.INTERNAL, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.MIC, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.SAMPLERATE, ScriptFieldType.SAMPLERATE),
+        ScriptField(ScriptParams.CHANNELS, ScriptFieldType.CHANNELS),
+        ScriptField(ScriptParams.BUFFER, ScriptFieldType.INT),
+        ScriptField(ScriptParams.PORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.MULTICAST, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.RTP, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.RTPPORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.HTTP, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.HTTPPORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT)
+    )
+    ScriptActionType.CONNECT -> listOf(
+        ScriptField(ScriptParams.IP, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.PORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.CLIENTMIC, ScriptFieldType.BOOL)
+    )
+    ScriptActionType.STOP -> emptyList()
+    ScriptActionType.SET -> listOf(
+        ScriptField(ScriptParams.INTERNAL, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.MIC, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.SAMPLERATE, ScriptFieldType.SAMPLERATE),
+        ScriptField(ScriptParams.CHANNELS, ScriptFieldType.CHANNELS),
+        ScriptField(ScriptParams.BUFFER, ScriptFieldType.INT),
+        ScriptField(ScriptParams.PORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.MICPORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.MULTICAST, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.RTP, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.RTPPORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.HTTP, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.HTTPPORT, ScriptFieldType.INT),
+        ScriptField(ScriptParams.HTTPSAFARI, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.CLIENTIP, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.AUTOCONNECT, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.CONNSOUND, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.DISCSOUND, ScriptFieldType.BOOL)
+    )
+}
+
+@Composable
+private fun scriptActionLabel(action: ScriptActionType): String = when (action) {
+    ScriptActionType.START_SERVER -> stringResource(R.string.script_action_server)
+    ScriptActionType.CONNECT -> stringResource(R.string.script_action_connect)
+    ScriptActionType.STOP -> stringResource(R.string.script_action_stop)
+    ScriptActionType.TOGGLE -> stringResource(R.string.script_action_toggle)
+    ScriptActionType.SET -> stringResource(R.string.script_action_set)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScriptingScreen(
+    isVisible: Boolean,
+    scripts: List<AppScript>,
+    onClose: () -> Unit,
+    onSaveScript: (AppScript) -> Unit,
+    onDeleteScript: (String) -> Unit,
+    onRunCommand: (ScriptCommand) -> Unit
+) {
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth },
+            animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy)
+        ) + fadeIn(),
+        exit = slideOutHorizontally(
+            targetOffsetX = { fullWidth -> fullWidth },
+            animationSpec = spring(stiffness = Spring.StiffnessMedium)
+        ) + fadeOut()
+    ) {
+        val context = LocalContext.current
+        val clipboard = LocalClipboardManager.current
+
+        var selectedAction by remember { mutableStateOf(ScriptActionType.START_SERVER) }
+        var name by remember { mutableStateOf("") }
+        var editingId by remember { mutableStateOf<String?>(null) }
+        val params = remember { mutableStateMapOf<String, String>() }
+
+        val command = ScriptCommand(selectedAction, params.toMap().filterValues { it.isNotBlank() })
+        val generatedUri = command.toUri()
+        val broadcastAction = command.toBroadcastAction()
+        val selectedActionLabel = scriptActionLabel(selectedAction)
+
+        fun resetEditor() {
+            editingId = null
+            name = ""
+            params.clear()
+            selectedAction = ScriptActionType.START_SERVER
+        }
+
+        fun loadScript(script: AppScript) {
+            editingId = script.id
+            name = script.name
+            selectedAction = ScriptActionType.fromId(script.actionId) ?: ScriptActionType.START_SERVER
+            params.clear()
+            params.putAll(script.params)
+        }
+
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.scripting_title),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back_button_description))
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Row(modifier = Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Icon(Icons.Outlined.Nfc, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Text(
+                                text = stringResource(R.string.scripting_help),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SettingsGroupCard(
+                        title = stringResource(R.string.scripting_editor_title),
+                        icon = Icons.Outlined.Edit
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            var actionMenuExpanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(
+                                expanded = actionMenuExpanded,
+                                onExpandedChange = { actionMenuExpanded = it }
+                            ) {
+                                OutlinedTextField(
+                                    value = scriptActionLabel(selectedAction),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text(stringResource(R.string.scripting_action_label)) },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = actionMenuExpanded) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = actionMenuExpanded,
+                                    onDismissRequest = { actionMenuExpanded = false }
+                                ) {
+                                    ScriptActionType.entries.forEach { action ->
+                                        DropdownMenuItem(
+                                            text = { Text(scriptActionLabel(action)) },
+                                            onClick = {
+                                                selectedAction = action
+                                                val valid = scriptFieldsFor(action).map { it.key }.toSet()
+                                                val toRemove = params.keys.filter { it !in valid }
+                                                toRemove.forEach { params.remove(it) }
+                                                actionMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text(stringResource(R.string.scripting_name_label)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            scriptFieldsFor(selectedAction).forEach { field ->
+                                ScriptParamField(
+                                    field = field,
+                                    value = params[field.key],
+                                    onValueChange = { newValue ->
+                                        if (newValue.isNullOrBlank()) params.remove(field.key)
+                                        else params[field.key] = newValue
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(R.string.scripting_preview_uri), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Text(generatedUri, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                            Spacer(Modifier.height(4.dp))
+                            Text(stringResource(R.string.scripting_preview_broadcast), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Text(broadcastAction, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                FilledTonalButton(
+                                    onClick = { clipboard.setText(AnnotatedString(generatedUri)) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.scripting_copy_uri))
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        val share = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, generatedUri)
+                                        }
+                                        context.startActivity(Intent.createChooser(share, null))
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.scripting_share))
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = { clipboard.setText(AnnotatedString(broadcastAction)) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Outlined.Terminal, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.scripting_copy_broadcast))
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val finalName = name.ifBlank { selectedActionLabel }
+                                        onSaveScript(
+                                            AppScript(
+                                                id = editingId ?: UUID.randomUUID().toString(),
+                                                name = finalName,
+                                                actionId = selectedAction.id,
+                                                params = params.toMap().filterValues { it.isNotBlank() }
+                                            )
+                                        )
+                                        resetEditor()
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (editingId == null) stringResource(R.string.scripting_save) else stringResource(R.string.scripting_update))
+                                }
+                                FilledTonalButton(
+                                    onClick = { onRunCommand(command) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.scripting_run))
+                                }
+                            }
+                            if (editingId != null) {
+                                TextButton(onClick = { resetEditor() }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(stringResource(R.string.scripting_cancel_edit))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        text = stringResource(R.string.scripting_library_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                if (scripts.isEmpty()) {
+                    item {
+                        Text(
+                            text = stringResource(R.string.scripting_library_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                } else {
+                    items(scripts, key = { it.id }) { script ->
+                        ScriptLibraryItem(
+                            script = script,
+                            onRun = {
+                                val action = ScriptActionType.fromId(script.actionId)
+                                if (action != null) onRunCommand(ScriptCommand(action, script.params))
+                            },
+                            onCopy = {
+                                val action = ScriptActionType.fromId(script.actionId) ?: ScriptActionType.STOP
+                                clipboard.setText(AnnotatedString(ScriptCommand(action, script.params).toUri()))
+                            },
+                            onShare = {
+                                val action = ScriptActionType.fromId(script.actionId) ?: ScriptActionType.STOP
+                                val share = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, ScriptCommand(action, script.params).toUri())
+                                }
+                                context.startActivity(Intent.createChooser(share, null))
+                            },
+                            onEdit = { loadScript(script) },
+                            onDelete = { onDeleteScript(script.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScriptParamField(
+    field: ScriptField,
+    value: String?,
+    onValueChange: (String?) -> Unit
+) {
+    when (field.type) {
+        ScriptFieldType.BOOL -> ScriptTriStateRow(
+            label = field.key,
+            value = value,
+            options = listOf(
+                stringResource(R.string.scripting_value_default) to null,
+                stringResource(R.string.scripting_value_on) to "true",
+                stringResource(R.string.scripting_value_off) to "false"
+            ),
+            onValueChange = onValueChange
+        )
+        ScriptFieldType.SAMPLERATE -> ScriptTriStateRow(
+            label = field.key,
+            value = value,
+            options = listOf(
+                stringResource(R.string.scripting_value_default) to null,
+                "44100" to "44100",
+                "48000" to "48000"
+            ),
+            onValueChange = onValueChange
+        )
+        ScriptFieldType.CHANNELS -> ScriptTriStateRow(
+            label = field.key,
+            value = value?.uppercase(),
+            options = listOf(
+                stringResource(R.string.scripting_value_default) to null,
+                "MONO" to "MONO",
+                "STEREO" to "STEREO"
+            ),
+            onValueChange = onValueChange
+        )
+        ScriptFieldType.INT -> OutlinedTextField(
+            value = value ?: "",
+            onValueChange = { onValueChange(it.filter { c -> c.isDigit() }) },
+            label = { Text(field.key) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+        ScriptFieldType.TEXT -> OutlinedTextField(
+            value = value ?: "",
+            onValueChange = { onValueChange(it) },
+            label = { Text(field.key) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ScriptTriStateRow(
+    label: String,
+    value: String?,
+    options: List<Pair<String, String?>>,
+    onValueChange: (String?) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (optLabel, optValue) ->
+                FilterChip(
+                    selected = value == optValue,
+                    onClick = { onValueChange(optValue) },
+                    label = { Text(optLabel) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScriptLibraryItem(
+    script: AppScript,
+    onRun: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val action = ScriptActionType.fromId(script.actionId)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(script.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = (action?.let { scriptActionLabel(it) } ?: script.actionId) +
+                    " · " + stringResource(R.string.scripting_param_count, script.params.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (action != null) {
+                Text(
+                    text = ScriptCommand(action, script.params).toUri(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                FilledTonalIconButton(onClick = onRun) { Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.scripting_run)) }
+                IconButton(onClick = onCopy) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.scripting_copy_uri)) }
+                IconButton(onClick = onShare) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.scripting_share)) }
+                IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.scripting_edit)) }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.scripting_delete), tint = MaterialTheme.colorScheme.error) }
+            }
         }
     }
 }

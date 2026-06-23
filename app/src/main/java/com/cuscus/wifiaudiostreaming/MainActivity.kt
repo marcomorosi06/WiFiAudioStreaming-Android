@@ -22,6 +22,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,33 +68,45 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.ui.theme.WiFiAudioStreamingTheme
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
+import com.cuscus.wifiaudiostreaming.scripting.ResolvedServerParams
+import com.cuscus.wifiaudiostreaming.scripting.ScriptActionType
+import com.cuscus.wifiaudiostreaming.scripting.ScriptCommand
+import com.cuscus.wifiaudiostreaming.scripting.ScriptExecutor
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    private var pendingServerParams: ResolvedServerParams? = null
+    private val pendingCommand = mutableStateOf<ScriptCommand?>(null)
+
     @RequiresApi(Build.VERSION_CODES.O)
     private val mediaProjectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
+                val params = pendingServerParams ?: viewModel.appSettings.value?.let {
+                    ScriptExecutor.resolveServerParams(it, ScriptCommand(ScriptActionType.START_SERVER))
+                }
                 val intent = Intent(this, AudioCaptureService::class.java).apply {
                     action = AudioCaptureService.ACTION_START
                     putExtra(AudioCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                     putExtra(AudioCaptureService.EXTRA_DATA, result.data)
 
-                    viewModel.appSettings.value?.let { settings ->
-                        putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, settings.streamInternal)
-                        putExtra(AudioCaptureService.EXTRA_STREAM_MIC, settings.streamMic)
-                        putExtra("sample_rate", settings.sampleRate)
-                        putExtra("channel_config", settings.channelConfig)
-                        putExtra("buffer_size", settings.bufferSize)
-                        putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled)
-                        putExtra("streaming_port", settings.streamingPort)
-                        putExtra("network_interface", settings.networkInterface)
-                        putExtra("rtp_enabled", settings.rtpEnabled)
-                        putExtra("rtp_port", settings.rtpPort)
-                        putExtra("http_enabled", settings.httpEnabled)
-                        putExtra("http_port", settings.httpPort)
+                    params?.let {
+                        putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, it.streamInternal)
+                        putExtra(AudioCaptureService.EXTRA_STREAM_MIC, it.streamMic)
+                        putExtra("sample_rate", it.sampleRate)
+                        putExtra("channel_config", it.channelConfig)
+                        putExtra("buffer_size", it.bufferSize)
+                        putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, it.isMulticast)
+                        putExtra("streaming_port", it.streamingPort)
+                        putExtra("network_interface", it.networkInterface)
+                        putExtra("rtp_enabled", it.rtpEnabled)
+                        putExtra("rtp_port", it.rtpPort)
+                        putExtra("http_enabled", it.httpEnabled)
+                        putExtra("http_port", it.httpPort)
                     }
                 }
                 startForegroundService(intent)
@@ -102,6 +116,7 @@ class MainActivity : ComponentActivity() {
                 viewModel.setIsStreaming(false)
                 viewModel.updateStatus(getString(R.string.capture_permission_denied))
             }
+            pendingServerParams = null
         }
 
     private var onMicPermissionGranted: (() -> Unit)? = null
@@ -133,6 +148,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         actionBar?.hide()
+
+        pendingCommand.value = ScriptCommand.fromIntent(intent)
 
         setContent {
             WiFiAudioStreamingTheme {
@@ -185,6 +202,66 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingCommand.value = ScriptCommand.fromIntent(intent)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun requestServerStart(params: ResolvedServerParams) {
+        pendingServerParams = params
+
+        if (params.streamInternal && !hasRecordAudioPermission()) {
+            onMicPermissionGranted = { requestServerStart(params) }
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        if (!params.streamInternal && params.streamMic) {
+            ScriptExecutor.startServerMicOnly(this, params)
+            viewModel.setIsStreaming(true)
+            pendingServerParams = null
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
+        } else {
+            viewModel.updateStatus(getString(R.string.internal_audio_android_version_required))
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun executeScriptCommand(command: ScriptCommand) {
+        val settings = viewModel.appSettings.value ?: return
+        when (command.action) {
+            ScriptActionType.START_SERVER ->
+                requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
+
+            ScriptActionType.TOGGLE -> {
+                if (NetworkManager.isStreamingCurrent.value) {
+                    ScriptExecutor.stop(this)
+                    viewModel.setIsStreaming(false)
+                } else {
+                    requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
+                }
+            }
+
+            ScriptActionType.STOP -> {
+                ScriptExecutor.stop(this)
+                viewModel.setIsStreaming(false)
+            }
+
+            ScriptActionType.CONNECT ->
+                lifecycleScope.launch { ScriptExecutor.connect(this@MainActivity, command) }
+
+            ScriptActionType.SET ->
+                lifecycleScope.launch { ScriptExecutor.applySet(this@MainActivity, command) }
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     @Composable
     private fun MainAppContent() {
@@ -192,6 +269,8 @@ class MainActivity : ComponentActivity() {
         val currentSettings = appSettings!!
 
         val showSettingsScreen = remember { mutableStateOf(false) }
+        val showScriptingScreen = remember { mutableStateOf(false) }
+        val scripts by viewModel.scripts.collectAsStateWithLifecycle()
 
         val isServer by viewModel.isServer.collectAsStateWithLifecycle()
         val isStreaming by viewModel.isStreaming.collectAsStateWithLifecycle()
@@ -214,6 +293,22 @@ class MainActivity : ComponentActivity() {
         }
 
         ClientDiscoveryHandler()
+
+        val protocolMismatch by viewModel.protocolMismatch.collectAsStateWithLifecycle()
+        protocolMismatch?.let { mismatch ->
+            ProtocolMismatchDialog(
+                mismatch = mismatch,
+                onUpdate = {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases")
+                    )
+                    runCatching { context.startActivity(intent) }
+                    viewModel.clearProtocolMismatch()
+                },
+                onDismiss = { viewModel.clearProtocolMismatch() }
+            )
+        }
 
         val intentAction = intent.action
         val connectClientIp = intent.getStringExtra("CONNECT_CLIENT_IP")
@@ -244,6 +339,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        LaunchedEffect(pendingCommand.value) {
+            pendingCommand.value?.let { command ->
+                executeScriptCommand(command)
+                pendingCommand.value = null
+                intent.data = null
+                intent.action = null
+            }
+        }
+
         LaunchedEffect(isStreaming, isServer) {
             updateWidgetState(context, isStreaming, isServer)
         }
@@ -261,7 +365,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        BackHandler(enabled = showSettingsScreen.value) {
+        BackHandler(enabled = showScriptingScreen.value) {
+            showScriptingScreen.value = false
+        }
+
+        BackHandler(enabled = showSettingsScreen.value && !showScriptingScreen.value) {
             showSettingsScreen.value = false
         }
 
@@ -354,7 +462,17 @@ class MainActivity : ComponentActivity() {
             onAutoConnectEnabledChange = viewModel::setAutoConnectEnabled,
             onSaveAutoConnectList = viewModel::saveAutoConnectList,
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
-            onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled
+            onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
+            onOpenScripting = { showScriptingScreen.value = true }
+        )
+
+        ScriptingScreen(
+            isVisible = showScriptingScreen.value,
+            scripts = scripts,
+            onClose = { showScriptingScreen.value = false },
+            onSaveScript = viewModel::saveScript,
+            onDeleteScript = viewModel::deleteScript,
+            onRunCommand = { command -> executeScriptCommand(command) }
         )
     }
 
@@ -377,43 +495,11 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startMediaProjectionRequest() {
         val settings = viewModel.appSettings.value ?: return
-
-        if (settings.streamInternal && !hasRecordAudioPermission()) {
-            onMicPermissionGranted = { startMediaProjectionRequest() }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
-            return
-        }
-
-        if (!settings.streamInternal && settings.streamMic) {
-            val intent = Intent(this, AudioCaptureService::class.java).apply {
-                action = AudioCaptureService.ACTION_START
-                putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, false)
-                putExtra(AudioCaptureService.EXTRA_STREAM_MIC, true)
-                putExtra("sample_rate", settings.sampleRate)
-                putExtra("channel_config", settings.channelConfig)
-                putExtra("buffer_size", settings.bufferSize)
-                putExtra(AudioCaptureService.EXTRA_IS_MULTICAST, viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled)
-                putExtra("streaming_port", settings.streamingPort)
-                putExtra("network_interface", settings.networkInterface)
-                putExtra("rtp_enabled", settings.rtpEnabled)
-                putExtra("rtp_port", settings.rtpPort)
-                putExtra("http_enabled", settings.httpEnabled)
-                putExtra("http_port", settings.httpPort)
-            }
-            startForegroundService(intent)
-            NetworkManager.isServerStreaming = true
-            viewModel.setIsStreaming(true)
-            return
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
-        } else {
-            viewModel.updateStatus(getString(R.string.internal_audio_android_version_required))
-        }
+        val command = ScriptCommand(
+            ScriptActionType.START_SERVER,
+            mapOf("multicast" to (viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled).toString())
+        )
+        requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (NetworkManager.isServerStreaming) {
@@ -458,6 +544,38 @@ fun ClientDiscoveryHandler() {
     }
 }
 
+
+@Composable
+fun ProtocolMismatchDialog(
+    mismatch: ProtocolMismatch,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+        title = { Text(text = stringResource(R.string.protocol_incompatible_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    R.string.protocol_incompatible_body,
+                    mismatch.localVersion,
+                    mismatch.remoteVersion
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onUpdate) {
+                Text(stringResource(R.string.protocol_incompatible_update))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
+}
 
 @Composable
 fun NotificationPermissionDialog(
