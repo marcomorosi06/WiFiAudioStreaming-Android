@@ -61,11 +61,13 @@ object ScriptParams {
     const val CONNSOUND = "connsound"
     const val DISCSOUND = "discsound"
     const val MODE = "mode"
+    const val AUTHMODE = "authmode"
+    const val AUTHKEY = "authkey"
 
     val ALL = listOf(
         INTERNAL, MIC, SAMPLERATE, CHANNELS, BUFFER, PORT, MICPORT, MULTICAST,
         RTP, RTPPORT, HTTP, HTTPPORT, HTTPSAFARI, IFACE, IP, CLIENTMIC, CLIENTIP,
-        AUTOCONNECT, CONNSOUND, DISCSOUND, MODE
+        AUTOCONNECT, CONNSOUND, DISCSOUND, MODE, AUTHMODE, AUTHKEY
     )
 
     fun parseBool(value: String?): Boolean? {

@@ -76,7 +76,9 @@ class ScriptCommandReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val settings = SettingsDataStore(context).settingsFlow.first()
+                val store = SettingsDataStore(context)
+                val settings = store.settingsFlow.first()
+                ScriptExecutor.persistSecurityIfPresent(store, settings, command)
                 val resolved = ScriptExecutor.resolveServerParams(settings, command)
                 if (resolved.streamInternal) {
                     launchActivityForProjection(context, command)

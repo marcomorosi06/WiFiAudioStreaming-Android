@@ -22,6 +22,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 data class AutoConnectEntry(val ip: String, val ssid: String = "") {
@@ -63,7 +64,14 @@ data class AppSettings(
     val autoConnectEnabled: Boolean = false,
     val autoConnectList: String = "",
     val connectionSoundEnabled: Boolean = true,
-    val disconnectionSoundEnabled: Boolean = true
+    val disconnectionSoundEnabled: Boolean = true,
+    val lastSeenChangelogVersion: String = "",
+    val autoUpdateCheckEnabled: Boolean = true,
+    val latencyMs: Int = 120,
+    val maxPayloadBytes: Int = 1390,
+    val securityMode: String = "OFF",
+    val authKey: String = "",
+    val encryptionEnabled: Boolean = false
 )
 
 class SettingsDataStore(context: Context) {
@@ -75,6 +83,11 @@ class SettingsDataStore(context: Context) {
         val SAMPLE_RATE = intPreferencesKey("sample_rate")
         val CHANNEL_CONFIG = stringPreferencesKey("channel_config")
         val BUFFER_SIZE = intPreferencesKey("buffer_size")
+        val LATENCY_MS = intPreferencesKey("latency_ms")
+        val MAX_PAYLOAD = intPreferencesKey("max_payload")
+        val SECURITY_MODE = stringPreferencesKey("security_mode")
+        val AUTH_KEY = stringPreferencesKey("auth_key")
+        val ENCRYPTION_ENABLED = booleanPreferencesKey("encryption_enabled")
         val STREAMING_PORT = intPreferencesKey("streaming_port")
         val SEND_CLIENT_MICROPHONE = booleanPreferencesKey("send_client_microphone")
         val MIC_PORT = intPreferencesKey("mic_port")
@@ -92,6 +105,8 @@ class SettingsDataStore(context: Context) {
         val CONNECTION_SOUND_ENABLED = booleanPreferencesKey("connection_sound_enabled")
         val DISCONNECTION_SOUND_ENABLED = booleanPreferencesKey("disconnection_sound_enabled")
         val AUTOMATION_SCRIPTS = stringPreferencesKey("automation_scripts")
+        val LAST_SEEN_CHANGELOG_VERSION = stringPreferencesKey("last_seen_changelog_version")
+        val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
     }
 
     val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
@@ -126,8 +141,27 @@ class SettingsDataStore(context: Context) {
             autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
             autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: "",
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
-            disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true
+            disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
+            lastSeenChangelogVersion = preferences[PreferencesKeys.LAST_SEEN_CHANGELOG_VERSION] ?: "",
+            autoUpdateCheckEnabled = preferences[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] ?: true,
+            latencyMs = preferences[PreferencesKeys.LATENCY_MS] ?: 120,
+            maxPayloadBytes = preferences[PreferencesKeys.MAX_PAYLOAD] ?: 1390,
+            securityMode = preferences[PreferencesKeys.SECURITY_MODE] ?: "OFF",
+            authKey = preferences[PreferencesKeys.AUTH_KEY] ?: "",
+            encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: false
         )
+    }
+
+    suspend fun setLastSeenChangelogVersion(version: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_SEEN_CHANGELOG_VERSION] = version
+        }
+    }
+
+    suspend fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] = enabled
+        }
     }
 
     suspend fun saveAudioSourceSettings(streamInternal: Boolean, streamMic: Boolean) {
@@ -154,6 +188,74 @@ class SettingsDataStore(context: Context) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.BUFFER_SIZE] = bufferSize
         }
+    }
+
+    suspend fun saveAdvancedAudio(latencyMs: Int, maxPayloadBytes: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LATENCY_MS] = latencyMs
+            preferences[PreferencesKeys.MAX_PAYLOAD] = maxPayloadBytes
+        }
+    }
+
+    suspend fun saveSecurity(mode: String, key: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SECURITY_MODE] = mode
+            preferences[PreferencesKeys.AUTH_KEY] = key
+        }
+    }
+
+    suspend fun saveEncryption(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ENCRYPTION_ENABLED] = enabled
+        }
+    }
+
+    // Multicast encryption: server monotonic session epoch + per-server-IP highest
+    // epoch accepted by a client (anti ghost-replay).
+    suspend fun nextMcastEpoch(): Long {
+        val key = androidx.datastore.preferences.core.longPreferencesKey("mcast_server_epoch")
+        var result = 1L
+        dataStore.edit { p -> val e = (p[key] ?: 0L) + 1L; p[key] = e; result = e }
+        return result
+    }
+    suspend fun getMcastClientEpoch(ip: String): Long {
+        val key = androidx.datastore.preferences.core.longPreferencesKey("mcast_epoch_$ip")
+        return dataStore.data.first()[key] ?: 0L
+    }
+    suspend fun setMcastClientEpoch(ip: String, e: Long) {
+        val key = androidx.datastore.preferences.core.longPreferencesKey("mcast_epoch_$ip")
+        dataStore.edit { p -> p[key] = e }
+    }
+
+    suspend fun isDonationQualified(): Boolean {
+        val key = booleanPreferencesKey("donation_qualified")
+        return dataStore.data.first()[key] ?: false
+    }
+    suspend fun setDonationQualified(b: Boolean) {
+        val key = booleanPreferencesKey("donation_qualified")
+        dataStore.edit { p -> p[key] = b }
+    }
+    suspend fun donationSnoozeUntil(): Long {
+        val key = androidx.datastore.preferences.core.longPreferencesKey("donation_snooze_until")
+        return dataStore.data.first()[key] ?: 0L
+    }
+    suspend fun setDonationSnoozeUntil(t: Long) {
+        val key = androidx.datastore.preferences.core.longPreferencesKey("donation_snooze_until")
+        dataStore.edit { p -> p[key] = t }
+    }
+    suspend fun donationDismissCount(): Int {
+        val key = androidx.datastore.preferences.core.intPreferencesKey("donation_dismiss_count")
+        return dataStore.data.first()[key] ?: 0
+    }
+    suspend fun setDonationDismissCount(n: Int) {
+        val key = androidx.datastore.preferences.core.intPreferencesKey("donation_dismiss_count")
+        dataStore.edit { p -> p[key] = n }
+    }
+    fun donationBackoffDays(count: Int): Long = when {
+        count <= 1 -> 2L
+        count == 2 -> 5L
+        count == 3 -> 14L
+        else -> 30L
     }
 
     suspend fun saveStreamingPort(port: Int) {

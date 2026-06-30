@@ -180,6 +180,8 @@ fun WiFiAudioStreamingApp(
     onServerProtocolsChange: (Boolean, Int, Boolean) -> Unit,
     onHttpSettingsChange: (Int, Boolean) -> Unit,
     onToggleAutoConnectIp: (String) -> Unit,
+    onSecurityChange: (String, String) -> Unit = { _, _ -> },
+    onEncryptionChange: (Boolean) -> Unit = {},
     hasMicPermission: Boolean = true
 ) {
     val backgroundGradient by animateColorAsState(
@@ -246,6 +248,11 @@ fun WiFiAudioStreamingApp(
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
+                    securityMode = appSettings.securityMode,
+                    authKey = appSettings.authKey,
+                    onSecurityChange = onSecurityChange,
+                    encryptionEnabled = appSettings.encryptionEnabled,
+                    onEncryptionChange = onEncryptionChange,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -435,6 +442,8 @@ fun ExpressiveSettingsScreen(
     onSampleRateChange: (Int) -> Unit,
     onChannelConfigChange: (String) -> Unit,
     onBufferSizeChange: (Int) -> Unit,
+    onAdvancedAudioChange: (Int, Int) -> Unit = { _, _ -> },
+    onSecurityChange: (String, String) -> Unit = { _, _ -> },
     onStreamingPortChange: (Int) -> Unit,
     onMicPortChange: (Int) -> Unit,
     onClose: () -> Unit,
@@ -448,6 +457,9 @@ fun ExpressiveSettingsScreen(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onOpenScripting: () -> Unit = {},
+    onAutoUpdateCheckChange: (Boolean) -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    checkingForUpdate: Boolean = false,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -467,6 +479,8 @@ fun ExpressiveSettingsScreen(
             onSampleRateChange = onSampleRateChange,
             onChannelConfigChange = onChannelConfigChange,
             onBufferSizeChange = onBufferSizeChange,
+            onAdvancedAudioChange = onAdvancedAudioChange,
+            onSecurityChange = onSecurityChange,
             onStreamingPortChange = onStreamingPortChange,
             onMicPortChange = onMicPortChange,
             onClose = onClose,
@@ -479,7 +493,10 @@ fun ExpressiveSettingsScreen(
             onAutoConnectEnabledChange = onAutoConnectEnabledChange,
             onConnectionSoundChange = onConnectionSoundChange,
             onDisconnectionSoundChange = onDisconnectionSoundChange,
-            onOpenScripting = onOpenScripting
+            onOpenScripting = onOpenScripting,
+            onAutoUpdateCheckChange = onAutoUpdateCheckChange,
+            onCheckForUpdates = onCheckForUpdates,
+            checkingForUpdate = checkingForUpdate
         )
     }
 }
@@ -493,6 +510,8 @@ fun SettingsScreenContent(
     onSampleRateChange: (Int) -> Unit,
     onChannelConfigChange: (String) -> Unit,
     onBufferSizeChange: (Int) -> Unit,
+    onAdvancedAudioChange: (Int, Int) -> Unit = { _, _ -> },
+    onSecurityChange: (String, String) -> Unit = { _, _ -> },
     onStreamingPortChange: (Int) -> Unit,
     onMicPortChange: (Int) -> Unit,
     onClose: () -> Unit,
@@ -506,6 +525,9 @@ fun SettingsScreenContent(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onOpenScripting: () -> Unit = {},
+    onAutoUpdateCheckChange: (Boolean) -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    checkingForUpdate: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -678,18 +700,33 @@ fun SettingsScreenContent(
                     title = stringResource(R.string.settings_group_performance),
                     icon = Icons.Outlined.Speed
                 ) {
-                    val bufferSizeRange = 512f..8192f
-                    val bufferStepValue = 256f
-                    val bufferSteps = ((bufferSizeRange.endInclusive - bufferSizeRange.start) / bufferStepValue).toInt() - 1
-
                     SettingsSliderItem(
-                        title = stringResource(R.string.settings_item_buffer_size_title),
-                        description = stringResource(R.string.settings_item_buffer_size_desc),
+                        title = stringResource(R.string.settings_item_latency_title),
+                        description = stringResource(R.string.settings_item_latency_desc),
                         icon = Icons.Outlined.Timer,
-                        value = appSettings.bufferSize.toFloat(),
-                        range = bufferSizeRange,
-                        steps = bufferSteps,
-                        onValueChange = { onBufferSizeChange(it.toInt()) }
+                        value = appSettings.latencyMs.toFloat(),
+                        range = 40f..400f,
+                        steps = ((400f - 40f) / 20f).toInt() - 1,
+                        valueSuffix = "ms",
+                        onValueChange = { onAdvancedAudioChange(it.toInt(), appSettings.maxPayloadBytes) }
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_advanced),
+                    icon = Icons.Outlined.Tune
+                ) {
+                    SettingsSliderItem(
+                        title = stringResource(R.string.settings_item_packet_size_title),
+                        description = stringResource(R.string.settings_item_packet_size_desc),
+                        icon = Icons.Outlined.SettingsEthernet,
+                        value = appSettings.maxPayloadBytes.toFloat(),
+                        range = 256f..1390f,
+                        steps = ((1390f - 256f) / 32f).toInt() - 1,
+                        valueSuffix = "B",
+                        onValueChange = { onAdvancedAudioChange(appSettings.latencyMs, it.toInt()) }
                     )
                 }
             }
@@ -922,6 +959,34 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
+                    title = Bilingual("Updates", "Aggiornamenti").text(),
+                    icon = Icons.Outlined.Update
+                ) {
+                    SettingsSwitchItem(
+                        title = Bilingual("Check for updates automatically", "Controlla aggiornamenti automaticamente").text(),
+                        description = Bilingual(
+                            "On launch, check GitHub for a newer release.",
+                            "All'avvio, controlla su GitHub se c'è una nuova versione."
+                        ).text(),
+                        icon = Icons.Outlined.Update,
+                        isChecked = appSettings.autoUpdateCheckEnabled,
+                        onCheckedChange = onAutoUpdateCheckChange
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsClickableItem(
+                        title = Bilingual("Check for updates now", "Controlla aggiornamenti ora").text(),
+                        description = if (checkingForUpdate)
+                            Bilingual("Checking…", "Controllo in corso…").text()
+                        else
+                            Bilingual("Tap to check GitHub now.", "Tocca per controllare ora su GitHub.").text(),
+                        icon = Icons.Outlined.Refresh,
+                        onClick = onCheckForUpdates
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
                     title = stringResource(R.string.settings_group_license),
                     icon = Icons.Outlined.Gavel
                 ) {
@@ -1140,6 +1205,10 @@ fun ExpressiveDeviceList(
                 hostname = hostname,
                 ipAddress = "${serverInfo.ip}:${serverInfo.port}",
                 isMulticast = serverInfo.isMulticast,
+                securityMode = serverInfo.securityMode,
+                encrypted = serverInfo.encrypted,
+                serverSendsMic = serverInfo.serverSendsMic,
+                serverWantsMic = serverInfo.serverWantsMic,
                 isAutoConnectTarget = autoConnectList.contains(serverInfo.ip),
                 onConnect = { onConnect(serverInfo) },
                 onToggleAutoConnect = { onToggleAutoConnectIp(serverInfo.ip) }
@@ -1154,6 +1223,10 @@ fun ExpressiveDeviceCard(
     hostname: String,
     ipAddress: String,
     isMulticast: Boolean,
+    securityMode: String?,
+    encrypted: Boolean,
+    serverSendsMic: Boolean,
+    serverWantsMic: Boolean,
     isAutoConnectTarget: Boolean,
     onConnect: () -> Unit,
     onToggleAutoConnect: () -> Unit
@@ -1180,7 +1253,10 @@ fun ExpressiveDeviceCard(
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(text = hostname, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                ModeTag(isMulticast = isMulticast)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ModeTag(isMulticast = isMulticast)
+                    DeviceBadges(securityMode, encrypted, serverSendsMic, serverWantsMic)
+                }
                 Text(text = ipAddress, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = { onToggleAutoConnect(); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }) {
@@ -1328,6 +1404,7 @@ fun SettingsSliderItem(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
+    valueSuffix: String = "B",
     onValueChange: (Float) -> Unit
 ) {
     var sliderValue by remember(value) { mutableFloatStateOf(value) }
@@ -1359,7 +1436,7 @@ fun SettingsSliderItem(
             }
             Spacer(Modifier.width(16.dp))
             Text(
-                text = stringResource(R.string.buffer_size_value, sliderValue.toInt()),
+                text = "${sliderValue.toInt()} $valueSuffix",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Light
@@ -1760,6 +1837,11 @@ fun ExpressiveAudioSourceSelector(
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
+    securityMode: String = "OFF",
+    authKey: String = "",
+    onSecurityChange: (String, String) -> Unit = { _, _ -> },
+    encryptionEnabled: Boolean = false,
+    onEncryptionChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -1833,6 +1915,108 @@ fun ExpressiveAudioSourceSelector(
                 enabled = !rtpEnabled,               // Blocca lo switch se RTP è on
                 onCheckedChange = onMulticastChange
             )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 20.dp, horizontal = 16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.settings_group_security),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            val secMode = securityMode.uppercase()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = secMode == "OFF",
+                    onClick = { onSecurityChange("OFF", authKey) },
+                    label = { Text(stringResource(R.string.sec_mode_off), maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Outlined.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = secMode == "ASK",
+                    onClick = { onSecurityChange("ASK", authKey) },
+                    label = { Text(stringResource(R.string.sec_mode_ask), maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = secMode == "KEY",
+                    onClick = { onSecurityChange("KEY", authKey) },
+                    label = { Text(stringResource(R.string.sec_mode_key), maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (secMode == "KEY") {
+                Spacer(modifier = Modifier.height(12.dp))
+                // Local edit state: the field must NOT be driven by the DataStore-backed
+                // value, or the async save→flow→recompose round-trip resets the caret /
+                // drops characters. We persist on each change but display the local text.
+                var keyText by remember { mutableStateOf(authKey) }
+                OutlinedTextField(
+                    value = keyText,
+                    onValueChange = { keyText = it; onSecurityChange(securityMode, it) },
+                    label = { Text(stringResource(R.string.settings_item_auth_key_title)) },
+                    leadingIcon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.EnhancedEncryption,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_item_encryption_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_item_encryption_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = encryptionEnabled && secMode == "KEY",
+                        onCheckedChange = onEncryptionChange,
+                        enabled = secMode == "KEY"
+                    )
+                }
+            }
         }
     }
 }
@@ -2555,6 +2739,36 @@ fun ModeTag(isMulticast: Boolean) {
     }
 }
 
+@Composable
+fun DeviceBadges(securityMode: String?, encrypted: Boolean, serverSendsMic: Boolean, serverWantsMic: Boolean) {
+    val mode = securityMode?.uppercase()
+    val badges = buildList {
+        when {
+            encrypted -> add(Triple(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true))
+            mode == "KEY" -> add(Triple(Icons.Outlined.Key, stringResource(R.string.sec_key), true))
+            mode == "ASK" -> add(Triple(Icons.Outlined.Security, stringResource(R.string.sec_ask), true))
+        }
+        if (serverSendsMic) add(Triple(Icons.Filled.Mic, stringResource(R.string.mic_sends), false))
+        if (serverWantsMic) add(Triple(Icons.Filled.Hearing, stringResource(R.string.mic_wants), false))
+    }
+    if (badges.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        badges.forEach { (icon, desc, accent) -> DeviceBadge(icon, desc, accent) }
+    }
+}
+
+@Composable
+private fun DeviceBadge(icon: ImageVector, desc: String, accent: Boolean) {
+    val bg = if (accent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+    val fg = if (accent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+    Box(
+        modifier = Modifier.size(26.dp).clip(CircleShape).background(bg),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = desc, tint = fg, modifier = Modifier.size(15.dp))
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2732,7 +2946,7 @@ private data class FeatureItem(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
-    val pagerState = rememberPagerState { 3 }
+    val pagerState = rememberPagerState { 4 }
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -2764,6 +2978,7 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
                 0 -> WelcomePage()
                 1 -> FeaturesPage()
                 2 -> ProtocolsPage()
+                3 -> WhatsNewPage()
             }
         }
     }
@@ -3628,7 +3843,7 @@ fun ExpressiveHttpBanner(ip: String, port: Int) {
     }
 }
 
-private enum class ScriptFieldType { BOOL, INT, TEXT, SAMPLERATE, CHANNELS }
+private enum class ScriptFieldType { BOOL, INT, TEXT, SAMPLERATE, CHANNELS, AUTHMODE }
 
 private data class ScriptField(val key: String, val type: ScriptFieldType)
 
@@ -3645,12 +3860,16 @@ private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when 
         ScriptField(ScriptParams.RTPPORT, ScriptFieldType.INT),
         ScriptField(ScriptParams.HTTP, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.HTTPPORT, ScriptFieldType.INT),
-        ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT)
+        ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.AUTHMODE, ScriptFieldType.AUTHMODE),
+        ScriptField(ScriptParams.AUTHKEY, ScriptFieldType.TEXT)
     )
     ScriptActionType.CONNECT -> listOf(
         ScriptField(ScriptParams.IP, ScriptFieldType.TEXT),
         ScriptField(ScriptParams.PORT, ScriptFieldType.INT),
-        ScriptField(ScriptParams.CLIENTMIC, ScriptFieldType.BOOL)
+        ScriptField(ScriptParams.CLIENTMIC, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.AUTHMODE, ScriptFieldType.AUTHMODE),
+        ScriptField(ScriptParams.AUTHKEY, ScriptFieldType.TEXT)
     )
     ScriptActionType.STOP -> emptyList()
     ScriptActionType.SET -> listOf(
@@ -3671,7 +3890,9 @@ private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when 
         ScriptField(ScriptParams.CLIENTIP, ScriptFieldType.TEXT),
         ScriptField(ScriptParams.AUTOCONNECT, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.CONNSOUND, ScriptFieldType.BOOL),
-        ScriptField(ScriptParams.DISCSOUND, ScriptFieldType.BOOL)
+        ScriptField(ScriptParams.DISCSOUND, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.AUTHMODE, ScriptFieldType.AUTHMODE),
+        ScriptField(ScriptParams.AUTHKEY, ScriptFieldType.TEXT)
     )
 }
 
@@ -4008,6 +4229,17 @@ private fun ScriptParamField(
                 stringResource(R.string.scripting_value_default) to null,
                 "MONO" to "MONO",
                 "STEREO" to "STEREO"
+            ),
+            onValueChange = onValueChange
+        )
+        ScriptFieldType.AUTHMODE -> ScriptTriStateRow(
+            label = field.key,
+            value = value?.uppercase(),
+            options = listOf(
+                stringResource(R.string.scripting_value_default) to null,
+                stringResource(R.string.security_off) to "OFF",
+                stringResource(R.string.security_ask) to "ASK",
+                stringResource(R.string.security_key) to "KEY"
             ),
             onValueChange = onValueChange
         )

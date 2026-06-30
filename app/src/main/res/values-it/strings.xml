@@ -70,6 +70,16 @@
     <string name="unicast_mode_desc">Connessione diretta, latenza minore</string>
     <string name="mode_multicast">Multicast</string>
     <string name="mode_unicast">Unicast</string>
+    <string name="sec_encrypted">Crittografato</string>
+    <string name="sec_key">Richiede chiave</string>
+    <string name="sec_ask">Approvazione</string>
+    <string name="mic_sends">Invia il microfono</string>
+    <string name="mic_wants">Accetta il tuo microfono</string>
+    <string name="donation_title">Ti piace WiFi Audio Streaming?</string>
+    <string name="donation_body">Quest\'app è gratuita e senza pubblicità, fatta da una persona sola nel tempo libero. Se ti è utile, un piccolo contributo su Ko-fi aiuta a tenerla viva. Nessun obbligo: continui a usare tutto comunque.</string>
+    <string name="donation_support">Supporta su Ko-fi ☕</string>
+    <string name="donation_later">Forse più tardi</string>
+    <string name="donation_dismiss_30">Non mostrare per 30 giorni</string>
     <string name="client_options_title">Opzioni Client</string>
     <string name="send_mic_to_server_title">Condividi microfono</string>
     <string name="send_mic_to_server_subtitle">Parla attraverso il desktop (Discord, Zoom, giochi...)</string>
@@ -95,6 +105,11 @@
     <string name="settings_group_performance">Prestazioni e Latenza</string>
     <string name="settings_item_buffer_size_title">Dimensione Buffer</string>
     <string name="settings_item_buffer_size_desc">Un buffer piccolo riduce la latenza ma può causare interruzioni</string>
+    <string name="settings_item_latency_title">Latenza</string>
+    <string name="settings_item_latency_desc">Profondità del buffer di riproduzione. Più alta = più stabile, più ritardo.</string>
+    <string name="settings_group_advanced">Avanzate</string>
+    <string name="settings_item_packet_size_title">Dimensione pacchetto</string>
+    <string name="settings_item_packet_size_desc">Byte di audio per pacchetto di rete (stream e microfono). Più basso = pacchetti più piccoli, es. per microcontrollori.</string>
     <string name="buffer_size_value">%1$d B</string>
     <string name="settings_group_network">Rete</string>
     <string name="main_audio_port_title">Porta Audio Principale</string>
@@ -127,7 +142,7 @@
     <string name="settings_item_network_interface_title">Scheda di Rete</string>
     <string name="settings_item_network_interface_desc">Seleziona la VPN (es. tun0) per lo streaming remoto</string>
     <string name="vpn_note_title">Stai usando una VPN?</string>
-    <string name="vpn_note_desc">La discovery dei dispositivi non funziona tramite VPN — i pacchetti multicast non attraversano un tunnel. Se sei connesso solo via VPN (non sulla stessa rete Wi-Fi), seleziona la modalità Unicast e inserisci l\'IP del server manualmente. Il multicast richiede la stessa rete locale.</string>
+    <string name="vpn_note_desc">La discovery dei dispositivi non funziona tramite VPN, i pacchetti multicast non attraversano un tunnel. Se sei connesso solo via VPN (non sulla stessa rete Wi-Fi), seleziona la modalità Unicast e inserisci l\'IP del server manualmente. Il multicast richiede la stessa rete locale.</string>
     <string name="server_ip_active">Il tuo IP: %1$s</string>
     <string name="settings_group_server_protocols">Protocolli Server</string>
     <string name="settings_item_wfas_title">WFAS (Nativo)</string>
@@ -156,7 +171,7 @@
     <string name="source_code_view_on_github">Visualizza su GitHub</string>
     <string name="app_version_label">Versione</string>
     <string name="settings_group_license">Licenza</string>
-    <string name="license_info_title">EUPL v1.2 — © Marco Morosi</string>
+    <string name="license_info_title">EUPL v1.2 - © Marco Morosi</string>
     <string name="license_info_desc">Questo progetto è sotto la licenza European Union Public Licence v1.2. Tutta la proprietà intellettuale è di Marco Morosi. La licenza ti dà il diritto di usare, studiare, modificare e ridistribuire il software, anche in forma modificata, a condizione di mantenere la stessa licenza.</string>
     <string name="license_read_full_title">Leggi il testo completo della EUPL v1.2</string>
     <string name="license_read_full_desc">Apre eupl.eu nel tuo browser</string>
@@ -232,7 +247,7 @@
     <string name="mic_permission_required">È necessario dare l\'accesso al microfono.</string>
     <string name="mic_permission_why_button">Perché?</string>
     <string name="mic_permission_explanation_title">Perché serve il permesso del microfono?</string>
-    <string name="mic_permission_explanation_body">A partire da Android 10, la cattura dell\'audio interno richiede la MediaProjection API, che a sua volta richiede sempre il permesso RECORD_AUDIO — anche se si intende catturare solo l\'audio di sistema e non il microfono. Si tratta di una misura cautelare imposta dal sistema operativo: la pipeline audio viene inizializzata come un\'unica unità, e il sistema richiede il permesso preventivamente senza sapere in anticipo quale sorgente verrà usata. Inoltre, alcune implementazioni OEM (Samsung, Xiaomi e altri) applicano questo requisito in modo più rigido rispetto ad Android stock, rendendo il permesso di fatto obbligatorio in tutti i casi.</string>
+    <string name="mic_permission_explanation_body">A partire da Android 10, la cattura dell\'audio interno richiede la MediaProjection API, che a sua volta richiede sempre il permesso RECORD_AUDIO, anche se si intende catturare solo l\'audio di sistema e non il microfono. Si tratta di una misura cautelare imposta dal sistema operativo: la pipeline audio viene inizializzata come un\'unica unità, e il sistema richiede il permesso preventivamente senza sapere in anticipo quale sorgente verrà usata. Inoltre, alcune implementazioni OEM (Samsung, Xiaomi e altri) applicano questo requisito in modo più rigido rispetto ad Android stock, rendendo il permesso di fatto obbligatorio in tutti i casi.</string>
     <string name="server_audio_restart_hint">Non si sente niente dall\'altra parte? Prova a riavviare questo dispositivo.</string>
 
     <string name="settings_group_automation">Automazione e Script</string>
@@ -267,6 +282,31 @@
     <string name="script_action_set">Cambia impostazioni</string>
     <string name="close">Chiudi</string>
     <string name="status_protocol_incompatible">Versione del protocollo incompatibile</string>
+    <string name="status_unauthorized">Connessione rifiutata dal server</string>
+    <string name="status_awaiting_approval">In attesa di approvazione dall\'altro dispositivo…</string>
+    <string name="status_key_required">Questo server richiede una chiave</string>
+    <string name="settings_group_security">Sicurezza</string>
+    <string name="settings_item_security_mode_title">Richiedi autorizzazione (server)</string>
+    <string name="settings_item_security_mode_desc">Scegli chi può connettersi quando questo dispositivo fa da server</string>
+    <string name="security_off">No</string>
+    <string name="security_ask">Chiedi ogni volta</string>
+    <string name="security_key">Chiave condivisa</string>
+    <string name="sec_mode_off">Off</string>
+    <string name="sec_mode_ask">Chiedi</string>
+    <string name="sec_mode_key">Chiave</string>
+    <string name="settings_item_auth_key_title">Chiave</string>
+    <string name="settings_item_auth_key_desc">Entrambi i dispositivi devono inserire la stessa chiave. Non viene mai inviata in rete.</string>
+    <string name="settings_item_encryption_title">Cifra l\'audio</string>
+    <string name="settings_item_encryption_desc">Cifra l\'audio end-to-end con ChaCha20-Poly1305. Richiede la modalità Chiave (chiave pre-condivisa).</string>
+    <string name="auth_request_title">Consentire la connessione?</string>
+    <string name="auth_request_body">%1$s vuole connettersi a questo dispositivo.</string>
+    <string name="auth_allow">Consenti</string>
+    <string name="auth_deny">Nega</string>
+    <string name="key_dialog_title">Chiave richiesta</string>
+    <string name="key_dialog_body">Questo server richiede una chiave. Inseriscila per connetterti:</string>
+    <string name="key_dialog_wrong">Chiave errata. Riprova:</string>
+    <string name="key_dialog_connect">Connetti</string>
+    <string name="key_dialog_cancel">Annulla</string>
     <string name="protocol_incompatible_title">Aggiornamento necessario</string>
     <string name="protocol_incompatible_body">Le due app usano versioni incompatibili del protocollo WFAS (questo dispositivo: v%1$d, altro dispositivo: v%2$d). La connessione è stata chiusa. Aggiorna entrambi i dispositivi all\'ultima versione.</string>
     <string name="protocol_incompatible_update">Apri i download</string>

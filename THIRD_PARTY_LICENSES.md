@@ -5,6 +5,12 @@ It uses the third-party open-source components listed below. Each remains the
 property of its respective authors and is distributed under its own licence.
 We are grateful to all of these projects.
 
+> **WFAS v2 protocol (MIT):** the WiFi Audio Streaming wire protocol is this
+> project's own. A C reference implementation is published separately under the
+> **MIT License** (Copyright © 2026 Marco Morosi,
+> <https://github.com/marcomorosi06/wfas-protocol>) so anyone can adopt WFAS v2 freely,
+> e.g. on microcontrollers. It is not bundled in this app.
+
 ---
 
 ## Summary table

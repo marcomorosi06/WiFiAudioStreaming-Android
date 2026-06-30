@@ -30,9 +30,10 @@ This application allows you to send your phone's audio to any device on the loca
 * **Smart Auto-Connect**: The app can automatically connect to prioritized IP addresses as soon as they are detected on the network, even in the background.
 * **Widgets & Quick Settings**: Control your server or client directly from your home screen using Material You widgets, or use the Quick Settings tiles in your notification shade for instant access.
 * **Internal Audio Streaming**: Stream your device's internal audio (apps, games, music) to other devices (requires Android 10+).  
-* **Automatic & Smart Manual Discovery**: Clients automatically find available servers via mDNS. If entering an IP manually, the app automatically detects if the host is using Unicast or Multicast.
+* **Automatic & Smart Manual Discovery**: Clients automatically find available servers via a UDP multicast beacon (group `239.255.0.1`, port `9091`), and the device list badges each server as Multicast/Unicast and whether it is encrypted or requires a key. If entering an IP manually, the app automatically detects if the host is using Unicast or Multicast.
 * **Network Interface Selection**: Manually select your active network interface to bypass VPN routing issues or handle multiple Wi-Fi/LAN connections.
 * **Server Volume Control**: Adjust the transmission volume directly from the UI or by using your device's physical volume buttons while streaming.
+* **Security & Encryption**: Optionally gate who can connect (approve each device, or require a pre-shared key with mutual HMAC-SHA256) and encrypt the audio end-to-end with **ChaCha20-Poly1305** (per-packet AEAD, anti-replay, HKDF-derived keys) on both unicast and multicast — no PKI required. See [`WFAS_PROTOCOL.md`](WFAS_PROTOCOL.md) §7–8.
 * **Modern Interface**: Built with **Jetpack Compose** and **Material Expressive**, featuring dynamic colors and bilingual support (EN/IT).
 
 ---
@@ -135,6 +136,8 @@ You are free to:
 - **No Warranty**: The software is provided **"as is"**, without any warranties.
 
 For the full legal text, see the `LICENSE.md` file included in this repository or visit the [official EUPL website](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+
+The **app** is EUPL, but the **WFAS v2 wire protocol** is not locked up: a C reference implementation is published separately under the permissive **MIT License** ([`wfas-protocol`](https://github.com/marcomorosi06/wfas-protocol), © 2026 Marco Morosi), so anyone — including embedded/firmware projects — can implement WFAS v2 freely. The copyleft protects this app; the protocol stays open.
 
 ---
 

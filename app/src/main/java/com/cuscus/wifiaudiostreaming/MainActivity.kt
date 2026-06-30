@@ -37,16 +37,23 @@ import androidx.annotation.RequiresApi
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -167,6 +175,20 @@ class MainActivity : ComponentActivity() {
                             label = "OnboardingTransition"
                         ) { isCompleted ->
                             if (isCompleted) {
+                                val needsChangelog =
+                                    appSettings!!.lastSeenChangelogVersion != Changelog.latest.version
+                                var changelogDone by remember { mutableStateOf(false) }
+
+                                if (needsChangelog && !changelogDone) {
+                                    WhatsNewStandaloneScreen(
+                                        onContinue = {
+                                            changelogDone = true
+                                            viewModel.markChangelogSeen()
+                                        }
+                                    )
+                                    return@Crossfade
+                                }
+
                                 MainAppContent()
 
                                 var showNotificationPermissionDialog by remember { mutableStateOf(false) }
@@ -185,6 +207,58 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onDismiss = {
                                             showNotificationPermissionDialog = false
+                                        }
+                                    )
+                                }
+
+                                var showDonation by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) {
+                                    val store = SettingsDataStore(applicationContext)
+                                    if (store.isDonationQualified() && System.currentTimeMillis() >= store.donationSnoozeUntil()) {
+                                        showDonation = true
+                                    }
+                                }
+                                if (showDonation) {
+                                    val later: () -> Unit = {
+                                        showDonation = false
+                                        lifecycleScope.launch {
+                                            val s = SettingsDataStore(applicationContext)
+                                            val c = s.donationDismissCount() + 1
+                                            s.setDonationDismissCount(c)
+                                            s.setDonationQualified(false)
+                                            s.setDonationSnoozeUntil(System.currentTimeMillis() + s.donationBackoffDays(c) * 24 * 60 * 60 * 1000)
+                                        }
+                                    }
+                                    val snooze30: () -> Unit = {
+                                        showDonation = false
+                                        lifecycleScope.launch {
+                                            val s = SettingsDataStore(applicationContext)
+                                            s.setDonationDismissCount(4)
+                                            s.setDonationQualified(false)
+                                            s.setDonationSnoozeUntil(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000)
+                                        }
+                                    }
+                                    AlertDialog(
+                                        onDismissRequest = later,
+                                        title = { Text(getString(R.string.donation_title)) },
+                                        text = { Text(getString(R.string.donation_body)) },
+                                        confirmButton = {
+                                            Button(onClick = {
+                                                showDonation = false
+                                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi")))
+                                                lifecycleScope.launch {
+                                                    val s = SettingsDataStore(applicationContext)
+                                                    s.setDonationDismissCount(0)
+                                                    s.setDonationQualified(false)
+                                                    s.setDonationSnoozeUntil(System.currentTimeMillis() + 14L * 24 * 60 * 60 * 1000)
+                                                }
+                                            }) { Text(getString(R.string.donation_support)) }
+                                        },
+                                        dismissButton = {
+                                            Row {
+                                                TextButton(onClick = snooze30) { Text(getString(R.string.donation_dismiss_30)) }
+                                                TextButton(onClick = later) { Text(getString(R.string.donation_later)) }
+                                            }
                                         }
                                     )
                                 }
@@ -299,14 +373,43 @@ class MainActivity : ComponentActivity() {
             ProtocolMismatchDialog(
                 mismatch = mismatch,
                 onUpdate = {
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases")
-                    )
+                    val updateUrl = if (mismatch.localVersion < mismatch.remoteVersion)
+                        "https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases"
+                    else
+                        "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop/releases"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateUrl))
                     runCatching { context.startActivity(intent) }
                     viewModel.clearProtocolMismatch()
                 },
                 onDismiss = { viewModel.clearProtocolMismatch() }
+            )
+        }
+
+        LaunchedEffect(Unit) { viewModel.autoCheckForUpdates() }
+
+        val checkingForUpdate by viewModel.checkingForUpdate.collectAsStateWithLifecycle()
+        val updateBanner by viewModel.updateBanner.collectAsStateWithLifecycle()
+        updateBanner?.let { info ->
+            UpdateAvailableDialog(
+                current = info.current,
+                latest = info.latest,
+                onUpdate = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.url))) }
+                    viewModel.dismissUpdateBanner()
+                },
+                onDismiss = { viewModel.dismissUpdateBanner() }
+            )
+        }
+
+        val manualUpdateResult by viewModel.manualUpdateResult.collectAsStateWithLifecycle()
+        manualUpdateResult?.let { res ->
+            UpdateResultDialog(
+                result = res,
+                onUpdate = { url ->
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                    viewModel.clearManualUpdateResult()
+                },
+                onDismiss = { viewModel.clearManualUpdateResult() }
             )
         }
 
@@ -437,6 +540,8 @@ class MainActivity : ComponentActivity() {
             onServerProtocolsChange = viewModel::setServerProtocols,
             onHttpSettingsChange = viewModel::setHttpSettings,
             onToggleAutoConnectIp = viewModel::toggleAutoConnectIp,
+            onSecurityChange = viewModel::setSecurity,
+            onEncryptionChange = viewModel::setEncryption,
             hasMicPermission = hasMicPermission
         )
 
@@ -448,6 +553,8 @@ class MainActivity : ComponentActivity() {
             onSampleRateChange = viewModel::setSampleRate,
             onChannelConfigChange = viewModel::setChannelConfig,
             onBufferSizeChange = viewModel::setBufferSize,
+            onAdvancedAudioChange = viewModel::setAdvancedAudio,
+            onSecurityChange = viewModel::setSecurity,
             onStreamingPortChange = viewModel::setStreamingPort,
             onMicPortChange = viewModel::setMicPort,
             onClose = { showSettingsScreen.value = false },
@@ -463,7 +570,10 @@ class MainActivity : ComponentActivity() {
             onSaveAutoConnectList = viewModel::saveAutoConnectList,
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
-            onOpenScripting = { showScriptingScreen.value = true }
+            onOpenScripting = { showScriptingScreen.value = true },
+            onAutoUpdateCheckChange = viewModel::setAutoUpdateCheckEnabled,
+            onCheckForUpdates = viewModel::checkForUpdatesManual,
+            checkingForUpdate = checkingForUpdate
         )
 
         ScriptingScreen(
@@ -474,6 +584,67 @@ class MainActivity : ComponentActivity() {
             onDeleteScript = viewModel::deleteScript,
             onRunCommand = { command -> executeScriptCommand(command) }
         )
+
+        DisposableEffect(Unit) {
+            NetworkManager.keyPromptEnabled = true
+            onDispose { NetworkManager.keyPromptEnabled = false }
+        }
+        val keyRequest by NetworkManager.pendingKeyRequest.collectAsStateWithLifecycle()
+        keyRequest?.let { wrong ->
+            var keyText by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { NetworkManager.submitKey(null) },
+                title = { Text(stringResource(R.string.key_dialog_title)) },
+                text = {
+                    Column {
+                        Text(
+                            if (wrong) stringResource(R.string.key_dialog_wrong)
+                            else stringResource(R.string.key_dialog_body)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = keyText,
+                            onValueChange = { keyText = it },
+                            singleLine = true,
+                            label = { Text(stringResource(R.string.settings_item_auth_key_title)) }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { NetworkManager.submitKey(keyText) }) {
+                        Text(stringResource(R.string.key_dialog_connect))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { NetworkManager.submitKey(null) }) {
+                        Text(stringResource(R.string.key_dialog_cancel))
+                    }
+                }
+            )
+        }
+
+        DisposableEffect(Unit) {
+            NetworkManager.authPromptEnabled = true
+            onDispose { NetworkManager.authPromptEnabled = false }
+        }
+        val authRequest by NetworkManager.pendingAuthRequest.collectAsStateWithLifecycle()
+        authRequest?.let { peer ->
+            AlertDialog(
+                onDismissRequest = { NetworkManager.submitAuth(false) },
+                title = { Text(stringResource(R.string.auth_request_title)) },
+                text = { Text(stringResource(R.string.auth_request_body, peer)) },
+                confirmButton = {
+                    TextButton(onClick = { NetworkManager.submitAuth(true) }) {
+                        Text(stringResource(R.string.auth_allow))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { NetworkManager.submitAuth(false) }) {
+                        Text(stringResource(R.string.auth_deny))
+                    }
+                }
+            )
+        }
     }
 
     private fun hasRecordAudioPermission(): Boolean {

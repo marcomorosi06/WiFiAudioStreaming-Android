@@ -24,12 +24,31 @@ import android.os.Build
 import com.cuscus.wifiaudiostreaming.AudioCaptureService
 import com.cuscus.wifiaudiostreaming.ClientService
 import com.cuscus.wifiaudiostreaming.NetworkManager
+import com.cuscus.wifiaudiostreaming.SecurityMode
 import com.cuscus.wifiaudiostreaming.ServerInfo
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import kotlinx.coroutines.flow.first
 
 object ScriptExecutor {
+
+    private fun resolveAuthMode(command: ScriptCommand, fallback: String): String = when {
+        command.str(ScriptParams.AUTHMODE) != null ->
+            SecurityMode.fromStringSafe(command.str(ScriptParams.AUTHMODE)).name
+        command.str(ScriptParams.AUTHKEY) != null -> SecurityMode.KEY.name
+        else -> fallback
+    }
+
+    suspend fun persistSecurityIfPresent(
+        store: SettingsDataStore,
+        current: AppSettings,
+        command: ScriptCommand
+    ) {
+        val authMode = command.str(ScriptParams.AUTHMODE)
+        val authKey = command.str(ScriptParams.AUTHKEY)
+        if (authMode == null && authKey == null) return
+        store.saveSecurity(resolveAuthMode(command, current.securityMode), authKey ?: current.authKey)
+    }
 
     fun resolveServerParams(settings: AppSettings, command: ScriptCommand): ResolvedServerParams {
         val rtpEnabled = command.bool(ScriptParams.RTP) ?: settings.rtpEnabled
@@ -97,6 +116,8 @@ object ScriptExecutor {
         val isMulti = known?.isMulticast ?: NetworkManager.probeIsMulticast(ip, port)
         val serverInfo = ServerInfo(ip = ip, isMulticast = isMulti, port = port)
 
+        NetworkManager.clientPresharedKey = command.str(ScriptParams.AUTHKEY) ?: ""
+
         context.startService(Intent(context, ClientService::class.java))
         NetworkManager.isStreamingCurrent.value = true
         NetworkManager.startClient(
@@ -156,5 +177,7 @@ object ScriptExecutor {
         command.bool(ScriptParams.AUTOCONNECT)?.let { store.setAutoConnectEnabled(it) }
         command.bool(ScriptParams.CONNSOUND)?.let { store.saveConnectionSoundEnabled(it) }
         command.bool(ScriptParams.DISCSOUND)?.let { store.saveDisconnectionSoundEnabled(it) }
+
+        persistSecurityIfPresent(store, s, command)
     }
 }

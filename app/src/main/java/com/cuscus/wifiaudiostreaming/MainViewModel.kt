@@ -67,6 +67,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearProtocolMismatch() = NetworkManager.clearProtocolMismatch()
 
+    private val _updateBanner = MutableStateFlow<UpdateChecker.Result.Available?>(null)
+    val updateBanner: StateFlow<UpdateChecker.Result.Available?> = _updateBanner.asStateFlow()
+
+    private val _manualUpdateResult = MutableStateFlow<UpdateChecker.Result?>(null)
+    val manualUpdateResult: StateFlow<UpdateChecker.Result?> = _manualUpdateResult.asStateFlow()
+
+    private val _checkingForUpdate = MutableStateFlow(false)
+    val checkingForUpdate: StateFlow<Boolean> = _checkingForUpdate.asStateFlow()
+
+    fun autoCheckForUpdates() {
+        viewModelScope.launch {
+            val enabled = settingsDataStore.settingsFlow.first().autoUpdateCheckEnabled
+            if (!enabled) return@launch
+            val r = UpdateChecker.check(getApplication<Application>())
+            if (r is UpdateChecker.Result.Available) _updateBanner.value = r
+        }
+    }
+
+    fun checkForUpdatesManual() {
+        if (_checkingForUpdate.value) return
+        viewModelScope.launch {
+            _checkingForUpdate.value = true
+            val r = UpdateChecker.check(getApplication<Application>())
+            _checkingForUpdate.value = false
+            _manualUpdateResult.value = r
+        }
+    }
+
+    fun dismissUpdateBanner() { _updateBanner.value = null }
+    fun clearManualUpdateResult() { _manualUpdateResult.value = null }
+
+    fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.setAutoUpdateCheckEnabled(enabled) }
+    }
+
     val discoveredDevices: StateFlow<Map<String, ServerInfo>> = NetworkManager.discoveredDevices
 
     val scripts: StateFlow<List<AppScript>> = settingsDataStore.scriptsFlow
@@ -155,6 +190,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setAdvancedAudio(latencyMs: Int, maxPayloadBytes: Int) {
+        viewModelScope.launch {
+            settingsDataStore.saveAdvancedAudio(latencyMs, maxPayloadBytes)
+        }
+    }
+
+    fun setSecurity(mode: String, key: String) {
+        viewModelScope.launch {
+            settingsDataStore.saveSecurity(mode, key)
+        }
+    }
+
+    fun setEncryption(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.saveEncryption(enabled)
+        }
+    }
+
     fun setStreamingPort(port: Int) {
         viewModelScope.launch {
             if (port in 1024..65535) {
@@ -179,7 +232,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setOnboardingCompleted() {
         viewModelScope.launch {
+            settingsDataStore.setLastSeenChangelogVersion(Changelog.latest.version)
             settingsDataStore.setOnboardingCompleted(true)
+        }
+    }
+
+    fun markChangelogSeen() {
+        viewModelScope.launch {
+            settingsDataStore.setLastSeenChangelogVersion(Changelog.latest.version)
         }
     }
 
@@ -245,6 +305,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val currentSettings = appSettings.value
         if (currentSettings != null) {
+            NetworkManager.configureSecurity(currentSettings.securityMode, currentSettings.authKey, currentSettings.encryptionEnabled)
+            NetworkManager.clientPresharedKey = ""   // interactive client: key comes from the on-connect dialog
             NetworkManager.startClient(
                 context = getApplication(),
                 serverInfo = serverInfo,
