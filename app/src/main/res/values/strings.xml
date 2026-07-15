@@ -310,4 +310,6 @@
     <string name="protocol_incompatible_title">Update required</string>
     <string name="protocol_incompatible_body">The two apps are running incompatible WFAS protocol versions (this device: v%1$d, other end: v%2$d). The connection was closed. Please update so both devices run the latest version.</string>
     <string name="protocol_incompatible_update">Open downloads</string>
+    <string name="blackout_button">Dark screen</string>
+    <string name="blackout_hint">Double tap to return</string>
 </resources>

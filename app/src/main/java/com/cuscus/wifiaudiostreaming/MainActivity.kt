@@ -645,6 +645,8 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+
+        BlackoutOverlay()
     }
 
     private fun hasRecordAudioPermission(): Boolean {

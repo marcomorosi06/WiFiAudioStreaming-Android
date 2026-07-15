@@ -1395,94 +1395,115 @@ object NetworkManager {
                             }
                         }
 
-                        try {
-                            while (isActive) {
-                                val datagram = socket.receive()
-                                val packet = datagram.packet
-                                val bytes = ByteArray(packet.remaining.toInt())
-                                packet.readFully(bytes)
+                        val maxLagPackets = 5
 
-                                if (bytes.size >= 2 && bytes[0] == MAGIC_0 && bytes[1] == MAGIC_1) {
-                                    if (bytes.size < HEADER_SIZE) continue
+                        suspend fun playPacket(bytes: ByteArray) {
+                            if (bytes.size < HEADER_SIZE) return
 
-                                    if (!versionChecked) {
-                                        versionChecked = true
-                                        val packetVersion = bytes[2].toInt() and 0xFF
-                                        if (packetVersion != WFAS_PROTOCOL_VERSION) {
-                                            signalProtocolMismatch(packetVersion)
-                                            connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
-                                            streamingJob?.cancel()
-                                            break
+                            if (!versionChecked) {
+                                versionChecked = true
+                                val packetVersion = bytes[2].toInt() and 0xFF
+                                if (packetVersion != WFAS_PROTOCOL_VERSION) {
+                                    signalProtocolMismatch(packetVersion)
+                                    connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                    streamingJob?.cancel()
+                                    return
+                                }
+                            }
+
+                            val encFlag = (bytes[3].toInt() and WfasCrypto.FLAG_ENCRYPTED) != 0
+                            val data: ByteArray
+                            if (encFlag) {
+                                if (recvDir == null) return
+                                val r = WfasCrypto.decryptPacket(recvDir, recvWin, bytes, bytes.size)
+                                if (r !is WfasCrypto.Decrypted.Ok) return
+                                serverEncrypts = true
+                                data = ByteArray(HEADER_SIZE + r.pcm.size)
+                                System.arraycopy(bytes, 0, data, 0, HEADER_SIZE)
+                                System.arraycopy(r.pcm, 0, data, HEADER_SIZE, r.pcm.size)
+                            } else {
+                                if (serverEncrypts) return
+                                data = bytes
+                            }
+
+                            val flags     = data[3].toInt() and 0xFF
+                            val seq       = ((data[4].toInt() and 0xFF) shl 8) or (data[5].toInt() and 0xFF)
+                            val isSilence = (flags and 0x01) != 0
+
+                            if (expectedSeq == -1) {
+                                expectedSeq = seq
+                            } else {
+                                val gap = (seq - expectedSeq) and 0xFFFF
+                                if (gap in 1..8) {
+                                    val ref = lastGoodPcm
+                                    if (ref != null) {
+                                        var step = 0
+                                        repeat(gap.coerceAtMost(3)) {
+                                            val factor = 1.0f - step * 0.35f
+                                            step++
+                                            val fade = ByteArray(ref.size)
+                                            val bb  = ByteBuffer.wrap(ref).order(ByteOrder.LITTLE_ENDIAN)
+                                            val out = ByteBuffer.wrap(fade).order(ByteOrder.LITTLE_ENDIAN)
+                                            while (bb.remaining() >= 2) {
+                                                val s = (bb.short * factor).toInt()
+                                                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                                                out.putShort(s.toShort())
+                                            }
+                                            audioTrack.write(fade, 0, fade.size, AudioTrack.WRITE_BLOCKING)
                                         }
                                     }
+                                }
+                            }
 
-                                    val encFlag = (bytes[3].toInt() and WfasCrypto.FLAG_ENCRYPTED) != 0
-                                    val data: ByteArray
-                                    if (encFlag) {
-                                        if (recvDir == null) continue
-                                        val r = WfasCrypto.decryptPacket(recvDir, recvWin, bytes, bytes.size)
-                                        if (r !is WfasCrypto.Decrypted.Ok) continue
-                                        serverEncrypts = true
-                                        data = ByteArray(HEADER_SIZE + r.pcm.size)
-                                        System.arraycopy(bytes, 0, data, 0, HEADER_SIZE)
-                                        System.arraycopy(r.pcm, 0, data, HEADER_SIZE, r.pcm.size)
+                            expectedSeq = (seq + 1) and 0xFFFF
+
+                            if (isSilence || data.size <= HEADER_SIZE) {
+                                val silenceLen = lastGoodPcm?.size ?: 3840
+                                val silenceBuffer = ByteArray(silenceLen)
+                                audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
+                            } else {
+                                val pcmLen = data.size - HEADER_SIZE
+                                audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
+                                    lastGoodPcm = ByteArray(pcmLen)
+                                }
+                                data.copyInto(lastGoodPcm!!, 0, HEADER_SIZE, HEADER_SIZE + pcmLen)
+                            }
+                        }
+
+                        try {
+                            while (isActive) {
+                                val audio = ArrayList<ByteArray>()
+                                var byeReceived = false
+                                var dg: Datagram? = socket.receive()
+                                while (dg != null) {
+                                    val pk = dg.packet
+                                    val pb = ByteArray(pk.remaining.toInt())
+                                    pk.readFully(pb)
+                                    if (pb.size >= 2 && pb[0] == MAGIC_0 && pb[1] == MAGIC_1) {
+                                        audio.add(pb)
                                     } else {
-                                        if (serverEncrypts) continue
-                                        data = bytes
-                                    }
-
-                                    val flags     = data[3].toInt() and 0xFF
-                                    val seq       = ((data[4].toInt() and 0xFF) shl 8) or (data[5].toInt() and 0xFF)
-                                    val isSilence = (flags and 0x01) != 0
-
-                                    if (expectedSeq == -1) {
-                                        expectedSeq = seq
-                                    } else {
-                                        val gap = (seq - expectedSeq) and 0xFFFF
-                                        if (gap in 1..8) {
-                                            val ref = lastGoodPcm
-                                            if (ref != null) {
-                                                var step = 0
-                                                repeat(gap.coerceAtMost(3)) {
-                                                    val factor = 1.0f - step * 0.35f
-                                                    step++
-                                                    val fade = ByteArray(ref.size)
-                                                    val bb  = ByteBuffer.wrap(ref).order(ByteOrder.LITTLE_ENDIAN)
-                                                    val out = ByteBuffer.wrap(fade).order(ByteOrder.LITTLE_ENDIAN)
-                                                    while (bb.remaining() >= 2) {
-                                                        val s = (bb.short * factor).toInt()
-                                                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-                                                        out.putShort(s.toShort())
-                                                    }
-                                                    audioTrack.write(fade, 0, fade.size, AudioTrack.WRITE_BLOCKING)
-                                                }
+                                        val ctrl = pb.toString(Charsets.UTF_8).trim()
+                                        when (ctrl) {
+                                            "PING" -> lastPingReceived = System.currentTimeMillis()
+                                            "BYE" -> {
+                                                if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
+                                                byeReceived = true
                                             }
                                         }
                                     }
+                                    dg = socket.incoming.tryReceive().getOrNull()
+                                }
+                                if (byeReceived) { streamingJob?.cancel(); break }
+                                if (audio.isEmpty()) continue
 
-                                    expectedSeq = (seq + 1) and 0xFFFF
-
-                                    if (isSilence || data.size <= HEADER_SIZE) {
-                                        val silenceLen = lastGoodPcm?.size ?: 3840
-                                        val silenceBuffer = ByteArray(silenceLen)
-                                        audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
-                                    } else {
-                                        val pcmLen = data.size - HEADER_SIZE
-                                        audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
-                                        if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
-                                            lastGoodPcm = ByteArray(pcmLen)
-                                        }
-                                        data.copyInto(lastGoodPcm!!, 0, HEADER_SIZE, HEADER_SIZE + pcmLen)
-                                    }
+                                if (audio.size > maxLagPackets) {
+                                    expectedSeq = -1
+                                    playPacket(audio[audio.size - 1])
                                 } else {
-                                    val text = bytes.toString(Charsets.UTF_8).trim()
-                                    when (text) {
-                                        "PING" -> lastPingReceived = System.currentTimeMillis()
-                                        "BYE"  -> {
-                                            if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
-                                            streamingJob?.cancel()
-                                            break
-                                        }
+                                    for (b in audio) {
+                                        if (!isActive) break
+                                        playPacket(b)
                                     }
                                 }
                             }
@@ -1563,66 +1584,105 @@ object NetworkManager {
                         var mcLastEpoch = SettingsDataStore(context).getMcastClientEpoch(serverInfo.ip)
                         val beaconPrefixLen = WfasCrypto.MSG_MCAST_ENC.length
 
+                        val drainPacket = DatagramPacket(ByteArray(65536), 65536)
+                        val maxLagPackets = 5
                         while (isActive) {
                             try {
                                 multicastSocket.receive(packet)
                             } catch (_: java.net.SocketTimeoutException) {
                                 continue
                             }
-                            val len = packet.length
-                            if (len <= 0) continue
-                            if (len >= beaconPrefixLen &&
-                                String(packet.data, 0, beaconPrefixLen, Charsets.US_ASCII) == WfasCrypto.MSG_MCAST_ENC) {
-                                if (mcKey.isEmpty() && !mcKeyAsked) {
-                                    mcKeyAsked = true
-                                    mcKey = requestKeyFromUi(false) ?: ""
-                                    if (mcKey.isBlank()) connectionStatus.value = context.getString(R.string.status_key_required)
-                                }
-                                if (mcKey.isNotEmpty()) {
-                                    val info = WfasCrypto.parseMcastBeacon(mcKey, String(packet.data, 0, len, Charsets.US_ASCII), -1L)
-                                    if (info != null && (info.epoch > mcLastEpoch || (mcDir == null && info.epoch == mcLastEpoch))) {
-                                        mcDir = WfasCrypto.deriveMulticast(mcKey, info.salt)
-                                        mcWin = WfasCrypto.ReplayWindow()
-                                        if (info.epoch > mcLastEpoch) {
-                                            mcLastEpoch = info.epoch
-                                            SettingsDataStore(context).setMcastClientEpoch(serverInfo.ip, info.epoch)
+
+                            val audioPackets = ArrayList<ByteArray>()
+                            var stopLoop = false
+                            var mcAbort = false
+
+                            suspend fun classify(src: ByteArray, plen: Int) {
+                                if (plen <= 0) return
+                                if (plen >= beaconPrefixLen &&
+                                    String(src, 0, beaconPrefixLen, Charsets.US_ASCII) == WfasCrypto.MSG_MCAST_ENC) {
+                                    if (mcKey.isEmpty() && !mcKeyAsked) {
+                                        mcKeyAsked = true
+                                        mcKey = requestKeyFromUi(false) ?: ""
+                                        if (mcKey.isBlank()) connectionStatus.value = context.getString(R.string.status_key_required)
+                                    }
+                                    if (mcKey.isNotEmpty()) {
+                                        val info = WfasCrypto.parseMcastBeacon(mcKey, String(src, 0, plen, Charsets.US_ASCII), -1L)
+                                        if (info != null && (info.epoch > mcLastEpoch || (mcDir == null && info.epoch == mcLastEpoch))) {
+                                            mcDir = WfasCrypto.deriveMulticast(mcKey, info.salt)
+                                            mcWin = WfasCrypto.ReplayWindow()
+                                            if (info.epoch > mcLastEpoch) {
+                                                mcLastEpoch = info.epoch
+                                                SettingsDataStore(context).setMcastClientEpoch(serverInfo.ip, info.epoch)
+                                            }
                                         }
                                     }
+                                    return
                                 }
-                                continue
-                            }
-                            if (len == 3 && String(packet.data, 0, 3, Charsets.UTF_8) == "BYE") {
-                                if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
-                                break
-                            }
-                            if (len >= MC_HEADER_SIZE && packet.data[0] == MC_MAGIC_0 && packet.data[1] == MC_MAGIC_1) {
-                                if (!mcVersionChecked) {
-                                    mcVersionChecked = true
-                                    val packetVersion = packet.data[2].toInt() and 0xFF
-                                    if (packetVersion != WFAS_PROTOCOL_VERSION) {
-                                        signalProtocolMismatch(packetVersion)
-                                        connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
-                                        break
-                                    }
+                                if (plen == 3 && String(src, 0, 3, Charsets.UTF_8) == "BYE") {
+                                    if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
+                                    stopLoop = true
+                                    return
                                 }
-                                if ((packet.data[3].toInt() and WfasCrypto.FLAG_ENCRYPTED) != 0) {
-                                    val dir = mcDir
-                                    if (dir != null) {
-                                        val r = WfasCrypto.decryptPacket(dir, mcWin, packet.data, len)
-                                        if (r is WfasCrypto.Decrypted.Ok && r.pcm.isNotEmpty()) {
-                                            audioTrack.write(r.pcm, 0, r.pcm.size, AudioTrack.WRITE_BLOCKING)
+                                audioPackets.add(src.copyOf(plen))
+                            }
+
+                            suspend fun playMc(audio: ByteArray) {
+                                val len = audio.size
+                                if (len >= MC_HEADER_SIZE && audio[0] == MC_MAGIC_0 && audio[1] == MC_MAGIC_1) {
+                                    if (!mcVersionChecked) {
+                                        mcVersionChecked = true
+                                        val packetVersion = audio[2].toInt() and 0xFF
+                                        if (packetVersion != WFAS_PROTOCOL_VERSION) {
+                                            signalProtocolMismatch(packetVersion)
+                                            connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                            mcAbort = true
+                                            return
                                         }
                                     }
-                                    // no key yet -> drop until a valid beacon arrives
+                                    if ((audio[3].toInt() and WfasCrypto.FLAG_ENCRYPTED) != 0) {
+                                        val dir = mcDir
+                                        if (dir != null) {
+                                            val r = WfasCrypto.decryptPacket(dir, mcWin, audio, len)
+                                            if (r is WfasCrypto.Decrypted.Ok && r.pcm.isNotEmpty()) {
+                                                audioTrack.write(r.pcm, 0, r.pcm.size, AudioTrack.WRITE_BLOCKING)
+                                            }
+                                        }
+                                    } else {
+                                        val pcmLen = len - MC_HEADER_SIZE
+                                        if (pcmLen > 0) {
+                                            audioTrack.write(audio, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                        }
+                                    }
                                 } else {
-                                    val pcmLen = len - MC_HEADER_SIZE
-                                    if (pcmLen > 0) {
-                                        audioTrack.write(packet.data, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
-                                    }
+                                    audioTrack.write(audio, 0, len, AudioTrack.WRITE_BLOCKING)
                                 }
-                            } else {
-                                audioTrack.write(packet.data, 0, len, AudioTrack.WRITE_BLOCKING)
                             }
+
+                            classify(packet.data, packet.length)
+                            multicastSocket.soTimeout = 1
+                            while (!stopLoop) {
+                                try {
+                                    multicastSocket.receive(drainPacket)
+                                } catch (_: java.net.SocketTimeoutException) {
+                                    break
+                                }
+                                classify(drainPacket.data, drainPacket.length)
+                            }
+                            multicastSocket.soTimeout = 2000
+
+                            if (stopLoop) break
+                            if (audioPackets.isEmpty()) continue
+
+                            if (audioPackets.size > maxLagPackets) {
+                                playMc(audioPackets[audioPackets.size - 1])
+                            } else {
+                                for (a in audioPackets) {
+                                    if (!isActive) break
+                                    playMc(a)
+                                }
+                            }
+                            if (mcAbort) break
                         }
                     } finally {
                         audioTrack?.stop()

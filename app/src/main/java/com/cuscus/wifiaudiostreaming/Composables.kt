@@ -25,8 +25,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
@@ -63,11 +65,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -2342,7 +2347,18 @@ fun ExpressiveStreamingControlCenter(
                         }
                     }
 
-                    // --- NUOVO SLIDER VOLUME SU ANDROID ---
+                    if (!isServer) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        FilledTonalButton(
+                            onClick = { BlackoutController.show() },
+                            shape = RoundedCornerShape(28.dp)
+                        ) {
+                            Icon(Icons.Filled.DarkMode, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.blackout_button))
+                        }
+                    }
+
                     if (isServer) {
                         Spacer(modifier = Modifier.height(24.dp))
                         val volume by NetworkManager.serverVolume.collectAsState()
@@ -4323,5 +4339,92 @@ private fun ScriptLibraryItem(
                 IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.scripting_delete), tint = MaterialTheme.colorScheme.error) }
             }
         }
+    }
+}
+
+object BlackoutController {
+    val active = mutableStateOf(false)
+    fun show() { active.value = true }
+    fun hide() { active.value = false }
+}
+
+@Composable
+fun BlackoutOverlay() {
+    val active = BlackoutController.active.value
+    val overlayAlpha by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "BlackoutOverlayAlpha"
+    )
+
+    if (!active && overlayAlpha == 0f) return
+
+    val view = LocalView.current
+    DisposableEffect(active) {
+        view.keepScreenOn = active
+        onDispose { view.keepScreenOn = false }
+    }
+
+    BackHandler(enabled = active) { BlackoutController.hide() }
+
+    var pendingTapAt by remember { mutableStateOf(0L) }
+    var hintKey by remember { mutableStateOf(0) }
+    val hintAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(active) {
+        if (active) {
+            pendingTapAt = 0L
+            hintKey = 0
+            hintAlpha.snapTo(0f)
+        }
+    }
+
+    LaunchedEffect(pendingTapAt) {
+        if (pendingTapAt == 0L) return@LaunchedEffect
+        delay(2000)
+        pendingTapAt = 0L
+    }
+
+    LaunchedEffect(hintKey) {
+        if (hintKey == 0) return@LaunchedEffect
+        hintAlpha.snapTo(1f)
+        delay(5000)
+        hintAlpha.animateTo(0f, animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1f)
+            .graphicsLayer { alpha = overlayAlpha }
+            .background(Color.Black)
+            .then(
+                if (active) Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            if (pendingTapAt != 0L && now - pendingTapAt <= 2000L) {
+                                pendingTapAt = 0L
+                                BlackoutController.hide()
+                            } else {
+                                pendingTapAt = now
+                                hintKey += 1
+                            }
+                        }
+                    )
+                } else Modifier
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(R.string.blackout_hint),
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(32.dp)
+                .graphicsLayer { alpha = hintAlpha.value }
+        )
     }
 }
