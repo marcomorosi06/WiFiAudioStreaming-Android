@@ -1397,7 +1397,7 @@ object NetworkManager {
 
                         val maxLagPackets = 5
 
-                        suspend fun playPacket(bytes: ByteArray) {
+                        suspend fun playPacket(bytes: ByteArray, smooth: Boolean = false) {
                             if (bytes.size < HEADER_SIZE) return
 
                             if (!versionChecked) {
@@ -1463,7 +1463,25 @@ object NetworkManager {
                                 audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
                             } else {
                                 val pcmLen = data.size - HEADER_SIZE
-                                audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                val ref = lastGoodPcm
+                                if (smooth && ref != null && ref.size >= 2 && pcmLen >= 2) {
+                                    val outBuf = ByteArray(pcmLen)
+                                    System.arraycopy(data, HEADER_SIZE, outBuf, 0, pcmLen)
+                                    val fadeSamples = (minOf(ref.size, pcmLen) / 2).coerceAtMost(256)
+                                    val refBuf = ByteBuffer.wrap(ref).order(ByteOrder.LITTLE_ENDIAN)
+                                    val outB   = ByteBuffer.wrap(outBuf).order(ByteOrder.LITTLE_ENDIAN)
+                                    for (s in 0 until fadeSamples) {
+                                        val t = (s + 1).toFloat() / (fadeSamples + 1)
+                                        val refS = refBuf.getShort(s * 2).toInt()
+                                        val newS = outB.getShort(s * 2).toInt()
+                                        val mixed = (refS * (1f - t) + newS * t).toInt()
+                                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                                        outB.putShort(s * 2, mixed.toShort())
+                                    }
+                                    audioTrack.write(outBuf, 0, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                } else {
+                                    audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                }
                                 if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
                                     lastGoodPcm = ByteArray(pcmLen)
                                 }
@@ -1499,7 +1517,7 @@ object NetworkManager {
 
                                 if (audio.size > maxLagPackets) {
                                     expectedSeq = -1
-                                    playPacket(audio[audio.size - 1])
+                                    playPacket(audio[audio.size - 1], smooth = true)
                                 } else {
                                     for (b in audio) {
                                         if (!isActive) break
