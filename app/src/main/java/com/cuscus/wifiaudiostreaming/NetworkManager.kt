@@ -121,6 +121,45 @@ object NetworkManager {
     fun configureSecurity(mode: String, key: String, encrypt: Boolean = false) {
         securityMode = mode; authKey = key; encryptionEnabled = encrypt
     }
+
+    @Volatile private var audioPrewarmed = false
+    fun prewarmAudio() {
+        if (audioPrewarmed) return
+        audioPrewarmed = true
+        Thread {
+            runCatching {
+                val sr = 48000
+                val ch = AudioFormat.CHANNEL_OUT_STEREO
+                val minBuf = AudioTrack.getMinBufferSize(sr, ch, AudioFormat.ENCODING_PCM_16BIT)
+                if (minBuf <= 0) return@runCatching
+                val builder = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sr)
+                            .setChannelMask(ch)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(minBuf)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                }
+                val track = builder.build()
+                track.write(ByteArray(minBuf), 0, minBuf, AudioTrack.WRITE_BLOCKING)
+                track.play()
+                Thread.sleep(80)
+                runCatching { track.stop() }
+                track.release()
+            }
+        }.apply { isDaemon = true; start() }
+    }
     // Pre-shared key used only when acting as a CLIENT (scripting). The interactive
     // client leaves this empty and gets the key from the on-connect dialog.
     @Volatile var clientPresharedKey: String = ""
@@ -1237,16 +1276,18 @@ object NetworkManager {
                     var socket: BoundDatagramSocket? = null
                     try {
                         val selectorManager = SelectorManager(Dispatchers.IO)
+                        val advSettings = SettingsDataStore(context).settingsFlow.first()
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
-                        val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
-                        var playbackBufferSize = minBuffer.coerceAtLeast(SettingsDataStore(context).settingsFlow.first().latencyMs * sampleRate / 1000 * (if (channelConfig == "STEREO") 4 else 2))
-
                         val frameSize = if (channelConfig == "STEREO") 4 else 2
+                        val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        val targetLatencyFrames = advSettings.latencyMs * sampleRate / 1000
+                        val marginFrames = sampleRate * 30 / 1000
+                        var playbackBufferSize = minBuffer.coerceAtLeast((targetLatencyFrames + marginFrames * 2) * frameSize)
                         if (playbackBufferSize % frameSize != 0) {
                             playbackBufferSize += frameSize - (playbackBufferSize % frameSize)
                         }
 
-                        audioTrack = AudioTrack.Builder()
+                        val trackBuilder = AudioTrack.Builder()
                             .setAudioAttributes(
                                 AudioAttributes.Builder()
                                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -1262,12 +1303,19 @@ object NetworkManager {
                             )
                             .setBufferSizeInBytes(playbackBufferSize)
                             .setTransferMode(AudioTrack.MODE_STREAM)
-                            .build()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            trackBuilder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                        }
+                        audioTrack = trackBuilder.build()
 
-                        audioTrack.play()
+                        val prerollLen = (sampleRate * frameSize * 30 / 1000)
+                            .coerceIn(0, playbackBufferSize - frameSize)
+                            .let { it - (it % frameSize) }
+                        if (prerollLen > 0) audioTrack!!.write(ByteArray(prerollLen), 0, prerollLen, AudioTrack.WRITE_BLOCKING)
+                        audioTrack!!.play()
 
                         connectionStatus.value = context.getString(R.string.status_contacting_server, serverInfo.ip)
-                        socket = aSocket(selectorManager).udp().bind()
+                        socket = aSocket(selectorManager).udp().bind { receiveBufferSize = 1 shl 20 }
                         val sock = socket!!
                         val remoteAddress = InetSocketAddress(serverInfo.ip, serverInfo.port)
 
@@ -1395,7 +1443,10 @@ object NetworkManager {
                             }
                         }
 
-                        val maxLagPackets = 5
+                        val maxLagPackets = 3
+                        val driftTargetBacklog = 2
+                        var driftAvgBacklog = driftTargetBacklog.toFloat()
+                        var driftCurrentRate = sampleRate
 
                         suspend fun playPacket(bytes: ByteArray, smooth: Boolean = false) {
                             if (bytes.size < HEADER_SIZE) return
@@ -1515,14 +1566,19 @@ object NetworkManager {
                                 if (byeReceived) { streamingJob?.cancel(); break }
                                 if (audio.isEmpty()) continue
 
-                                if (audio.size > maxLagPackets) {
-                                    expectedSeq = -1
-                                    playPacket(audio[audio.size - 1], smooth = true)
-                                } else {
-                                    for (b in audio) {
-                                        if (!isActive) break
-                                        playPacket(b)
-                                    }
+                                val skip = (audio.size - maxLagPackets).coerceAtLeast(0)
+                                if (skip > 0) expectedSeq = -1
+                                for (i in skip until audio.size) {
+                                    if (!isActive) break
+                                    playPacket(audio[i], smooth = (i == skip && skip > 0))
+                                }
+                                driftAvgBacklog = driftAvgBacklog * 0.9f + audio.size * 0.1f
+                                val err = driftAvgBacklog - driftTargetBacklog
+                                val factor = (1.0 + err * 0.0004).coerceIn(0.997, 1.003)
+                                val newRate = (sampleRate * factor).toInt()
+                                if (kotlin.math.abs(newRate - driftCurrentRate) >= 4) {
+                                    runCatching { audioTrack!!.setPlaybackRate(newRate) }
+                                    driftCurrentRate = newRate
                                 }
                             }
                         } finally {

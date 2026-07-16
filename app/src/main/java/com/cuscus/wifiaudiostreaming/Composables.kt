@@ -675,7 +675,7 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_audio_quality),
+                    title = stringResource(R.string.settings_group_audio),
                     icon = Icons.Outlined.Tune
                 ) {
                     SettingsSelectionItem(
@@ -697,14 +697,6 @@ fun SettingsScreenContent(
                         ),
                         onOptionSelected = { onChannelConfigChange(it) }
                     )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_performance),
-                    icon = Icons.Outlined.Speed
-                ) {
                     SettingsSliderItem(
                         title = stringResource(R.string.settings_item_latency_title),
                         description = stringResource(R.string.settings_item_latency_desc),
@@ -715,14 +707,6 @@ fun SettingsScreenContent(
                         valueSuffix = "ms",
                         onValueChange = { onAdvancedAudioChange(it.toInt(), appSettings.maxPayloadBytes) }
                     )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_advanced),
-                    icon = Icons.Outlined.Tune
-                ) {
                     SettingsSliderItem(
                         title = stringResource(R.string.settings_item_packet_size_title),
                         description = stringResource(R.string.settings_item_packet_size_desc),
@@ -992,8 +976,8 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_license),
-                    icon = Icons.Outlined.Gavel
+                    title = stringResource(R.string.settings_group_info),
+                    icon = Icons.Outlined.Info
                 ) {
                     SettingsInfoItem(
                         title = stringResource(R.string.license_info_title),
@@ -1017,14 +1001,7 @@ fun SettingsScreenContent(
                         icon = Icons.Outlined.Description,
                         onClick = { showLicensesDialog = true }
                     )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_about),
-                    icon = Icons.Outlined.Info
-                ) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.settings_item_show_intro_title),
                         description = stringResource(R.string.settings_item_show_intro_desc),

@@ -157,6 +157,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         actionBar?.hide()
 
+        NetworkManager.prewarmAudio()
+
         pendingCommand.value = ScriptCommand.fromIntent(intent)
 
         setContent {

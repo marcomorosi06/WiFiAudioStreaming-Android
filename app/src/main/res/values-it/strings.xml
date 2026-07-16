@@ -96,6 +96,8 @@
     <string name="settings_item_mic_title">Microfono</string>
     <string name="settings_item_mic_desc">Trasmetti l\'audio catturato dal microfono</string>
     <string name="settings_group_audio_quality">Qualità Audio</string>
+    <string name="settings_group_audio">Audio</string>
+    <string name="settings_group_info">Info</string>
     <string name="settings_item_sample_rate_title">Frequenza di Campionamento</string>
     <string name="settings_item_sample_rate_desc">Qualità più alta richiede più banda</string>
     <string name="settings_item_channels_title">Canali Audio</string>
