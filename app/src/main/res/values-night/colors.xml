@@ -5,4 +5,9 @@
     <color name="widget_preview_secondary_container">#4A4458</color>
     <color name="widget_preview_on_surface">#E6E1E5</color>
     <color name="widget_preview_on_surface_variant">#CAC4D0</color>
+    <color name="splash_background">#141218</color>
+    <color name="splash_background_top">#1D1B20</color>
+    <color name="splash_background_bottom">#141218</color>
+    <color name="splash_accent">#D0BCFF</color>
+    <color name="splash_icon_bg">#4F378B</color>
 </resources>
