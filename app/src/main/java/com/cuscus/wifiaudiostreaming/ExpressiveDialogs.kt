@@ -160,6 +160,68 @@ private fun ExpressiveDialogButton(
 }
 
 @Composable
+fun ExpressiveInfoDialog(
+    icon: ImageVector,
+    accent: Color,
+    title: String,
+    body: String,
+    confirmLabel: String,
+    onDismiss: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DialogShapeBadge(icon, accent, alert = false)
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                ExpressiveDialogButton(
+                    label = confirmLabel,
+                    icon = null,
+                    container = accent,
+                    content = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.tap()
+                    onDismiss()
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ExpressiveAuthRequestDialog(
     peer: String,
     onAllow: () -> Unit,
