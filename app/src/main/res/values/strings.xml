@@ -315,4 +315,6 @@
     <string name="blackout_button">Dark screen</string>
     <string name="blackout_hint">Double tap to return</string>
     <string name="playback_keep_open_hint">For the best quality, keep this app open on screen and the phone unlocked. Leaving the app or locking the device may cause audio artifacts.</string>
+    <string name="settings_item_haptics_title">Haptic feedback</string>
+    <string name="settings_item_haptics_desc">Vibrate on taps, toggles and key actions</string>
 </resources>

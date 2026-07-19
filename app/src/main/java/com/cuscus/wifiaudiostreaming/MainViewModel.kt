@@ -290,6 +290,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveDisconnectionSoundEnabled(enabled) }
     }
 
+    fun setHapticsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveHapticsEnabled(enabled) }
+    }
+
     // Aggiorna startListening (passando l'interfaccia)
     fun startListening() {
         val currentSettings = appSettings.value

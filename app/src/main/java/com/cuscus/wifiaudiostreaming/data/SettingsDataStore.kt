@@ -71,7 +71,8 @@ data class AppSettings(
     val maxPayloadBytes: Int = 1390,
     val securityMode: String = "OFF",
     val authKey: String = "",
-    val encryptionEnabled: Boolean = false
+    val encryptionEnabled: Boolean = false,
+    val hapticsEnabled: Boolean = true
 )
 
 class SettingsDataStore(context: Context) {
@@ -107,6 +108,7 @@ class SettingsDataStore(context: Context) {
         val AUTOMATION_SCRIPTS = stringPreferencesKey("automation_scripts")
         val LAST_SEEN_CHANGELOG_VERSION = stringPreferencesKey("last_seen_changelog_version")
         val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
+        val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
     }
 
     val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
@@ -142,6 +144,7 @@ class SettingsDataStore(context: Context) {
             autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: "",
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
             disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
+            hapticsEnabled = preferences[PreferencesKeys.HAPTICS_ENABLED] ?: true,
             lastSeenChangelogVersion = preferences[PreferencesKeys.LAST_SEEN_CHANGELOG_VERSION] ?: "",
             autoUpdateCheckEnabled = preferences[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] ?: true,
             latencyMs = preferences[PreferencesKeys.LATENCY_MS] ?: 120,
@@ -344,6 +347,12 @@ class SettingsDataStore(context: Context) {
     suspend fun saveDisconnectionSoundEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveHapticsEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HAPTICS_ENABLED] = enabled
         }
     }
 

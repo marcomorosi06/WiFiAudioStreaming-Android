@@ -85,4 +85,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 
     implementation("androidx.core:core-splashscreen:1.0.1")
+
+    implementation("androidx.graphics:graphics-shapes:1.0.1")
 }

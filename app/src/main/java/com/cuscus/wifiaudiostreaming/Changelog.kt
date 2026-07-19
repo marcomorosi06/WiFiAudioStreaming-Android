@@ -187,7 +187,8 @@ fun WhatsNewPage(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = { showHistory = true }) {
+                val historyHaptics = rememberAppHaptics()
+                IconButton(onClick = { historyHaptics.tap(); showHistory = true }) {
                     Icon(
                         imageVector = Icons.Outlined.History,
                         contentDescription = versionHistoryTitle.text()
@@ -212,8 +213,9 @@ fun WhatsNewPage(
             }
 
             if (onContinue != null) {
+                val continueHaptics = rememberAppHaptics()
                 Button(
-                    onClick = onContinue,
+                    onClick = { continueHaptics.confirm(); onContinue() },
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -303,8 +305,10 @@ private fun ChangelogItemCard(item: ChangelogItem, accent: ChangelogAccent) {
                 )
                 if (item.linkUrl != null && item.linkLabel != null) {
                     val context = androidx.compose.ui.platform.LocalContext.current
+                    val linkHaptics = rememberAppHaptics()
                     TextButton(
                         onClick = {
+                            linkHaptics.tap()
                             runCatching {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.linkUrl)))
                             }
@@ -335,8 +339,9 @@ private fun VersionHistorySheet(
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(Changelog.entries) { entry ->
+                    val entryHaptics = rememberAppHaptics()
                     Surface(
-                        onClick = { onSelect(entry) },
+                        onClick = { entryHaptics.tap(); onSelect(entry) },
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
@@ -358,7 +363,8 @@ private fun VersionHistorySheet(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(closeLabel.text()) }
+            val dismissHaptics = rememberAppHaptics()
+            TextButton(onClick = { dismissHaptics.tap(); onDismiss() }) { Text(closeLabel.text()) }
         }
     )
 }

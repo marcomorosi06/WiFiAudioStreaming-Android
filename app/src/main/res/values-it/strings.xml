@@ -315,4 +315,6 @@
     <string name="blackout_button">Schermo nero</string>
     <string name="blackout_hint">Tocca due volte per tornare</string>
     <string name="playback_keep_open_hint">Per la massima qualità, tieni l\'app aperta sullo schermo e il telefono sbloccato. Uscire dall\'app o bloccare il dispositivo può causare artefatti audio.</string>
+    <string name="settings_item_haptics_title">Feedback aptico</string>
+    <string name="settings_item_haptics_desc">Vibrazione su tocchi, interruttori e azioni principali</string>
 </resources>

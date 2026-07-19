@@ -40,10 +40,12 @@ fun UpdateAvailableDialog(
         title = { Text(updateAvailableTitle.text()) },
         text = { Text(availableBody(latest, current)) },
         confirmButton = {
-            Button(onClick = onUpdate) { Text(downloadLabel.text()) }
+            val haptic = rememberAppHaptics()
+            Button(onClick = { haptic.confirm(); onUpdate() }) { Text(downloadLabel.text()) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(laterLabel.text()) }
+            val haptic = rememberAppHaptics()
+            TextButton(onClick = { haptic.tap(); onDismiss() }) { Text(laterLabel.text()) }
         }
     )
 }
@@ -65,15 +67,17 @@ fun UpdateResultDialog(
         title = { Text(checkUpdatesTitle.text()) },
         text = { Text(message) },
         confirmButton = {
+            val haptic = rememberAppHaptics()
             if (result is UpdateChecker.Result.Available) {
-                Button(onClick = { onUpdate(result.url) }) { Text(downloadLabel.text()) }
+                Button(onClick = { haptic.confirm(); onUpdate(result.url) }) { Text(downloadLabel.text()) }
             } else {
-                TextButton(onClick = onDismiss) { Text(closeUpdateLabel.text()) }
+                TextButton(onClick = { haptic.tap(); onDismiss() }) { Text(closeUpdateLabel.text()) }
             }
         },
         dismissButton = {
+            val haptic = rememberAppHaptics()
             if (result is UpdateChecker.Result.Available) {
-                TextButton(onClick = onDismiss) { Text(closeUpdateLabel.text()) }
+                TextButton(onClick = { haptic.tap(); onDismiss() }) { Text(closeUpdateLabel.text()) }
             }
         }
     )

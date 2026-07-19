@@ -55,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -165,6 +166,9 @@ class MainActivity : ComponentActivity() {
             WiFiAudioStreamingTheme {
                 val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
+                CompositionLocalProvider(
+                    LocalHapticsEnabled provides (appSettings?.hapticsEnabled ?: true)
+                ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -245,7 +249,9 @@ class MainActivity : ComponentActivity() {
                                         title = { Text(getString(R.string.donation_title)) },
                                         text = { Text(getString(R.string.donation_body)) },
                                         confirmButton = {
+                                            val dHaptics = rememberAppHaptics()
                                             Button(onClick = {
+                                                dHaptics.confirm()
                                                 showDonation = false
                                                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi")))
                                                 lifecycleScope.launch {
@@ -257,9 +263,10 @@ class MainActivity : ComponentActivity() {
                                             }) { Text(getString(R.string.donation_support)) }
                                         },
                                         dismissButton = {
+                                            val dHaptics = rememberAppHaptics()
                                             Row {
-                                                TextButton(onClick = snooze30) { Text(getString(R.string.donation_dismiss_30)) }
-                                                TextButton(onClick = later) { Text(getString(R.string.donation_later)) }
+                                                TextButton(onClick = { dHaptics.tap(); snooze30() }) { Text(getString(R.string.donation_dismiss_30)) }
+                                                TextButton(onClick = { dHaptics.tap(); later() }) { Text(getString(R.string.donation_later)) }
                                             }
                                         }
                                     )
@@ -273,6 +280,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -478,7 +486,7 @@ class MainActivity : ComponentActivity() {
             showSettingsScreen.value = false
         }
 
-        WiFiAudioStreamingApp(
+        ExpressiveHomeScreen(
             appSettings = currentSettings,
             isServer = isServer,
             isStreaming = isStreaming,
@@ -572,6 +580,7 @@ class MainActivity : ComponentActivity() {
             onSaveAutoConnectList = viewModel::saveAutoConnectList,
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
+            onHapticsChange = viewModel::setHapticsEnabled,
             onOpenScripting = { showScriptingScreen.value = true },
             onAutoUpdateCheckChange = viewModel::setAutoUpdateCheckEnabled,
             onCheckForUpdates = viewModel::checkForUpdatesManual,
@@ -593,35 +602,10 @@ class MainActivity : ComponentActivity() {
         }
         val keyRequest by NetworkManager.pendingKeyRequest.collectAsStateWithLifecycle()
         keyRequest?.let { wrong ->
-            var keyText by remember { mutableStateOf("") }
-            AlertDialog(
-                onDismissRequest = { NetworkManager.submitKey(null) },
-                title = { Text(stringResource(R.string.key_dialog_title)) },
-                text = {
-                    Column {
-                        Text(
-                            if (wrong) stringResource(R.string.key_dialog_wrong)
-                            else stringResource(R.string.key_dialog_body)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = keyText,
-                            onValueChange = { keyText = it },
-                            singleLine = true,
-                            label = { Text(stringResource(R.string.settings_item_auth_key_title)) }
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { NetworkManager.submitKey(keyText) }) {
-                        Text(stringResource(R.string.key_dialog_connect))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { NetworkManager.submitKey(null) }) {
-                        Text(stringResource(R.string.key_dialog_cancel))
-                    }
-                }
+            ExpressiveKeyRequestDialog(
+                wrong = wrong,
+                onSubmit = { key -> NetworkManager.submitKey(key) },
+                onCancel = { NetworkManager.submitKey(null) }
             )
         }
 
@@ -631,20 +615,10 @@ class MainActivity : ComponentActivity() {
         }
         val authRequest by NetworkManager.pendingAuthRequest.collectAsStateWithLifecycle()
         authRequest?.let { peer ->
-            AlertDialog(
-                onDismissRequest = { NetworkManager.submitAuth(false) },
-                title = { Text(stringResource(R.string.auth_request_title)) },
-                text = { Text(stringResource(R.string.auth_request_body, peer)) },
-                confirmButton = {
-                    TextButton(onClick = { NetworkManager.submitAuth(true) }) {
-                        Text(stringResource(R.string.auth_allow))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { NetworkManager.submitAuth(false) }) {
-                        Text(stringResource(R.string.auth_deny))
-                    }
-                }
+            ExpressiveAuthRequestDialog(
+                peer = peer,
+                onAllow = { NetworkManager.submitAuth(true) },
+                onDeny = { NetworkManager.submitAuth(false) }
             )
         }
 
@@ -740,12 +714,14 @@ fun ProtocolMismatchDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onUpdate) {
+            val pHaptics = rememberAppHaptics()
+            TextButton(onClick = { pHaptics.confirm(); onUpdate() }) {
                 Text(stringResource(R.string.protocol_incompatible_update))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            val pHaptics = rememberAppHaptics()
+            TextButton(onClick = { pHaptics.tap(); onDismiss() }) {
                 Text(stringResource(R.string.close))
             }
         }
@@ -763,12 +739,14 @@ fun NotificationPermissionDialog(
         title = { Text(text = stringResource(R.string.notification_permission_title)) },
         text = { Text(text = stringResource(R.string.notification_permission_description)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            val nHaptics = rememberAppHaptics()
+            TextButton(onClick = { nHaptics.confirm(); onConfirm() }) {
                 Text(stringResource(R.string.grant_permission_button))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            val nHaptics = rememberAppHaptics()
+            TextButton(onClick = { nHaptics.tap(); onDismiss() }) {
                 Text(stringResource(R.string.later_button))
             }
         }

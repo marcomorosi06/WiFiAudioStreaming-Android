@@ -64,13 +64,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
@@ -81,6 +79,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -372,9 +371,9 @@ fun ExpressiveClientSettingsPanel(
 ) {
     ElevatedCard(
         modifier = modifier,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -414,20 +413,16 @@ fun SettingsClickableItem(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
+    val appHaptics = rememberAppHaptics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { appHaptics.tap(); onClick() }
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(20.dp))
+        SettingsRowIcon(icon)
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -464,6 +459,7 @@ fun ExpressiveSettingsScreen(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
+    onHapticsChange: (Boolean) -> Unit = {},
     onOpenScripting: () -> Unit = {},
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -501,6 +497,7 @@ fun ExpressiveSettingsScreen(
             onAutoConnectEnabledChange = onAutoConnectEnabledChange,
             onConnectionSoundChange = onConnectionSoundChange,
             onDisconnectionSoundChange = onDisconnectionSoundChange,
+            onHapticsChange = onHapticsChange,
             onOpenScripting = onOpenScripting,
             onAutoUpdateCheckChange = onAutoUpdateCheckChange,
             onCheckForUpdates = onCheckForUpdates,
@@ -532,12 +529,14 @@ fun SettingsScreenContent(
     onSaveAutoConnectList: (List<AutoConnectEntry>) -> Unit,
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
+    onHapticsChange: (Boolean) -> Unit = {},
     onOpenScripting: () -> Unit = {},
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     checkingForUpdate: Boolean = false,
 ) {
     val context = LocalContext.current
+    val settingsHaptics = rememberAppHaptics()
 
     var showLicensesDialog by remember { mutableStateOf(false) }
     val licensesText = remember {
@@ -560,7 +559,7 @@ fun SettingsScreenContent(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showLicensesDialog = false }) {
+                TextButton(onClick = { settingsHaptics.tap(); showLicensesDialog = false }) {
                     Text(stringResource(R.string.licenses_close))
                 }
             }
@@ -605,12 +604,15 @@ fun SettingsScreenContent(
                 title = {
                     Text(
                         text = stringResource(R.string.settings_title),
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-0.5).sp,
                         modifier = Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
                             fredClickCount++
+                            if (fredClickCount >= 7) settingsHaptics.confirm() else settingsHaptics.tick()
 
                             if (fredClickCount < 7) {
                                 val toastMessage = when (fredClickCount) {
@@ -636,23 +638,23 @@ fun SettingsScreenContent(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = { settingsHaptics.tap(); onClose() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back_button_description))
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
             item {
                 SettingsGroupCard(
@@ -932,6 +934,14 @@ fun SettingsScreenContent(
                         isChecked = appSettings.disconnectionSoundEnabled,
                         onCheckedChange = onDisconnectionSoundChange
                     )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_haptics_title),
+                        description = stringResource(R.string.settings_item_haptics_desc),
+                        icon = Icons.Outlined.Vibration,
+                        isChecked = appSettings.hapticsEnabled,
+                        onCheckedChange = onHapticsChange
+                    )
                 }
             }
 
@@ -1081,16 +1091,12 @@ fun SettingsTextFieldItem(
 ) {
     var text by remember(value) { mutableStateOf(value) }
     val focusManager = LocalFocusManager.current
+    val fieldHaptics = rememberAppHaptics()
 
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(20.dp))
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1115,6 +1121,7 @@ fun SettingsTextFieldItem(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             keyboardActions = KeyboardActions(onDone = {
+                fieldHaptics.confirm()
                 onValueChange(text)
                 focusManager.clearFocus()
             })
@@ -1131,18 +1138,12 @@ fun ExpressiveDeviceDiscoveryPanel(
     onToggleAutoConnectIp: (String) -> Unit,
     modifier: Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
-    val cardElevation by animateFloatAsState(
-        targetValue = if (devices.isNotEmpty()) 12f else 6f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "Discovery Panel Elevation"
-    )
-
+    val haptic = rememberAppHaptics()
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = cardElevation.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Row(
@@ -1157,7 +1158,7 @@ fun ExpressiveDeviceDiscoveryPanel(
                     Text(text = stringResource(R.string.nearby_devices_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
                 val refreshRotation by animateFloatAsState(targetValue = if (devices.isEmpty()) 360f else 0f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), label = "Refresh Button Rotation")
-                FilledTonalIconButton(onClick = { onRefresh(); haptic.performHapticFeedback(HapticFeedbackType.LongPress) }, modifier = Modifier.graphicsLayer { rotationZ = refreshRotation }) {
+                FilledTonalIconButton(onClick = { onRefresh(); haptic.confirm() }, modifier = Modifier.graphicsLayer { rotationZ = refreshRotation }) {
                     Icon(imageVector = Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh_button_description), modifier = Modifier.size(20.dp))
                 }
             }
@@ -1216,17 +1217,17 @@ fun ExpressiveDeviceCard(
     onConnect: () -> Unit,
     onToggleAutoConnect: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     ElevatedCard(
         onClick = {
             onConnect()
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptic.confirm()
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -1244,7 +1245,7 @@ fun ExpressiveDeviceCard(
                 }
                 Text(text = ipAddress, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = { onToggleAutoConnect(); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }) {
+            IconButton(onClick = { onToggleAutoConnect(); haptic.tick() }) {
                 Icon(
                     imageVector = if (isAutoConnectTarget) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     contentDescription = null,
@@ -1266,25 +1267,20 @@ fun SettingsSwitchItem(
     isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val appHaptics = rememberAppHaptics()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) // oppure LongPress / Confirm
+                appHaptics.toggle(!isChecked)
                 onCheckedChange(!isChecked)
             }
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(20.dp))
+        SettingsRowIcon(icon)
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -1301,7 +1297,7 @@ fun SettingsSwitchItem(
         Switch(
             checked = isChecked,
             onCheckedChange = {
-                haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                appHaptics.toggle(it)
                 onCheckedChange(it)
             },
             thumbContent = {
@@ -1336,10 +1332,11 @@ fun <T> SettingsSelectionItem(
     onOptionSelected: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val appHaptics = rememberAppHaptics()
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
+        onExpandedChange = { appHaptics.tap(); expanded = !expanded },
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
         Row(
@@ -1348,8 +1345,8 @@ fun <T> SettingsSelectionItem(
                 .menuAnchor(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(20.dp))
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1372,6 +1369,7 @@ fun <T> SettingsSelectionItem(
                 DropdownMenuItem(
                     text = { Text(label) },
                     onClick = {
+                        appHaptics.confirm()
                         onOptionSelected(value)
                         expanded = false
                     }
@@ -1393,20 +1391,15 @@ fun SettingsSliderItem(
     onValueChange: (Float) -> Unit
 ) {
     var sliderValue by remember(value) { mutableFloatStateOf(value) }
-    val haptic = LocalHapticFeedback.current
+    val appHaptics = rememberAppHaptics()
 
     // Ricordiamo l’ultimo intero attraversato per evitare vibrazioni continue
     var lastStep by remember { mutableIntStateOf(value.toInt()) }
 
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(20.dp))
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -1435,13 +1428,13 @@ fun SettingsSliderItem(
 
                 val currentStep = newValue.toInt()
                 if (currentStep != lastStep) {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    appHaptics.tick()
                     lastStep = currentStep
                 }
             },
             valueRange = range,
             steps = steps,
-            onValueChangeFinished = { onValueChange(sliderValue) },
+            onValueChangeFinished = { appHaptics.gestureEnd(); onValueChange(sliderValue) },
             modifier = Modifier.padding(top = 8.dp)
         )
     }
@@ -1738,7 +1731,7 @@ fun ExpressiveModeButton(
     modifier: Modifier = Modifier,
     shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes()
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1f else 0.95f,
@@ -1752,10 +1745,8 @@ fun ExpressiveModeButton(
     ToggleButton(
         checked = isSelected,
         onCheckedChange = {
+            haptic.toggle(true)
             onClick()
-            haptic.performHapticFeedback(
-                if (isSelected) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove
-            )
         },
         enabled = enabled,
         modifier = modifier
@@ -1831,10 +1822,10 @@ fun ExpressiveAudioSourceSelector(
 ) {
     ElevatedCard(
         modifier = modifier,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -2012,7 +2003,7 @@ fun ExpressiveStreamingModeToggle(
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     val title = if (checked) stringResource(R.string.multicast_mode_title) else stringResource(R.string.unicast_mode_title)
 
@@ -2091,7 +2082,7 @@ fun ExpressiveStreamingModeToggle(
             enabled = enabled,
             onCheckedChange = {
                 onCheckedChange(it)
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptic.confirm()
             },
             thumbContent = {
                 AnimatedContent(targetState = checked, label = "Switch Thumb Icon") { isChecked ->
@@ -2115,7 +2106,7 @@ fun ExpressiveAudioSourceToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     val rowScale by animateFloatAsState(
         targetValue = if (checked) 1.02f else 1f,
@@ -2178,9 +2169,7 @@ fun ExpressiveAudioSourceToggle(
             checked = checked,
             onCheckedChange = {
                 onCheckedChange(it)
-                haptic.performHapticFeedback(
-                    if (it) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove
-                )
+                haptic.toggle(it)
             },
             thumbContent = {
                 AnimatedContent(
@@ -2269,14 +2258,14 @@ fun ExpressiveStreamingControlCenter(
 
                     if (isServer && localIp.isNotEmpty() && localIp != "0.0.0.0") {
                         val clipboardManager = LocalClipboardManager.current
-                        val haptic = LocalHapticFeedback.current
+                        val haptic = rememberAppHaptics()
                         Spacer(modifier = Modifier.height(16.dp))
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                             modifier = Modifier.clickable {
                                 clipboardManager.setText(AnnotatedString(localIp))
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.confirm()
                             }
                         ) {
                             Row(
@@ -2406,7 +2395,7 @@ fun ExpressiveStreamingControlCenter(
 }
 @Composable
 fun ExpressiveStreamingActiveIndicator(onStopServer: () -> Unit) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2472,7 +2461,7 @@ fun ExpressiveStreamingActiveIndicator(onStopServer: () -> Unit) {
         FilledTonalButton(
             onClick = {
                 onStopServer()
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptic.confirm()
             },
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -2495,7 +2484,7 @@ fun ExpressiveServerControls(
     hasMicPermission: Boolean,
     onStartServer: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
     val isReady = streamInternal || streamMic
     var showMicPermissionExplanation by remember { mutableStateOf(false) }
 
@@ -2625,7 +2614,7 @@ fun ExpressiveServerControls(
         Button(
             onClick = {
                 onStartServer()
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptic.confirm()
             },
             enabled = isReady,
             modifier = Modifier.fillMaxWidth(),
@@ -2799,20 +2788,20 @@ fun ExpressiveDeviceCard(
     isMulticast: Boolean,
     onConnect: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     ElevatedCard(
         onClick = {
             onConnect()
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptic.confirm()
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -3008,7 +2997,7 @@ fun OnboardingScreen(onOnboardingFinished: () -> Unit) {
 @Composable
 fun WelcomePage() {
     val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
     val link = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop"
 
     var visible by remember { mutableStateOf(false) }
@@ -3077,7 +3066,7 @@ fun WelcomePage() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptic.tick()
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
                             context.startActivity(intent)
                         },
@@ -3228,7 +3217,7 @@ private fun OnboardingFeaturePage(
     subtitleRes: Int,
     features: List<FeatureItem>
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -3297,7 +3286,7 @@ private fun OnboardingFeaturePage(
                         item = item,
                         title = stringResource(item.titleRes),
                         description = stringResource(item.descRes),
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+                        onClick = { haptic.tick() }
                     )
                 }
             }
@@ -3372,7 +3361,7 @@ private fun OnboardingNavigation(
     onNextClick: () -> Unit,
     onSkipClick: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     Row(
         modifier = Modifier
@@ -3384,7 +3373,7 @@ private fun OnboardingNavigation(
     ) {
         TextButton(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.tick()
                 onSkipClick()
             },
             content = {
@@ -3423,7 +3412,7 @@ private fun OnboardingNavigation(
 
         Button(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.tick()
                 onNextClick()
             },
             shape = RoundedCornerShape(16.dp)
@@ -3479,7 +3468,7 @@ fun ExpressiveRtpSdpBanner(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
@@ -3529,18 +3518,13 @@ fun SettingsCodecSelectorItem(
     isSafariMode: Boolean,
     onCodecChange: (Boolean) -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberAppHaptics()
 
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
         // Intestazione (Sopra)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(20.dp))
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3562,7 +3546,7 @@ fun SettingsCodecSelectorItem(
                 text = stringResource(R.string.codec_opus),
                 selected = !isSafariMode,
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.tick()
                     onCodecChange(false)
                 },
                 modifier = Modifier.weight(1f)
@@ -3572,7 +3556,7 @@ fun SettingsCodecSelectorItem(
                 text = stringResource(R.string.codec_aac),
                 selected = isSafariMode,
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.tick()
                     onCodecChange(true)
                 },
                 modifier = Modifier.weight(1f)
@@ -3588,6 +3572,7 @@ fun AutoConnectPriorityListManager(
 ) {
     var localList by remember(autoConnectListString) { mutableStateOf(AutoConnectEntry.parseList(autoConnectListString)) }
     val context = LocalContext.current
+    val acHaptics = rememberAppHaptics()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
@@ -3622,6 +3607,7 @@ fun AutoConnectPriorityListManager(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
+                                acHaptics.confirm()
                                 onListChange(localList)
                                 focusManager.clearFocus()
                             }),
@@ -3646,6 +3632,7 @@ fun AutoConnectPriorityListManager(
                             trailingIcon = {
                                 IconButton(
                                     onClick = {
+                                        acHaptics.tap()
                                         Toast.makeText(context, context.getString(R.string.auto_connect_wifi_hint), Toast.LENGTH_SHORT).show()
                                         val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
                                         context.startActivity(intent)
@@ -3664,6 +3651,7 @@ fun AutoConnectPriorityListManager(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(start = 8.dp)) {
                         IconButton(
                             onClick = {
+                                acHaptics.tick()
                                 if (index > 0) {
                                     val newList = localList.toMutableList()
                                     val temp = newList[index]
@@ -3679,6 +3667,7 @@ fun AutoConnectPriorityListManager(
                         }
                         IconButton(
                             onClick = {
+                                acHaptics.tick()
                                 if (index < localList.size - 1) {
                                     val newList = localList.toMutableList()
                                     val temp = newList[index]
@@ -3694,6 +3683,7 @@ fun AutoConnectPriorityListManager(
                         }
                         IconButton(
                             onClick = {
+                                acHaptics.reject()
                                 val newList = localList.toMutableList()
                                 newList.removeAt(index)
                                 localList = newList
@@ -3709,6 +3699,7 @@ fun AutoConnectPriorityListManager(
 
         TextButton(
             onClick = {
+                acHaptics.confirm()
                 val newList = localList.toMutableList()
                 newList.add(AutoConnectEntry("", ""))
                 localList = newList
@@ -3771,40 +3762,54 @@ private fun CodecAnimatedButton(
     }
 }
 @Composable
+fun SettingsRowIcon(
+    icon: ImageVector,
+    tint: Color = MaterialTheme.colorScheme.primary
+) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = tint
+        )
+    }
+}
+
+@Composable
 fun SettingsGroupCard(
     title: String,
     icon: ImageVector,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Column(modifier = Modifier.padding(vertical = 16.dp)) {
-            Row(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(
+            label = title,
+            accent = MaterialTheme.colorScheme.primary,
+            trailing = {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(16.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                 )
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = content
-            )
-        }
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            content = content
+        )
     }
 }
 
@@ -3819,7 +3824,7 @@ fun ExpressiveHttpBanner(ip: String, port: Int) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
@@ -4290,13 +4295,14 @@ private fun ScriptTriStateRow(
     options: List<Pair<String, String?>>,
     onValueChange: (String?) -> Unit
 ) {
+    val paramHaptics = rememberAppHaptics()
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (optLabel, optValue) ->
                 FilterChip(
                     selected = value == optValue,
-                    onClick = { onValueChange(optValue) },
+                    onClick = { paramHaptics.tap(); onValueChange(optValue) },
                     label = { Text(optLabel) }
                 )
             }
@@ -4336,12 +4342,13 @@ private fun ScriptLibraryItem(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                FilledTonalIconButton(onClick = onRun) { Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.scripting_run)) }
-                IconButton(onClick = onCopy) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.scripting_copy_uri)) }
-                IconButton(onClick = onShare) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.scripting_share)) }
-                IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.scripting_edit)) }
+                val haptic = rememberAppHaptics()
+                FilledTonalIconButton(onClick = { haptic.confirm(); onRun() }) { Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.scripting_run)) }
+                IconButton(onClick = { haptic.tap(); onCopy() }) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.scripting_copy_uri)) }
+                IconButton(onClick = { haptic.tap(); onShare() }) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.scripting_share)) }
+                IconButton(onClick = { haptic.tap(); onEdit() }) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.scripting_edit)) }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.scripting_delete), tint = MaterialTheme.colorScheme.error) }
+                IconButton(onClick = { haptic.reject(); onDelete() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.scripting_delete), tint = MaterialTheme.colorScheme.error) }
             }
         }
     }
