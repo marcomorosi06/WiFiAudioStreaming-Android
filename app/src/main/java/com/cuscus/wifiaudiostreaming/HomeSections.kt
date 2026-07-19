@@ -6,7 +6,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -39,6 +43,7 @@ import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
@@ -116,6 +121,135 @@ internal fun randomBadgeShape(exclude: RoundedPolygon? = null): RoundedPolygon {
 internal fun randomExpressiveShape(exclude: RoundedPolygon? = null): RoundedPolygon {
     val candidates = heroShapePool.filter { it !== exclude }
     return candidates[Random.nextInt(candidates.size)]
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveHeroBadge(
+    size: androidx.compose.ui.unit.Dp,
+    accent: Color,
+    containerAlpha: Float = 0.16f,
+    content: @Composable () -> Unit
+) {
+    val infinite = rememberInfiniteTransition(label = "HeroBadge")
+    val spin by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing)),
+        label = "HeroBadgeSpin"
+    )
+
+    val shape = remember { randomBadgeShape() }
+    val morph = remember(shape) { Morph(MaterialShapes.Circle, shape) }
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { rotationZ = spin }
+            .clip(MorphOutlineShape(morph, progress.value))
+            .background(accent.copy(alpha = containerAlpha)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.graphicsLayer { rotationZ = -spin },
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveOnboardingOrb(
+    size: androidx.compose.ui.unit.Dp,
+    accent: Color,
+    shapeSeed: Int,
+    swipeOffset: Float,
+    content: @Composable () -> Unit
+) {
+    val infinite = rememberInfiniteTransition(label = "OnboardOrb")
+    val spin by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(24000, easing = LinearEasing)),
+        label = "OnboardOrbSpin"
+    )
+    val breathe by infinite.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            tween(2600, easing = FastOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "OnboardOrbBreathe"
+    )
+
+    val shape = remember(shapeSeed) {
+        badgeShapePool[(shapeSeed * 7 + 3) % badgeShapePool.size]
+    }
+    val morph = remember(shape) { Morph(MaterialShapes.Circle, shape) }
+    val progress = remember(shapeSeed) { Animatable(0f) }
+
+    LaunchedEffect(shapeSeed) {
+        progress.snapTo(0f)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .graphicsLayer {
+                    val halo = 1.22f + (breathe - 1f) * 2f
+                    scaleX = halo
+                    scaleY = halo
+                    alpha = 0.10f
+                    rotationZ = -spin * 0.7f
+                    translationX = swipeOffset * 90f
+                }
+                .clip(MorphOutlineShape(morph, progress.value))
+                .background(accent)
+        )
+        Box(
+            modifier = Modifier
+                .size(size)
+                .graphicsLayer {
+                    rotationZ = spin + swipeOffset * 40f
+                    scaleX = breathe
+                    scaleY = breathe
+                    translationX = swipeOffset * 160f
+                    alpha = 1f - kotlin.math.abs(swipeOffset).coerceAtMost(1f) * 0.6f
+                }
+                .clip(MorphOutlineShape(morph, progress.value))
+                .background(accent.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier.graphicsLayer { rotationZ = -(spin + swipeOffset * 40f) },
+                contentAlignment = Alignment.Center
+            ) {
+                content()
+            }
+        }
+    }
 }
 
 @Composable
@@ -437,6 +571,7 @@ fun ExpressiveSourceSection(
     streamMic: Boolean,
     isMulticast: Boolean,
     rtpEnabled: Boolean,
+    httpEnabled: Boolean,
     securityMode: String,
     authKey: String,
     encryptionEnabled: Boolean,
@@ -449,7 +584,10 @@ fun ExpressiveSourceSection(
 ) {
     val haptics = rememberAppHaptics()
     val secMode = securityMode.uppercase()
-    val multicastActive = isMulticast || rtpEnabled
+    // RTP e HTTP trasmettono entrambi a tutti gli ascoltatori: con uno dei due
+    // attivo il multicast e' imposto e il toggle va bloccato.
+    val multicastLocked = rtpEnabled || httpEnabled
+    val multicastActive = isMulticast || multicastLocked
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(stringResource(R.string.source_selector_title), accent)
@@ -484,15 +622,76 @@ fun ExpressiveSourceSection(
                 if (multicastActive) R.string.multicast_mode_title else R.string.unicast_mode_title
             ),
             subtitle = when {
-                rtpEnabled -> stringResource(R.string.rtp_forces_multicast)
+                multicastLocked -> stringResource(R.string.multicast_mode_desc)
                 multicastActive -> stringResource(R.string.multicast_mode_desc)
                 else -> stringResource(R.string.unicast_mode_desc)
             },
             checked = multicastActive,
-            enabled = !rtpEnabled,
+            enabled = !multicastLocked,
             accent = accent,
             onCheckedChange = onMulticastChange
         )
+
+        AnimatedVisibility(
+            visible = multicastLocked,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(accent.copy(alpha = 0.14f))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = accent
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.multicast_locked_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Black,
+                                color = accent
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = accent.copy(alpha = 0.6f)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(
+                                    when {
+                                        rtpEnabled && httpEnabled -> R.string.multicast_locked_by_both
+                                        rtpEnabled -> R.string.multicast_locked_by_rtp
+                                        else -> R.string.multicast_locked_by_http
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = accent.copy(alpha = 0.85f)
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.multicast_locked_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(Modifier.height(28.dp))
         SectionHeader(stringResource(R.string.settings_group_security), accent)

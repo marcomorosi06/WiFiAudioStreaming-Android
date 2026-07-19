@@ -79,7 +79,7 @@
     <string name="donation_body">Quest\'app è gratuita e senza pubblicità, fatta da una persona sola nel tempo libero. Se ti è utile, un piccolo contributo su Ko-fi aiuta a tenerla viva. Nessun obbligo: continui a usare tutto comunque.</string>
     <string name="donation_support">Supporta su Ko-fi ☕</string>
     <string name="donation_later">Forse più tardi</string>
-    <string name="donation_dismiss_30">Non mostrare per 30 giorni</string>
+    <string name="donation_dismiss_30">Non mostrare\nper 30 giorni</string>
     <string name="client_options_title">Opzioni Client</string>
     <string name="send_mic_to_server_title">Condividi microfono</string>
     <string name="send_mic_to_server_subtitle">Parla attraverso il desktop (Discord, Zoom, giochi...)</string>
@@ -317,4 +317,25 @@
     <string name="playback_keep_open_hint">Per la massima qualità, tieni l\'app aperta sullo schermo e il telefono sbloccato. Uscire dall\'app o bloccare il dispositivo può causare artefatti audio.</string>
     <string name="settings_item_haptics_title">Feedback aptico</string>
     <string name="settings_item_haptics_desc">Vibrazione su tocchi, interruttori e azioni principali</string>
+    <string name="settings_item_show_donation_title">Mostra il messaggio di supporto</string>
+    <string name="settings_item_show_donation_desc">Riporta il messaggio Ko-fi che hai chiuso</string>
+    <string name="source_code_protocol">Protocollo WFAS v2</string>
+    <string name="source_code_protocol_desc">Implementazione di riferimento in C99 su GitHub</string>
+    <string name="welcome_eyebrow">Audio in streaming via WiFi</string>
+    <string name="welcome_headline">Il tuo telefono,\nil tuo altoparlante.</string>
+    <string name="welcome_body">Manda l\'audio dal PC a questo dispositivo, o viceversa. Bassa latenza, sulla tua rete, niente cloud.</string>
+    <string name="welcome_step_desktop_title">Scarica l\'app desktop</string>
+    <string name="welcome_step_desktop_desc">Serve sul computer che vuoi collegare</string>
+    <string name="welcome_privacy_title">Controllo automatico aggiornamenti</string>
+    <string name="welcome_privacy_desc">A ogni avvio l\'app chiede a GitHub se esiste una versione più recente.</string>
+    <string name="welcome_privacy_detail">GitHub è un\'azienda statunitense di proprietà di Microsoft. Ogni richiesta rivela necessariamente il tuo indirizzo IP, insieme all\'orario della richiesta. Non viene inviato altro: nessun account, nessun identificativo, nessun dato d\'uso. Se lo disattivi, l\'app non contatta mai la rete da sola — puoi comunque controllare a mano dalle impostazioni quando vuoi.</string>
+    <string name="welcome_privacy_on">Attivo · controlla a ogni avvio</string>
+    <string name="welcome_privacy_off">Disattivo · l\'app non contatta mai GitHub</string>
+    <string name="more_details">Più dettagli</string>
+    <string name="less_details">Meno dettagli</string>
+    <string name="multicast_locked_title">Multicast bloccato</string>
+    <string name="multicast_locked_by_rtp">Lo richiede RTP</string>
+    <string name="multicast_locked_by_http">Lo richiede HTTP</string>
+    <string name="multicast_locked_by_both">Lo richiedono RTP e HTTP</string>
+    <string name="multicast_locked_hint">Trasmettono entrambi a tutti gli ascoltatori insieme, quindi la modalità a client singolo non è possibile. Disattiva RTP e HTTP nelle impostazioni per sbloccarla.</string>
 </resources>

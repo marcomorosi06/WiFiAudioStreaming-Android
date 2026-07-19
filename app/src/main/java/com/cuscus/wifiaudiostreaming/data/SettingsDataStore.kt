@@ -254,6 +254,21 @@ class SettingsDataStore(context: Context) {
         val key = androidx.datastore.preferences.core.intPreferencesKey("donation_dismiss_count")
         dataStore.edit { p -> p[key] = n }
     }
+    suspend fun donationSupported(): Boolean {
+        val key = booleanPreferencesKey("donation_supported")
+        return dataStore.data.first()[key] ?: false
+    }
+    suspend fun setDonationSupported(b: Boolean) {
+        val key = booleanPreferencesKey("donation_supported")
+        dataStore.edit { p -> p[key] = b }
+    }
+    suspend fun resetDonationPrompt() {
+        setDonationSupported(false)
+        setDonationQualified(true)
+        setDonationDismissCount(0)
+        setDonationSnoozeUntil(0L)
+    }
+
     fun donationBackoffDays(count: Int): Long = when {
         count <= 1 -> 2L
         count == 2 -> 5L

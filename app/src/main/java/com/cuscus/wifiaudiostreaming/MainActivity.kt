@@ -26,6 +26,12 @@ import android.net.Uri
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.view.View
+import android.view.animation.AccelerateInterpolator
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -43,6 +49,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -90,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
     private var pendingServerParams: ResolvedServerParams? = null
     private val pendingCommand = mutableStateOf<ScriptCommand?>(null)
+    private val forceDonation = mutableStateOf(false)
 
     @RequiresApi(Build.VERSION_CODES.O)
     private val mediaProjectionLauncher =
@@ -153,7 +162,37 @@ class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        installSplashScreen().setOnExitAnimationListener { provider ->
+            val finish = { runCatching { provider.remove() }.let { } }
+            val root = runCatching { provider.view }.getOrNull()
+            // iconView è annotato non-null ma può essere assente: il getter stesso lancia NPE
+            val icon = runCatching { provider.iconView }.getOrNull()
+
+            if (root == null) {
+                finish()
+            } else {
+                val animators = buildList<Animator> {
+                    icon?.let {
+                        add(ObjectAnimator.ofFloat(it, View.SCALE_X, it.scaleX, 1.45f))
+                        add(ObjectAnimator.ofFloat(it, View.SCALE_Y, it.scaleY, 1.45f))
+                        add(ObjectAnimator.ofFloat(it, View.ALPHA, 1f, 0f))
+                    }
+                    add(ObjectAnimator.ofFloat(root, View.ALPHA, 1f, 0f))
+                }
+                runCatching {
+                    AnimatorSet().apply {
+                        playTogether(animators)
+                        duration = 240
+                        interpolator = AccelerateInterpolator(1.6f)
+                        addListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) = finish()
+                            override fun onAnimationCancel(animation: Animator) = finish()
+                        })
+                        start()
+                    }
+                }.onFailure { finish() }
+            }
+        }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         actionBar?.hide()
@@ -220,53 +259,47 @@ class MainActivity : ComponentActivity() {
                                 var showDonation by remember { mutableStateOf(false) }
                                 LaunchedEffect(Unit) {
                                     val store = SettingsDataStore(applicationContext)
-                                    if (store.isDonationQualified() && System.currentTimeMillis() >= store.donationSnoozeUntil()) {
+                                    if (!store.donationSupported() &&
+                                        store.isDonationQualified() &&
+                                        System.currentTimeMillis() >= store.donationSnoozeUntil()
+                                    ) {
                                         showDonation = true
                                     }
                                 }
-                                if (showDonation) {
-                                    val later: () -> Unit = {
+                                if (showDonation || forceDonation.value) {
+                                    val close: () -> Unit = {
                                         showDonation = false
-                                        lifecycleScope.launch {
-                                            val s = SettingsDataStore(applicationContext)
-                                            val c = s.donationDismissCount() + 1
-                                            s.setDonationDismissCount(c)
-                                            s.setDonationQualified(false)
-                                            s.setDonationSnoozeUntil(System.currentTimeMillis() + s.donationBackoffDays(c) * 24 * 60 * 60 * 1000)
-                                        }
+                                        forceDonation.value = false
                                     }
-                                    val snooze30: () -> Unit = {
-                                        showDonation = false
-                                        lifecycleScope.launch {
-                                            val s = SettingsDataStore(applicationContext)
-                                            s.setDonationDismissCount(4)
-                                            s.setDonationQualified(false)
-                                            s.setDonationSnoozeUntil(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000)
-                                        }
-                                    }
-                                    AlertDialog(
-                                        onDismissRequest = later,
-                                        title = { Text(getString(R.string.donation_title)) },
-                                        text = { Text(getString(R.string.donation_body)) },
-                                        confirmButton = {
-                                            val dHaptics = rememberAppHaptics()
-                                            Button(onClick = {
-                                                dHaptics.confirm()
-                                                showDonation = false
-                                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi")))
-                                                lifecycleScope.launch {
-                                                    val s = SettingsDataStore(applicationContext)
-                                                    s.setDonationDismissCount(0)
-                                                    s.setDonationQualified(false)
-                                                    s.setDonationSnoozeUntil(System.currentTimeMillis() + 14L * 24 * 60 * 60 * 1000)
-                                                }
-                                            }) { Text(getString(R.string.donation_support)) }
+                                    ExpressiveDonationDialog(
+                                        onSupport = {
+                                            close()
+                                            startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/marcomorosi"))
+                                            )
+                                            lifecycleScope.launch {
+                                                SettingsDataStore(applicationContext).setDonationSupported(true)
+                                            }
                                         },
-                                        dismissButton = {
-                                            val dHaptics = rememberAppHaptics()
-                                            Row {
-                                                TextButton(onClick = { dHaptics.tap(); snooze30() }) { Text(getString(R.string.donation_dismiss_30)) }
-                                                TextButton(onClick = { dHaptics.tap(); later() }) { Text(getString(R.string.donation_later)) }
+                                        onSnooze30 = {
+                                            close()
+                                            lifecycleScope.launch {
+                                                val s = SettingsDataStore(applicationContext)
+                                                s.setDonationDismissCount(4)
+                                                s.setDonationQualified(false)
+                                                s.setDonationSnoozeUntil(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000)
+                                            }
+                                        },
+                                        onLater = {
+                                            close()
+                                            lifecycleScope.launch {
+                                                val s = SettingsDataStore(applicationContext)
+                                                val c = s.donationDismissCount() + 1
+                                                s.setDonationDismissCount(c)
+                                                s.setDonationQualified(false)
+                                                s.setDonationSnoozeUntil(
+                                                    System.currentTimeMillis() + s.donationBackoffDays(c) * 24 * 60 * 60 * 1000
+                                                )
                                             }
                                         }
                                     )
@@ -275,7 +308,9 @@ class MainActivity : ComponentActivity() {
                                 OnboardingScreen(
                                     onOnboardingFinished = {
                                         viewModel.setOnboardingCompleted()
-                                    }
+                                    },
+                                    autoUpdateEnabled = appSettings?.autoUpdateCheckEnabled ?: true,
+                                    onAutoUpdateChange = viewModel::setAutoUpdateCheckEnabled
                                 )
                             }
                         }
@@ -403,11 +438,20 @@ class MainActivity : ComponentActivity() {
             UpdateAvailableDialog(
                 current = info.current,
                 latest = info.latest,
-                onUpdate = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.url))) }
+                onOpenUrl = { url ->
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
                     viewModel.dismissUpdateBanner()
                 },
                 onDismiss = { viewModel.dismissUpdateBanner() }
+            )
+        }
+
+        val versionAhead by viewModel.versionAhead.collectAsStateWithLifecycle()
+        versionAhead?.let { ahead ->
+            VersionAheadDialog(
+                current = ahead.current,
+                latest = ahead.latest,
+                onDismiss = { viewModel.dismissVersionAhead() }
             )
         }
 
@@ -581,6 +625,13 @@ class MainActivity : ComponentActivity() {
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
             onHapticsChange = viewModel::setHapticsEnabled,
+            onShowDonation = {
+                showSettingsScreen.value = false
+                lifecycleScope.launch {
+                    SettingsDataStore(applicationContext).resetDonationPrompt()
+                    forceDonation.value = true
+                }
+            },
             onOpenScripting = { showScriptingScreen.value = true },
             onAutoUpdateCheckChange = viewModel::setAutoUpdateCheckEnabled,
             onCheckForUpdates = viewModel::checkForUpdatesManual,
@@ -700,31 +751,21 @@ fun ProtocolMismatchDialog(
     onUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
-        title = { Text(text = stringResource(R.string.protocol_incompatible_title)) },
-        text = {
-            Text(
-                text = stringResource(
-                    R.string.protocol_incompatible_body,
-                    mismatch.localVersion,
-                    mismatch.remoteVersion
-                )
-            )
-        },
-        confirmButton = {
-            val pHaptics = rememberAppHaptics()
-            TextButton(onClick = { pHaptics.confirm(); onUpdate() }) {
-                Text(stringResource(R.string.protocol_incompatible_update))
-            }
-        },
-        dismissButton = {
-            val pHaptics = rememberAppHaptics()
-            TextButton(onClick = { pHaptics.tap(); onDismiss() }) {
-                Text(stringResource(R.string.close))
-            }
-        }
+    ExpressiveVersionDialog(
+        icon = Icons.Outlined.SyncProblem,
+        accent = MaterialTheme.colorScheme.error,
+        title = stringResource(R.string.protocol_incompatible_title),
+        body = stringResource(
+            R.string.protocol_incompatible_body,
+            mismatch.localVersion,
+            mismatch.remoteVersion
+        ),
+        fromVersion = "v${mismatch.localVersion}",
+        toVersion = "v${mismatch.remoteVersion}",
+        confirmLabel = stringResource(R.string.protocol_incompatible_update),
+        dismissLabel = stringResource(R.string.close),
+        onConfirm = onUpdate,
+        onDismiss = onDismiss
     )
 }
 
@@ -733,22 +774,16 @@ fun NotificationPermissionDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-        title = { Text(text = stringResource(R.string.notification_permission_title)) },
-        text = { Text(text = stringResource(R.string.notification_permission_description)) },
-        confirmButton = {
-            val nHaptics = rememberAppHaptics()
-            TextButton(onClick = { nHaptics.confirm(); onConfirm() }) {
-                Text(stringResource(R.string.grant_permission_button))
-            }
-        },
-        dismissButton = {
-            val nHaptics = rememberAppHaptics()
-            TextButton(onClick = { nHaptics.tap(); onDismiss() }) {
-                Text(stringResource(R.string.later_button))
-            }
-        }
+    ExpressiveVersionDialog(
+        icon = Icons.Outlined.NotificationsActive,
+        accent = MaterialTheme.colorScheme.tertiary,
+        title = stringResource(R.string.notification_permission_title),
+        body = stringResource(R.string.notification_permission_description),
+        fromVersion = null,
+        toVersion = null,
+        confirmLabel = stringResource(R.string.grant_permission_button),
+        dismissLabel = stringResource(R.string.later_button),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
     )
 }

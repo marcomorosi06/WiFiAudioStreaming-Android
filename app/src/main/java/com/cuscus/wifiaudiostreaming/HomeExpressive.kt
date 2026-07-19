@@ -105,8 +105,11 @@ import androidx.compose.material3.MaterialShapes
 import androidx.graphics.shapes.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -280,6 +283,7 @@ fun ExpressiveHomeScreen(
                     streamMic = appSettings.streamMic,
                     isMulticast = isMulticastMode,
                     rtpEnabled = appSettings.rtpEnabled,
+                    httpEnabled = appSettings.httpEnabled,
                     securityMode = appSettings.securityMode,
                     authKey = appSettings.authKey,
                     encryptionEnabled = appSettings.encryptionEnabled,
@@ -497,6 +501,48 @@ private fun StateHero(
         }
     }
 
+    var boost by remember { mutableStateOf(0f) }
+    var extraSpin by remember { mutableStateOf(0f) }
+    var spinJob by remember { mutableStateOf<Job?>(null) }
+
+    suspend fun runSpinBoost() {
+        var last = withFrameNanos { it }
+        var held = 0f
+        var untilNextPulse = 0f
+        while (true) {
+            val now = withFrameNanos { it }
+            val dt = ((now - last) / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
+            last = now
+
+            held += dt
+            boost = (held / 5f).coerceAtMost(1f)
+            extraSpin += dt * boost * boost * 2200f
+
+            untilNextPulse -= dt
+            if (untilNextPulse <= 0f) {
+                when {
+                    boost > 0.85f -> haptics.longPress()
+                    boost > 0.60f -> haptics.confirm()
+                    boost > 0.30f -> haptics.tap()
+                    else -> haptics.tick()
+                }
+                untilNextPulse = 0.26f - 0.215f * boost
+            }
+        }
+    }
+
+    suspend fun decaySpinBoost() {
+        var last = withFrameNanos { it }
+        while (boost > 0.002f) {
+            val now = withFrameNanos { it }
+            val dt = ((now - last) / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
+            last = now
+            boost = (boost - dt * 0.7f).coerceAtLeast(0f)
+            extraSpin += dt * boost * boost * 2200f
+        }
+        boost = 0f
+    }
+
     val infinite = rememberInfiniteTransition(label = "HeroInfinite")
     val spin by infinite.animateFloat(
         initialValue = 0f,
@@ -535,11 +581,11 @@ private fun StateHero(
                     modifier = Modifier
                         .size(orbSize)
                         .graphicsLayer {
-                            val halo = 1.18f + (breathe - 1f) * 2.2f
+                            val halo = 1.18f + (breathe - 1f) * 2.2f + boost * 0.22f
                             scaleX = halo
                             scaleY = halo
-                            alpha = 0.16f
-                            rotationZ = -spin * 0.6f
+                            alpha = 0.16f + boost * 0.34f
+                            rotationZ = -(spin + extraSpin) * 0.6f
                         }
                         .clip(MorphOutlineShape(morph, morphProgress))
                         .background(accent)
@@ -550,8 +596,8 @@ private fun StateHero(
                 modifier = Modifier
                     .size(orbSize)
                     .graphicsLayer {
-                        rotationZ = (if (live) spin else 0f) + tapSpin.value
-                        val s = (if (live) breathe else 1f) * tapScale.value
+                        rotationZ = (if (live) spin else 0f) + tapSpin.value + extraSpin
+                        val s = (if (live) breathe else 1f) * tapScale.value * (1f + boost * 0.08f)
                         scaleX = s
                         scaleY = s
                     }
@@ -564,14 +610,22 @@ private fun StateHero(
                             )
                         )
                     )
-                    .then(
-                        if (live) Modifier
-                        else Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onOrbTap
+                    .pointerInput(live) {
+                        detectTapGestures(
+                            onPress = {
+                                if (live) {
+                                    spinJob?.cancel()
+                                    spinJob = scope.launch { runSpinBoost() }
+                                    tryAwaitRelease()
+                                    spinJob?.cancel()
+                                    spinJob = scope.launch { decaySpinBoost() }
+                                } else {
+                                    tryAwaitRelease()
+                                }
+                            },
+                            onTap = { if (!live) onOrbTap() }
                         )
-                    )
+                    }
             )
 
             AnimatedContent(

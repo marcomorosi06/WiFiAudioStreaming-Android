@@ -92,7 +92,7 @@
     <string name="donation_body">This app is free and ad-free, made by one person in their spare time. If it\'s useful to you, a small tip on Ko-fi helps keep it alive. No pressure, everything keeps working either way.</string>
     <string name="donation_support">Support on Ko-fi ☕</string>
     <string name="donation_later">Maybe later</string>
-    <string name="donation_dismiss_30">Don\'t show for 30 days</string>
+    <string name="donation_dismiss_30">Don\'t show\nfor 30 days</string>
 
     <string name="status_idle">Idle</string>
     <string name="status_mic_permission_denied">Error: Microphone permission denied.</string>
@@ -317,4 +317,25 @@
     <string name="playback_keep_open_hint">For the best quality, keep this app open on screen and the phone unlocked. Leaving the app or locking the device may cause audio artifacts.</string>
     <string name="settings_item_haptics_title">Haptic feedback</string>
     <string name="settings_item_haptics_desc">Vibrate on taps, toggles and key actions</string>
+    <string name="settings_item_show_donation_title">Show support message</string>
+    <string name="settings_item_show_donation_desc">Bring back the Ko-fi message you dismissed</string>
+    <string name="source_code_protocol">WFAS v2 Protocol</string>
+    <string name="source_code_protocol_desc">Reference C99 implementation on GitHub</string>
+    <string name="welcome_eyebrow">Audio streaming over WiFi</string>
+    <string name="welcome_headline">Your phone,\nyour speaker.</string>
+    <string name="welcome_body">Send audio from your PC to this device, or the other way round. Low latency, over your own network, nothing in the cloud.</string>
+    <string name="welcome_step_desktop_title">Get the desktop app</string>
+    <string name="welcome_step_desktop_desc">Needed on the computer you want to pair with</string>
+    <string name="welcome_privacy_title">Automatic update check</string>
+    <string name="welcome_privacy_desc">On every launch the app asks GitHub whether a newer version exists.</string>
+    <string name="welcome_privacy_detail">GitHub is a US company owned by Microsoft. Every request necessarily reveals your IP address to them, along with the time of the request. Nothing else is sent: no account, no identifier, no usage data. Turn this off and the app never contacts the network on its own — you can still check manually from Settings at any time.</string>
+    <string name="welcome_privacy_on">On · checks at every launch</string>
+    <string name="welcome_privacy_off">Off · the app never contacts GitHub</string>
+    <string name="more_details">More details</string>
+    <string name="less_details">Fewer details</string>
+    <string name="multicast_locked_title">Multicast locked</string>
+    <string name="multicast_locked_by_rtp">RTP requires it</string>
+    <string name="multicast_locked_by_http">HTTP requires it</string>
+    <string name="multicast_locked_by_both">RTP and HTTP require it</string>
+    <string name="multicast_locked_hint">Both stream to every listener at once, so single-client mode is not possible. Turn RTP and HTTP off in Settings to unlock this.</string>
 </resources>

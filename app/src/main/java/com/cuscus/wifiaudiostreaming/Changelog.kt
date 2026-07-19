@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -50,6 +52,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.ui.unit.dp
 
 data class Bilingual(val en: String, val it: String) {
@@ -155,6 +171,7 @@ object Changelog {
 private val whatsNewTitle = Bilingual("What's new", "Novità")
 private val versionHistoryTitle = Bilingual("Version history", "Cronologia versioni")
 private val continueLabel = Bilingual("Continue", "Continua")
+private val currentLabel = Bilingual("current", "attuale")
 private val closeLabel = Bilingual("Close", "Chiudi")
 
 @Composable
@@ -177,13 +194,24 @@ fun WhatsNewPage(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = whatsNewTitle.text(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        text = whatsNewTitle.text().uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "v${shown.version}",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-2).sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "v${shown.version} · ${shown.date.text()}",
+                        text = shown.date.text(),
                         style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -201,14 +229,18 @@ fun WhatsNewPage(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 Text(
                     text = shown.headline.text(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                shown.items.forEachIndexed { i, item -> ChangelogItemCard(item, accentForIndex(i)) }
+                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                shown.items.forEachIndexed { i, item ->
+                    ChangelogItemCard(item, accentForIndex(i), isLast = i == shown.items.lastIndex)
+                }
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
@@ -216,13 +248,18 @@ fun WhatsNewPage(
                 val continueHaptics = rememberAppHaptics()
                 Button(
                     onClick = { continueHaptics.confirm(); onContinue() },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(28.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .height(58.dp)
                 ) {
-                    Text(continueLabel.text())
+                    Text(
+                        text = continueLabel.text(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -260,111 +297,260 @@ private fun accentForIndex(i: Int): ChangelogAccent = when (i % 3) {
 }
 
 @Composable
-private fun ChangelogItemCard(item: ChangelogItem, accent: ChangelogAccent) {
+private fun ChangelogItemCard(
+    item: ChangelogItem,
+    accent: ChangelogAccent,
+    isLast: Boolean = false
+) {
     val cs = MaterialTheme.colorScheme
-    val (container, onContainer, badge, onBadge) = when (accent) {
-        ChangelogAccent.PRIMARY -> listOf(cs.primaryContainer, cs.onPrimaryContainer, cs.primary, cs.onPrimary)
-        ChangelogAccent.SECONDARY -> listOf(cs.secondaryContainer, cs.onSecondaryContainer, cs.secondary, cs.onSecondary)
-        ChangelogAccent.TERTIARY -> listOf(cs.tertiaryContainer, cs.onTertiaryContainer, cs.tertiary, cs.onTertiary)
+    val badge = when (accent) {
+        ChangelogAccent.PRIMARY -> cs.primary
+        ChangelogAccent.SECONDARY -> cs.secondary
+        ChangelogAccent.TERTIARY -> cs.tertiary
     }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = container
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+
+    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+
+        // binario della timeline
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(56.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(badge),
-                contentAlignment = Alignment.Center
-            ) {
+            ExpressiveHeroBadge(size = 48.dp, accent = badge, containerAlpha = 0.20f) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
-                    tint = onBadge,
-                    modifier = Modifier.size(28.dp)
+                    tint = badge,
+                    modifier = Modifier.size(24.dp)
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = item.title.text(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = onContainer
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .weight(1f)
+                        .padding(vertical = 6.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(badge.copy(alpha = 0.22f))
                 )
-                Text(
-                    text = item.body.text(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onContainer.copy(alpha = 0.85f)
-                )
-                if (item.linkUrl != null && item.linkLabel != null) {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val linkHaptics = rememberAppHaptics()
-                    TextButton(
-                        onClick = {
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(top = 6.dp, bottom = if (isLast) 0.dp else 26.dp)
+        ) {
+            Text(
+                text = item.title.text(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-0.3).sp,
+                color = cs.onSurface
+            )
+            Text(
+                text = item.body.text(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onSurfaceVariant
+            )
+            if (item.linkUrl != null && item.linkLabel != null) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val linkHaptics = rememberAppHaptics()
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(badge.copy(alpha = 0.16f))
+                        .clickable {
                             linkHaptics.tap()
                             runCatching {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.linkUrl)))
                             }
-                        },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            item.linkLabel.text(),
-                            color = onContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = item.linkLabel.text(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = badge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun VersionHistorySheet(
     onDismiss: () -> Unit,
     onSelect: (ChangelogEntry) -> Unit
 ) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Filled.NewReleases, contentDescription = null) },
-        title = { Text(versionHistoryTitle.text()) },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(Changelog.entries) { entry ->
-                    val entryHaptics = rememberAppHaptics()
-                    Surface(
-                        onClick = { entryHaptics.tap(); onSelect(entry) },
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "v${entry.version}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = entry.date.text(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+    val haptics = rememberAppHaptics()
+    val cs = MaterialTheme.colorScheme
+    val current = Changelog.latest.version
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = cs.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 28.dp)
+            ) {
+                Text(
+                    text = versionHistoryTitle.text().uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 2.sp,
+                    color = cs.primary,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${Changelog.entries.size}",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-2).sp,
+                    color = cs.onSurface,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    modifier = Modifier.heightIn(max = 380.dp)
+                ) {
+                    itemsIndexed(Changelog.entries) { index, entry ->
+                        val isCurrent = entry.version == current
+                        val accent = when (index % 3) {
+                            0 -> cs.primary
+                            1 -> cs.secondary
+                            else -> cs.tertiary
+                        }
+                        val interaction = remember { MutableInteractionSource() }
+                        val pressed by interaction.collectIsPressedAsState()
+                        val corner by animateDpAsState(
+                            targetValue = if (pressed) 12.dp else 22.dp,
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            label = "historyCorner"
+                        )
+                        val scale by animateFloatAsState(
+                            targetValue = if (pressed) 0.97f else 1f,
+                            animationSpec = tween(150, easing = FastOutSlowInEasing),
+                            label = "historyScale"
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.width(40.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (isCurrent) 16.dp else 10.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isCurrent) accent else accent.copy(alpha = 0.35f))
+                                )
+                                if (index != Changelog.entries.lastIndex) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp)
+                                            .weight(1f)
+                                            .padding(vertical = 4.dp)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(accent.copy(alpha = 0.20f))
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(bottom = 8.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                    .clip(RoundedCornerShape(corner))
+                                    .background(
+                                        if (isCurrent) accent.copy(alpha = 0.16f)
+                                        else cs.surfaceContainerHighest
+                                    )
+                                    .clickable(interactionSource = interaction, indication = null) {
+                                        haptics.confirm()
+                                        onSelect(entry)
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "v${entry.version}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isCurrent) accent else cs.onSurface
+                                    )
+                                    Text(
+                                        text = entry.date.text(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = cs.onSurfaceVariant
+                                    )
+                                }
+                                if (isCurrent) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(accent)
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = currentLabel.text().uppercase(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 1.sp,
+                                            color = cs.surfaceContainerLowest
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(cs.surfaceContainerHighest)
+                        .clickable { haptics.tap(); onDismiss() },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = closeLabel.text(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = cs.onSurfaceVariant
+                    )
+                }
             }
-        },
-        confirmButton = {
-            val dismissHaptics = rememberAppHaptics()
-            TextButton(onClick = { dismissHaptics.tap(); onDismiss() }) { Text(closeLabel.text()) }
         }
-    )
+    }
 }

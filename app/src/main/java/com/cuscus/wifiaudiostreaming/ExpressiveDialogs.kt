@@ -21,15 +21,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -134,14 +142,15 @@ private fun ExpressiveDialogButton(
 
     Row(
         modifier = modifier
-            .height(56.dp)
+            .heightIn(min = 56.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
             .clip(RoundedCornerShape(corner))
             .background(container)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -151,11 +160,360 @@ private fun ExpressiveDialogButton(
         }
         Text(
             text = label,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
+            lineHeight = 17.sp,
             color = content,
-            maxLines = 1
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            softWrap = true,
+            overflow = TextOverflow.Visible
         )
+    }
+}
+
+@Composable
+fun ExpressiveVersionDialog(
+    icon: ImageVector,
+    accent: Color,
+    title: String,
+    body: String,
+    fromVersion: String?,
+    toVersion: String?,
+    confirmLabel: String?,
+    dismissLabel: String,
+    onConfirm: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    secondaryLabel: String? = null,
+    secondaryIcon: ImageVector? = null,
+    onSecondary: (() -> Unit)? = null,
+    confirmIcon: ImageVector? = Icons.Outlined.Download
+) {
+    val haptics = rememberAppHaptics()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DialogShapeBadge(icon, accent, alert = false)
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (fromVersion != null && toVersion != null) {
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        VersionChip(
+                            text = fromVersion,
+                            container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            content = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = accent
+                        )
+                        VersionChip(
+                            text = toVersion,
+                            container = accent,
+                            content = MaterialTheme.colorScheme.surfaceContainerLowest
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(if (fromVersion != null) 18.dp else 12.dp))
+
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                if (onConfirm != null && confirmLabel != null) {
+                    ExpressiveDialogButton(
+                        label = confirmLabel,
+                        icon = confirmIcon,
+                        container = accent,
+                        content = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        haptics.confirm()
+                        onConfirm()
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                if (onSecondary != null && secondaryLabel != null) {
+                    ExpressiveDialogButton(
+                        label = secondaryLabel,
+                        icon = secondaryIcon,
+                        container = accent.copy(alpha = 0.16f),
+                        content = accent,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        haptics.confirm()
+                        onSecondary()
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                ExpressiveDialogButton(
+                    label = dismissLabel,
+                    icon = null,
+                    container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    content = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.tap()
+                    onDismiss()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VersionChip(text: String, container: Color, content: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(container)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            color = content
+        )
+    }
+}
+
+@Composable
+fun ExpressiveDonationDialog(
+    onSupport: () -> Unit,
+    onSnooze30: () -> Unit,
+    onLater: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+    val accent = MaterialTheme.colorScheme.tertiary
+
+    Dialog(onDismissRequest = onLater) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DialogShapeBadge(Icons.Outlined.LocalCafe, accent, alert = false)
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = stringResource(R.string.donation_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = stringResource(R.string.donation_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                ExpressiveDialogButton(
+                    label = stringResource(R.string.donation_support),
+                    icon = Icons.Outlined.LocalCafe,
+                    container = accent,
+                    content = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.confirm()
+                    onSupport()
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ExpressiveDialogButton(
+                        label = stringResource(R.string.donation_dismiss_30),
+                        icon = null,
+                        container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        content = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        haptics.tap()
+                        onSnooze30()
+                    }
+                    ExpressiveDialogButton(
+                        label = stringResource(R.string.donation_later),
+                        icon = null,
+                        container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        content = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        haptics.tap()
+                        onLater()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExpressiveLongTextDialog(
+    icon: ImageVector,
+    accent: Color,
+    title: String,
+    subtitle: String? = null,
+    body: String,
+    dismissLabel: String,
+    onDismiss: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+    val scroll = rememberScrollState()
+
+    // Sfuma il bordo superiore/inferiore solo quando c'e' altro testo in quella
+    // direzione, cosi' si capisce che il blocco e' scorrevole.
+    val topFade by animateFloatAsState(
+        targetValue = if (scroll.value > 4) 1f else 0f,
+        animationSpec = tween(200),
+        label = "licTopFade"
+    )
+    val bottomFade by animateFloatAsState(
+        targetValue = if (scroll.value < scroll.maxValue - 4) 1f else 0f,
+        animationSpec = tween(200),
+        label = "licBottomFade"
+    )
+    val surface = MaterialTheme.colorScheme.surfaceContainerLow
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = surface,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 28.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ExpressiveHeroBadge(size = 52.dp, accent = accent) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-0.5).sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                Box {
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .heightIn(max = 380.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .verticalScroll(scroll)
+                            .padding(16.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .graphicsLayer { alpha = topFade }
+                            .background(Brush.verticalGradient(listOf(surface, Color.Transparent)))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .graphicsLayer { alpha = bottomFade }
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, surface)))
+                    )
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                ExpressiveDialogButton(
+                    label = dismissLabel,
+                    icon = null,
+                    container = accent,
+                    content = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.tap()
+                    onDismiss()
+                }
+            }
+        }
     }
 }
 

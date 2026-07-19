@@ -15,6 +15,8 @@ object UpdateChecker {
         data class UpToDate(val current: String) : Result()
         data class Available(val current: String, val latest: String, val url: String) : Result()
         data class Failed(val reason: String) : Result()
+        /** La versione installata e' piu' recente di quella pubblicata su GitHub. */
+        data class Ahead(val current: String, val latest: String) : Result()
     }
 
     private val TAG_RX = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"")
@@ -46,10 +48,12 @@ object UpdateChecker {
                 ?: return@withContext Result.Failed("no release tag found")
             val latest = normalize(tag)
             val current = normalize(currentVersion(context))
-            if (compareVersions(latest, current) > 0)
-                Result.Available(current, latest, RELEASES_URL)
-            else
-                Result.UpToDate(current)
+            val cmp = compareVersions(latest, current)
+            when {
+                cmp > 0  -> Result.Available(current, latest, RELEASES_URL)
+                cmp < 0  -> Result.Ahead(current, latest)
+                else     -> Result.UpToDate(current)
+            }
         } catch (e: Exception) {
             Result.Failed(e.message ?: "network error")
         }

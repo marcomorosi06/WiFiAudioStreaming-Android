@@ -73,6 +73,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _manualUpdateResult = MutableStateFlow<UpdateChecker.Result?>(null)
     val manualUpdateResult: StateFlow<UpdateChecker.Result?> = _manualUpdateResult.asStateFlow()
 
+    private val _versionAhead = MutableStateFlow<UpdateChecker.Result.Ahead?>(null)
+    val versionAhead: StateFlow<UpdateChecker.Result.Ahead?> = _versionAhead.asStateFlow()
+
     private val _checkingForUpdate = MutableStateFlow(false)
     val checkingForUpdate: StateFlow<Boolean> = _checkingForUpdate.asStateFlow()
 
@@ -81,7 +84,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val enabled = settingsDataStore.settingsFlow.first().autoUpdateCheckEnabled
             if (!enabled) return@launch
             val r = UpdateChecker.check(getApplication<Application>())
-            if (r is UpdateChecker.Result.Available) _updateBanner.value = r
+            // In automatico si mostra solo qualcosa di utile: se GitHub non
+            // risponde si resta in silenzio.
+            when (r) {
+                is UpdateChecker.Result.Available -> _updateBanner.value = r
+                is UpdateChecker.Result.Ahead     -> _versionAhead.value = r
+                else -> Unit
+            }
         }
     }
 
@@ -96,6 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissUpdateBanner() { _updateBanner.value = null }
+    fun dismissVersionAhead() { _versionAhead.value = null }
     fun clearManualUpdateResult() { _manualUpdateResult.value = null }
 
     fun setAutoUpdateCheckEnabled(enabled: Boolean) {
