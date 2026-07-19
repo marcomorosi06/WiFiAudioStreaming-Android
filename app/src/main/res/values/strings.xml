@@ -314,4 +314,5 @@
     <string name="protocol_incompatible_update">Open downloads</string>
     <string name="blackout_button">Dark screen</string>
     <string name="blackout_hint">Double tap to return</string>
+    <string name="playback_keep_open_hint">For the best quality, keep this app open on screen and the phone unlocked. Leaving the app or locking the device may cause audio artifacts.</string>
 </resources>

@@ -314,4 +314,5 @@
     <string name="protocol_incompatible_update">Apri i download</string>
     <string name="blackout_button">Schermo nero</string>
     <string name="blackout_hint">Tocca due volte per tornare</string>
+    <string name="playback_keep_open_hint">Per la massima qualità, tieni l\'app aperta sullo schermo e il telefono sbloccato. Uscire dall\'app o bloccare il dispositivo può causare artefatti audio.</string>
 </resources>

@@ -82,6 +82,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.data.AppScript
@@ -2334,6 +2337,31 @@ fun ExpressiveStreamingControlCenter(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.blackout_button))
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.Top,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.playback_keep_open_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Start
+                                )
+                            }
+                        }
                     }
 
                     if (isServer) {
@@ -4342,6 +4370,22 @@ fun BlackoutOverlay() {
         onDispose { view.keepScreenOn = false }
     }
 
+    val window = (view.context as? android.app.Activity)?.window
+    DisposableEffect(active, window) {
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        if (active && controller != null) {
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+
+    val isStreaming by NetworkManager.isStreamingCurrent.collectAsState()
+    LaunchedEffect(isStreaming) {
+        if (!isStreaming) BlackoutController.hide()
+    }
+
     BackHandler(enabled = active) { BlackoutController.hide() }
 
     var pendingTapAt by remember { mutableStateOf(0L) }
@@ -4393,15 +4437,26 @@ fun BlackoutOverlay() {
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = stringResource(R.string.blackout_hint),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .padding(32.dp)
                 .graphicsLayer { alpha = hintAlpha.value }
-        )
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.TouchApp,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text = stringResource(R.string.blackout_hint),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
