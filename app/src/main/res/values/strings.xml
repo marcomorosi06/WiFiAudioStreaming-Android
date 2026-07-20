@@ -338,4 +338,5 @@
     <string name="multicast_locked_by_http">HTTP requires it</string>
     <string name="multicast_locked_by_both">RTP and HTTP require it</string>
     <string name="multicast_locked_hint">Both stream to every listener at once, so single-client mode is not possible. Turn RTP and HTTP off in Settings to unlock this.</string>
+    <string name="status_unsupported_format">Cannot play this stream: the server sends %1$s, which this device does not support.</string>
 </resources>

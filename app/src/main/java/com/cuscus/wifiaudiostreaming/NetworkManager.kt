@@ -58,7 +58,49 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.cancellation.CancellationException
 
-data class ServerInfo(val ip: String, val isMulticast: Boolean, val port: Int, val securityMode: String? = null, val encrypted: Boolean = false, val serverSendsMic: Boolean = false, val serverWantsMic: Boolean = false)
+data class ServerInfo(
+    val ip: String,
+    val isMulticast: Boolean,
+    val port: Int,
+    val securityMode: String? = null,
+    val encrypted: Boolean = false,
+    val serverSendsMic: Boolean = false,
+    val serverWantsMic: Boolean = false,
+    /** Formato audio annunciato dal server nel beacon di discovery, se presente. */
+    val audioFormat: StreamAudioFormat? = null
+)
+
+/**
+ * Formato audio dichiarato da un server WFAS (campi sr/ch/bd del beacon).
+ * La pipeline di riproduzione e' PCM 16 bit: qualunque altra profondita' non e'
+ * riproducibile e va rifiutata invece di essere interpretata a caso.
+ */
+data class StreamAudioFormat(
+    val sampleRate: Int,
+    val channels: Int,
+    val bitDepth: Int
+) {
+    val isPlayable: Boolean
+        get() = bitDepth == 16 &&
+                channels in 1..2 &&
+                sampleRate in 4000..192000
+
+    fun describe(): String = "$sampleRate Hz, " +
+            (if (channels == 1) "mono" else "stereo") + ", $bitDepth bit"
+
+    companion object {
+        /** Estrae sr/ch/bd da un beacon gia' diviso su ';'. Null se assenti o non numerici. */
+        fun fromBeaconParts(parts: List<String>): StreamAudioFormat? {
+            val sr = parts.firstOrNull { it.startsWith("sr=") }?.removePrefix("sr=")
+                ?.toFloatOrNull()?.toInt() ?: return null
+            val ch = parts.firstOrNull { it.startsWith("ch=") }?.removePrefix("ch=")
+                ?.toIntOrNull() ?: return null
+            val bd = parts.firstOrNull { it.startsWith("bd=") }?.removePrefix("bd=")
+                ?.toIntOrNull() ?: 16
+            return StreamAudioFormat(sr, ch, bd)
+        }
+    }
+}
 
 data class ProtocolMismatch(val localVersion: Int, val remoteVersion: Int)
 
@@ -496,11 +538,13 @@ object NetworkManager {
                                             val encrypted = parts.firstOrNull { it.startsWith("enc=") }
                                                 ?.removePrefix("enc=") == "1"
                                             val micTok = parts.firstOrNull { it.startsWith("mic=") }?.removePrefix("mic=")
+                                            val advertisedFormat = StreamAudioFormat.fromBeaconParts(parts)
                                             val serverInfo = ServerInfo(
                                                 ip = remoteIp, isMulticast = isMulticast, port = port,
                                                 securityMode = authMode, encrypted = encrypted,
                                                 serverSendsMic = micTok?.contains("tx") == true,
-                                                serverWantsMic = micTok?.contains("rx") == true
+                                                serverWantsMic = micTok?.contains("rx") == true,
+                                                audioFormat = advertisedFormat
                                             )
                                             Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
 
@@ -532,7 +576,14 @@ object NetworkManager {
         }
     }
 
-    fun startBroadcastingPresence(context: Context, isMulticast: Boolean, streamingPort: Int, networkInterfaceName: String = "Auto", rtpEnabled: Boolean = false) {
+    fun startBroadcastingPresence(
+        context: Context,
+        isMulticast: Boolean,
+        streamingPort: Int,
+        networkInterfaceName: String = "Auto",
+        rtpEnabled: Boolean = false,
+        audioFormat: StreamAudioFormat? = null
+    ) {
         if (broadcastingJob?.isActive == true) return
         Log.d(TAG, "[BROADCAST] startBroadcastingPresence: isMulticast=$isMulticast port=$streamingPort iface=$networkInterfaceName rtp=$rtpEnabled")
         broadcastingJob = scope.launch {
@@ -548,7 +599,12 @@ object NetworkManager {
             val mode = if (isMulticast) "MULTICAST" else "UNICAST"
             val protocolsStr = if (rtpEnabled) "protocols=WFAS,RTP" else "protocols=WFAS"
             val micStr = if (serverStreamsMic) ";mic=tx" else ""
-            val staticPrefix = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;$mode;$streamingPort;$protocolsStr"
+            // Il formato va annunciato: senza, un ricevitore conforme non puo'
+            // adottarlo e ricadrebbe sulle proprie impostazioni locali.
+            val audioStr = audioFormat?.let {
+                ";sr=${it.sampleRate};ch=${it.channels};bd=${it.bitDepth}"
+            } ?: ""
+            val staticPrefix = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;$mode;$streamingPort;$protocolsStr$audioStr"
 
             val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
             val wifiIface = getWifiNetworkInterface(networkInterfaceName)
@@ -733,7 +789,12 @@ object NetworkManager {
         serverStreamsMic = streamMic
         startDonationTimer(context)
         Log.d(TAG, "[SERVER] startServerAudio: isMulticast=$isMulticast port=$streamingPort sr=$sampleRate ch=$channelConfig buf=$bufferSize streamInternal=$streamInternal streamMic=$streamMic")
-        startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled)
+        val serverFormat = StreamAudioFormat(
+            sampleRate = sampleRate,
+            channels = if (channelConfig == "STEREO") 2 else 1,
+            bitDepth = 16
+        )
+        startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled, serverFormat)
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         originalMediaVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -1043,7 +1104,7 @@ object NetworkManager {
                     var pendCnonce = ""
                     var pendSnonce = ""
                     while (isActive) {
-                        startBroadcastingPresence(context, isMulticast = false, streamingPort, networkInterfaceName, rtpEnabled)
+                        startBroadcastingPresence(context, isMulticast = false, streamingPort, networkInterfaceName, rtpEnabled, serverFormat)
                         connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
 
                         val clientDatagram = sendSocket.receive()
@@ -1256,6 +1317,21 @@ object NetworkManager {
         disconnectionSoundEnabled: Boolean = true,
         onServerDisconnected: (() -> Unit)? = null
     ) {
+        // ── Formato di riproduzione ───────────────────────────────────────────
+        // I byte li manda il server, quindi e' il suo formato a comandare: le
+        // impostazioni locali valgono solo come fallback se il beacon non lo
+        // annuncia. Un formato che non sappiamo riprodurre va rifiutato, perche'
+        // reinterpretarlo a caso produce solo rumore.
+        val advertised = serverInfo.audioFormat
+        if (advertised != null && !advertised.isPlayable) {
+            Log.w(TAG, "[CLIENT] Formato non riproducibile: ${advertised.describe()} - connessione rifiutata")
+            connectionStatus.value =
+                context.getString(R.string.status_unsupported_format, advertised.describe())
+            isStreamingCurrent.value = false
+            scope.launch(Dispatchers.Main) { onServerDisconnected?.invoke() }
+            return
+        }
+
         stopStreaming(context)
         isServerStreaming = false
         isStreamingCurrent.value = true
@@ -1263,8 +1339,18 @@ object NetworkManager {
 
         micSendDir = null
 
+        // Il microfono e' un flusso nostro in salita: resta sulle impostazioni locali.
         if (sendMicrophone) {
             micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
+        }
+
+        // Da qui in poi 'sampleRate' e 'channelConfig' sono quelli del flusso in arrivo.
+        @Suppress("NAME_SHADOWING")
+        val sampleRate = advertised?.sampleRate ?: sampleRate
+        @Suppress("NAME_SHADOWING")
+        val channelConfig = advertised?.let { if (it.channels == 2) "STEREO" else "MONO" } ?: channelConfig
+        if (advertised != null) {
+            Log.i(TAG, "[CLIENT] Riproduzione col formato annunciato dal server: ${advertised.describe()}")
         }
 
         streamingJob = scope.launch {
@@ -1280,6 +1366,18 @@ object NetworkManager {
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val frameSize = if (channelConfig == "STEREO") 4 else 2
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        // Ultima rete: il dispositivo puo' rifiutare una combinazione
+                        // che sulla carta e' valida. Meglio non riprodurre nulla.
+                        if (minBuffer == AudioTrack.ERROR || minBuffer == AudioTrack.ERROR_BAD_VALUE) {
+                            Log.e(TAG, "[CLIENT] AudioTrack non supporta ${sampleRate}Hz/$channelConfig")
+                            connectionStatus.value = context.getString(
+                                R.string.status_unsupported_format,
+                                "$sampleRate Hz, " + (if (channelConfig == "STEREO") "stereo" else "mono") + ", 16 bit"
+                            )
+                            isStreamingCurrent.value = false
+                            withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
+                            return@launch
+                        }
                         val targetLatencyFrames = advSettings.latencyMs * sampleRate / 1000
                         val marginFrames = sampleRate * 30 / 1000
                         var playbackBufferSize = minBuffer.coerceAtLeast((targetLatencyFrames + marginFrames * 2) * frameSize)
@@ -1612,6 +1710,18 @@ object NetworkManager {
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        // Ultima rete: il dispositivo puo' rifiutare una combinazione
+                        // che sulla carta e' valida. Meglio non riprodurre nulla.
+                        if (minBuffer == AudioTrack.ERROR || minBuffer == AudioTrack.ERROR_BAD_VALUE) {
+                            Log.e(TAG, "[CLIENT] AudioTrack non supporta ${sampleRate}Hz/$channelConfig")
+                            connectionStatus.value = context.getString(
+                                R.string.status_unsupported_format,
+                                "$sampleRate Hz, " + (if (channelConfig == "STEREO") "stereo" else "mono") + ", 16 bit"
+                            )
+                            isStreamingCurrent.value = false
+                            withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
+                            return@launch
+                        }
                         var playbackBufferSize = minBuffer.coerceAtLeast(SettingsDataStore(context).settingsFlow.first().latencyMs * sampleRate / 1000 * (if (channelConfig == "STEREO") 4 else 2))
 
                         val frameSize = if (channelConfig == "STEREO") 4 else 2

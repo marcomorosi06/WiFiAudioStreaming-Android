@@ -181,7 +181,10 @@ class AutoConnectService : Service() {
 
                                     if (isMatch) {
                                         Log.d("AutoConnect", "MATCH POSITIVO. Preparo la connessione a $remoteIp:$port")
-                                        targetServer = ServerInfo(remoteIp, isMulticast, port)
+                                        targetServer = ServerInfo(
+                                            remoteIp, isMulticast, port,
+                                            audioFormat = StreamAudioFormat.fromBeaconParts(parts)
+                                        )
                                         break
                                     }
                                 }

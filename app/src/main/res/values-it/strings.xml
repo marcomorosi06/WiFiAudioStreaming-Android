@@ -338,4 +338,5 @@
     <string name="multicast_locked_by_http">Lo richiede HTTP</string>
     <string name="multicast_locked_by_both">Lo richiedono RTP e HTTP</string>
     <string name="multicast_locked_hint">Trasmettono entrambi a tutti gli ascoltatori insieme, quindi la modalità a client singolo non è possibile. Disattiva RTP e HTTP nelle impostazioni per sbloccarla.</string>
+    <string name="status_unsupported_format">Impossibile riprodurre questo flusso: il server invia %1$s, non supportato da questo dispositivo.</string>
 </resources>
