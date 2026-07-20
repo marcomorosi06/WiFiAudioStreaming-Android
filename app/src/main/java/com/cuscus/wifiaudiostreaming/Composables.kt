@@ -464,6 +464,8 @@ fun ExpressiveSettingsScreen(
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
+    onDeveloperModeChange: (Boolean) -> Unit = {},
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
     onOpenScripting: () -> Unit = {},
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -503,6 +505,8 @@ fun ExpressiveSettingsScreen(
             onDisconnectionSoundChange = onDisconnectionSoundChange,
             onHapticsChange = onHapticsChange,
             onShowDonation = onShowDonation,
+            onDeveloperModeChange = onDeveloperModeChange,
+            onNoiseReductionChange = onNoiseReductionChange,
             onOpenScripting = onOpenScripting,
             onAutoUpdateCheckChange = onAutoUpdateCheckChange,
             onCheckForUpdates = onCheckForUpdates,
@@ -536,6 +540,8 @@ fun SettingsScreenContent(
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
+    onDeveloperModeChange: (Boolean) -> Unit = {},
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
     onOpenScripting: () -> Unit = {},
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -939,6 +945,60 @@ fun SettingsScreenContent(
                         isChecked = appSettings.hapticsEnabled,
                         onCheckedChange = onHapticsChange
                     )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_developer),
+                    icon = Icons.Outlined.DeveloperMode
+                ) {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_developer_title),
+                        description = stringResource(R.string.settings_item_developer_desc),
+                        icon = Icons.Outlined.Code,
+                        isChecked = appSettings.developerMode,
+                        onCheckedChange = onDeveloperModeChange
+                    )
+
+                    AnimatedVisibility(visible = appSettings.developerMode) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.nr_title),
+                                description = stringResource(R.string.nr_desc),
+                                icon = Icons.Outlined.GraphicEq,
+                                isChecked = appSettings.noiseReductionEnabled,
+                                onCheckedChange = { on ->
+                                    onNoiseReductionChange(on, appSettings.noiseReductionStrength)
+                                }
+                            )
+                            AnimatedVisibility(visible = appSettings.noiseReductionEnabled) {
+                                Column {
+                                    SettingsSliderItem(
+                                        title = stringResource(R.string.nr_title),
+                                        description = stringResource(
+                                            R.string.nr_strength, appSettings.noiseReductionStrength
+                                        ),
+                                        icon = Icons.Outlined.Tune,
+                                        value = appSettings.noiseReductionStrength.toFloat(),
+                                        range = 0f..100f,
+                                        steps = 19,
+                                        valueSuffix = "%",
+                                        onValueChange = { v ->
+                                            onNoiseReductionChange(true, v.toInt())
+                                        }
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.nr_hint),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

@@ -300,6 +300,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveDisconnectionSoundEnabled(enabled) }
     }
 
+    fun setDeveloperMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.saveDeveloperMode(enabled)
+            if (!enabled) NetworkManager.setNoiseReduction(false, 0)
+        }
+    }
+
+    fun setNoiseReduction(enabled: Boolean, strength: Int) {
+        viewModelScope.launch {
+            settingsDataStore.saveNoiseReduction(enabled, strength)
+            // Applicato subito al flusso in corso: niente riconnessione.
+            NetworkManager.setNoiseReduction(enabled, strength)
+        }
+    }
+
     fun setHapticsEnabled(enabled: Boolean) {
         viewModelScope.launch { settingsDataStore.saveHapticsEnabled(enabled) }
     }
@@ -315,7 +330,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startClient(serverInfo: ServerInfo) {
         val intent = Intent(getApplication(), ClientService::class.java)
         getApplication<Application>().startService(intent)
-        setIsStreaming(true)
+        // Niente ottimismo: lo stato "in riproduzione" lo alza NetworkManager
+        // quando l'handshake e' andato a buon fine. Alzarlo qui faceva sembrare
+        // connesso anche un client rifiutato perche' il server era occupato.
 
         val currentSettings = appSettings.value
         if (currentSettings != null) {

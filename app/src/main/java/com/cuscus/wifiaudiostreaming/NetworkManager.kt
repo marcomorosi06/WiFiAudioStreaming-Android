@@ -67,7 +67,9 @@ data class ServerInfo(
     val serverSendsMic: Boolean = false,
     val serverWantsMic: Boolean = false,
     /** Formato audio annunciato dal server nel beacon di discovery, se presente. */
-    val audioFormat: StreamAudioFormat? = null
+    val audioFormat: StreamAudioFormat? = null,
+    /** Istante dell'ultimo beacon ricevuto: serve a far scadere i server spariti. */
+    val lastSeen: Long = System.currentTimeMillis()
 )
 
 /**
@@ -108,6 +110,13 @@ data class ProtocolMismatch(val localVersion: Int, val remoteVersion: Int)
 object NetworkManager {
 
     private const val TAG = "WFAS_DBG"
+
+    /**
+     * Un server annuncia la propria presenza ogni 3 secondi. Tolleriamo tre
+     * beacon persi prima di considerarlo sparito, cosi' un pacchetto smarrito
+     * non lo fa lampeggiare dentro e fuori dalla lista.
+     */
+    private const val DISCOVERY_TTL_MS = 10_000L
 
     // --- GESTIONE VOLUME SERVER ANDROID ---
     val serverVolume = MutableStateFlow(1.0f)
@@ -153,6 +162,14 @@ object NetworkManager {
         const val PENDING_MESSAGE = "WFAS_PENDING"
         const val AUTH_REQUIRED_PREFIX = "WFAS_AUTH_REQUIRED"
         const val UNAUTHORIZED_MESSAGE = "WFAS_UNAUTHORIZED"
+
+        /**
+         * Il server unicast serve un client alla volta: a chiunque altro bussi
+         * mentre e' occupato risponde subito questo, invece di lasciarlo
+         * ritentare a vuoto per 30 secondi. I client che non lo conoscono
+         * semplicemente lo ignorano e vanno in timeout come prima.
+         */
+        const val BUSY_MESSAGE = "WFAS_BUSY"
     }
 
     const val WFAS_PROTOCOL_VERSION = 2
@@ -274,6 +291,55 @@ object NetworkManager {
     val isMicMuted = MutableStateFlow(false)
     var autoConnectOwnsListening = false
     val lastSeenDevices = mutableMapOf<String, Pair<ServerInfo, Long>>()
+
+    // ── Riduzione del rumore lato ricevitore (opt-in, modalita' sviluppatore) ──
+    private val noiseReducer = com.cuscus.wifiaudiostreaming.dsp.NoiseReducer()
+    @Volatile private var nrEnabled = false
+    private var nrScratch = ShortArray(0)
+
+    /** Modificabile a caldo: il flusso in riproduzione non va riavviato. */
+    fun setNoiseReduction(enabled: Boolean, strengthPercent: Int) {
+        noiseReducer.setStrength(strengthPercent.coerceIn(0, 100) / 100f)
+        if (enabled && !nrEnabled) noiseReducer.reset()
+        nrEnabled = enabled
+        Log.d(TAG, "[NR] enabled=$enabled strength=$strengthPercent%")
+    }
+
+    private suspend fun prepareNoiseReducer(context: Context, sampleRate: Int, channels: Int) {
+        // suspend, non runBlocking: viene chiamata da dentro una coroutine e
+        // bloccare quel thread potrebbe incastrare il dispatcher.
+        val s = runCatching { SettingsDataStore(context).settingsFlow.first() }.getOrNull()
+        val on = s != null && s.developerMode && s.noiseReductionEnabled
+        noiseReducer.init(sampleRate, channels)
+        noiseReducer.setStrength((s?.noiseReductionStrength ?: 50).coerceIn(0, 100) / 100f)
+        noiseReducer.reset()
+        nrEnabled = on
+        Log.d(TAG, "[NR] prepare: on=$on sr=$sampleRate ch=$channels")
+    }
+
+    /**
+     * Applica il denoiser a PCM 16 bit little endian, in place.
+     * Non fa nulla se disattivato: il percorso normale resta a costo zero.
+     */
+    private fun denoiseInPlace(buf: ByteArray, offset: Int, len: Int) {
+        if (!nrEnabled || len < 2) return
+        val samples = len / 2
+        if (nrScratch.size < samples) nrScratch = ShortArray(samples)
+        val sc = nrScratch
+        var bi = offset
+        for (i in 0 until samples) {
+            sc[i] = ((buf[bi].toInt() and 0xFF) or (buf[bi + 1].toInt() shl 8)).toShort()
+            bi += 2
+        }
+        noiseReducer.process(sc, 0, samples)
+        bi = offset
+        for (i in 0 until samples) {
+            val v = sc[i].toInt()
+            buf[bi] = (v and 0xFF).toByte()
+            buf[bi + 1] = ((v shr 8) and 0xFF).toByte()
+            bi += 2
+        }
+    }
 
     @SuppressLint("DefaultLocale", "MissingPermission")
     fun getLocalIpAddress(context: Context): String {
@@ -484,14 +550,19 @@ object NetworkManager {
         val multicastLock = wifiManager.createMulticastLock("wifi_audio_streamer_discovery_lock")
         multicastLock.setReferenceCounted(true)
 
+        // Un server che sparisce senza dire BYE (app chiusa, WiFi staccato, crash)
+        // resterebbe in lista per sempre. Il beacon arriva ogni 3s: dopo DISCOVERY_TTL_MS
+        // senza notizie lo consideriamo andato.
         scope.launch {
             while (isActive) {
-                delay(5000)
-                val currentTime = System.currentTimeMillis()
-                val currentMap = discoveredDevices.value
-
-                val filteredMap = currentMap.filter { (hostname, info) ->
-                    true
+                delay(2000)
+                val now = System.currentTimeMillis()
+                val current = discoveredDevices.value
+                val alive = current.filterValues { now - it.lastSeen <= DISCOVERY_TTL_MS }
+                if (alive.size != current.size) {
+                    val gone = current.keys - alive.keys
+                    Log.d(TAG, "[DISCOVERY] Scaduti (nessun beacon da ${DISCOVERY_TTL_MS}ms): $gone")
+                    discoveredDevices.value = alive
                 }
             }
         }
@@ -544,12 +615,22 @@ object NetworkManager {
                                                 securityMode = authMode, encrypted = encrypted,
                                                 serverSendsMic = micTok?.contains("tx") == true,
                                                 serverWantsMic = micTok?.contains("rx") == true,
-                                                audioFormat = advertisedFormat
+                                                audioFormat = advertisedFormat,
+                                                lastSeen = System.currentTimeMillis()
                                             )
                                             Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
 
                                             val currentMap = discoveredDevices.value
-                                            if (currentMap[hostname] != serverInfo) {
+                                            val known = currentMap[hostname]
+                                            // lastSeen cambia a ogni beacon: confrontarlo
+                                            // farebbe riemettere la lista ogni 3s. Si
+                                            // aggiorna quando cambia qualcosa di reale, o
+                                            // periodicamente per tenere vivo il TTL.
+                                            val sameData = known != null &&
+                                                known.copy(lastSeen = serverInfo.lastSeen) == serverInfo
+                                            val staleTimestamp = known != null &&
+                                                serverInfo.lastSeen - known.lastSeen > DISCOVERY_TTL_MS / 3
+                                            if (!sameData || staleTimestamp) {
                                                 discoveredDevices.value = currentMap + (hostname to serverInfo)
                                             }
                                         }
@@ -647,6 +728,39 @@ object NetworkManager {
     fun stopBroadcastingPresence() {
         broadcastingJob?.cancel()
         broadcastingJob = null
+    }
+
+    /**
+     * Manda subito un beacon BYE: i client tolgono il server dalla lista senza
+     * aspettare la scadenza. Best effort, un pacchetto perso non e' un problema
+     * perche' comunque il TTL fa il resto.
+     */
+    fun announceServerGone(context: Context, networkInterfaceName: String = "Auto") {
+        scope.launch {
+            runCatching {
+                val deviceName = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                        Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+                            ?: "${Build.MANUFACTURER} ${Build.MODEL}"
+                    } else {
+                        "${Build.MANUFACTURER} ${Build.MODEL}"
+                    }
+                } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" }
+
+                val message = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;BYE;0"
+                val bytes = message.toByteArray()
+                val group = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
+                MulticastSocket().use { sock ->
+                    sock.timeToLive = 4
+                    getWifiNetworkInterface(networkInterfaceName)?.let { sock.networkInterface = it }
+                    repeat(2) {
+                        sock.send(DatagramPacket(bytes, bytes.size, group, NetworkSettings.DISCOVERY_PORT))
+                        delay(120)
+                    }
+                }
+                Log.d(TAG, "[BROADCAST] BYE annunciato per '$deviceName'")
+            }.onFailure { Log.w(TAG, "[BROADCAST] BYE non inviato: ${it.message}") }
+        }
     }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
@@ -1187,6 +1301,14 @@ object NetworkManager {
                         sendSocket.send(Datagram(ackPacket, clientAddress))
                         Log.d(TAG, "[SERVER][UNICAST] HELLO_ACK inviato a $clientAddress")
 
+                        // In unicast il server serve un client solo: finche' e' occupato
+                        // non deve annunciarsi, altrimenti un terzo dispositivo lo vede
+                        // libero e prova a connettersi. Il beacon riparte da solo al
+                        // prossimo giro del while, cioe' quando il client si stacca.
+                        Log.d(TAG, "[SERVER][UNICAST] occupato: sospendo l'annuncio in discovery")
+                        stopBroadcastingPresence()
+                        announceServerGone(context, networkInterfaceName)
+
                         val clientAlive = java.util.concurrent.atomic.AtomicBoolean(true)
 
                         if (rtpEnabled) {
@@ -1230,6 +1352,23 @@ object NetworkManager {
                                     val datagram = sendSocket.receive()
                                     val msg = datagram.packet.readText().trim()
                                     Log.d(TAG, "[SERVER][UNICAST] byeJob ricevuto: '$msg' da ${datagram.address}")
+                                    // Solo il client collegato puo' pilotare questa sessione:
+                                    // senza questo controllo un CLIENT_BYE di un terzo
+                                    // dispositivo chiuderebbe la connessione altrui.
+                                    if (datagram.address != clientAddress) {
+                                        if (msg.startsWith(NetworkSettings.CLIENT_HELLO_MESSAGE) || msg == "MODE_PROBE") {
+                                            Log.w(TAG, "[SERVER][UNICAST] ${datagram.address} rifiutato: occupato con $clientAddress")
+                                            runCatching {
+                                                sendSocket.send(Datagram(
+                                                    buildPacket { writeText(NetworkSettings.BUSY_MESSAGE) },
+                                                    datagram.address
+                                                ))
+                                            }
+                                        } else {
+                                            Log.w(TAG, "[SERVER][UNICAST] datagram da ${datagram.address} ignorato: sessione occupata")
+                                        }
+                                        continue
+                                    }
                                     if (msg == "CLIENT_BYE") {
                                         Log.d(TAG, "[SERVER][UNICAST] CLIENT_BYE ricevuto, disconnessione pulita")
                                         println("--- Received CLIENT_BYE from $clientAddress ---")
@@ -1298,6 +1437,7 @@ object NetworkManager {
                 }
 
                 stopBroadcastingPresence()
+                announceServerGone(context, networkInterfaceName)
                 if (isActive && !hasError) connectionStatus.value = context.getString(R.string.status_server_stopped)
             }
         }
@@ -1366,6 +1506,7 @@ object NetworkManager {
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val frameSize = if (channelConfig == "STEREO") 4 else 2
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        prepareNoiseReducer(context, sampleRate, if (channelConfig == "STEREO") 2 else 1)
                         // Ultima rete: il dispositivo puo' rifiutare una combinazione
                         // che sulla carta e' valida. Meglio non riprodurre nulla.
                         if (minBuffer == AudioTrack.ERROR || minBuffer == AudioTrack.ERROR_BAD_VALUE) {
@@ -1451,6 +1592,13 @@ object NetworkManager {
                                 ackMsg.startsWith(NetworkSettings.INCOMPATIBLE_PREFIX) -> {
                                     signalProtocolMismatch(parseProtocolVersion(ackMsg))
                                     connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
+                                    return@launch
+                                }
+                                ackMsg == NetworkSettings.BUSY_MESSAGE -> {
+                                    Log.w(TAG, "[CLIENT] server occupato con un altro dispositivo")
+                                    connectionStatus.value = context.getString(R.string.status_server_busy)
+                                    isStreamingCurrent.value = false
+                                    withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
                                     return@launch
                                 }
                                 ackMsg == NetworkSettings.UNAUTHORIZED_MESSAGE -> {
@@ -1627,8 +1775,10 @@ object NetworkManager {
                                             .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                                         outB.putShort(s * 2, mixed.toShort())
                                     }
+                                    denoiseInPlace(outBuf, 0, pcmLen)
                                     audioTrack.write(outBuf, 0, pcmLen, AudioTrack.WRITE_BLOCKING)
                                 } else {
+                                    denoiseInPlace(data, HEADER_SIZE, pcmLen)
                                     audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
                                 }
                                 if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
@@ -1710,6 +1860,7 @@ object NetworkManager {
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
                         val minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfigOut, AudioFormat.ENCODING_PCM_16BIT)
+                        prepareNoiseReducer(context, sampleRate, if (channelConfig == "STEREO") 2 else 1)
                         // Ultima rete: il dispositivo puo' rifiutare una combinazione
                         // che sulla carta e' valida. Meglio non riprodurre nulla.
                         if (minBuffer == AudioTrack.ERROR || minBuffer == AudioTrack.ERROR_BAD_VALUE) {
@@ -1829,16 +1980,19 @@ object NetworkManager {
                                         if (dir != null) {
                                             val r = WfasCrypto.decryptPacket(dir, mcWin, audio, len)
                                             if (r is WfasCrypto.Decrypted.Ok && r.pcm.isNotEmpty()) {
+                                                denoiseInPlace(r.pcm, 0, r.pcm.size)
                                                 audioTrack.write(r.pcm, 0, r.pcm.size, AudioTrack.WRITE_BLOCKING)
                                             }
                                         }
                                     } else {
                                         val pcmLen = len - MC_HEADER_SIZE
                                         if (pcmLen > 0) {
+                                            denoiseInPlace(audio, MC_HEADER_SIZE, pcmLen)
                                             audioTrack.write(audio, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
                                         }
                                     }
                                 } else {
+                                    denoiseInPlace(audio, 0, len)
                                     audioTrack.write(audio, 0, len, AudioTrack.WRITE_BLOCKING)
                                 }
                             }
@@ -1921,6 +2075,8 @@ object NetworkManager {
     }
 
     fun stopStreaming(context: Context) {
+        // Va letto prima dell'azzeramento: serve a sapere se eravamo noi il server.
+        val wasServing = isServerStreaming
         isServerStreaming = false
         cancelDonationTimer()
 
@@ -1953,6 +2109,7 @@ object NetworkManager {
         }
 
         stopBroadcastingPresence()
+        if (wasServing) announceServerGone(context)
 
         connectionStatus.value = context.getString(R.string.status_idle)
         isStreamingCurrent.value = false

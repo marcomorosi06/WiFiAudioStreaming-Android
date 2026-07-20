@@ -596,7 +596,8 @@ class MainActivity : ComponentActivity() {
             onToggleAutoConnectIp = viewModel::toggleAutoConnectIp,
             onSecurityChange = viewModel::setSecurity,
             onEncryptionChange = viewModel::setEncryption,
-            hasMicPermission = hasMicPermission
+            hasMicPermission = hasMicPermission,
+            onNoiseReductionChange = viewModel::setNoiseReduction
         )
 
         ExpressiveSettingsScreen(
@@ -625,6 +626,8 @@ class MainActivity : ComponentActivity() {
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
             onHapticsChange = viewModel::setHapticsEnabled,
+            onDeveloperModeChange = viewModel::setDeveloperMode,
+            onNoiseReductionChange = viewModel::setNoiseReduction,
             onShowDonation = {
                 showSettingsScreen.value = false
                 lifecycleScope.launch {

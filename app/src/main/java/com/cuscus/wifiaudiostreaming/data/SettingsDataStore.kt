@@ -72,7 +72,10 @@ data class AppSettings(
     val securityMode: String = "OFF",
     val authKey: String = "",
     val encryptionEnabled: Boolean = false,
-    val hapticsEnabled: Boolean = true
+    val hapticsEnabled: Boolean = true,
+    val developerMode: Boolean = false,
+    val noiseReductionEnabled: Boolean = false,
+    val noiseReductionStrength: Int = 50
 )
 
 class SettingsDataStore(context: Context) {
@@ -109,6 +112,9 @@ class SettingsDataStore(context: Context) {
         val LAST_SEEN_CHANGELOG_VERSION = stringPreferencesKey("last_seen_changelog_version")
         val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+        val NOISE_REDUCTION_ENABLED = booleanPreferencesKey("noise_reduction_enabled")
+        val NOISE_REDUCTION_STRENGTH = intPreferencesKey("noise_reduction_strength")
     }
 
     val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
@@ -145,6 +151,9 @@ class SettingsDataStore(context: Context) {
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
             disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
             hapticsEnabled = preferences[PreferencesKeys.HAPTICS_ENABLED] ?: true,
+            developerMode = preferences[PreferencesKeys.DEVELOPER_MODE] ?: false,
+            noiseReductionEnabled = preferences[PreferencesKeys.NOISE_REDUCTION_ENABLED] ?: false,
+            noiseReductionStrength = preferences[PreferencesKeys.NOISE_REDUCTION_STRENGTH] ?: 50,
             lastSeenChangelogVersion = preferences[PreferencesKeys.LAST_SEEN_CHANGELOG_VERSION] ?: "",
             autoUpdateCheckEnabled = preferences[PreferencesKeys.AUTO_UPDATE_CHECK_ENABLED] ?: true,
             latencyMs = preferences[PreferencesKeys.LATENCY_MS] ?: 120,
@@ -362,6 +371,22 @@ class SettingsDataStore(context: Context) {
     suspend fun saveDisconnectionSoundEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveDeveloperMode(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEVELOPER_MODE] = enabled
+            // Spegnendo la modalita' sviluppatore non deve restare attivo un DSP
+            // che l'utente non puo' piu' vedere ne' disattivare.
+            if (!enabled) preferences[PreferencesKeys.NOISE_REDUCTION_ENABLED] = false
+        }
+    }
+
+    suspend fun saveNoiseReduction(enabled: Boolean, strength: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.NOISE_REDUCTION_ENABLED] = enabled
+            preferences[PreferencesKeys.NOISE_REDUCTION_STRENGTH] = strength.coerceIn(0, 100)
         }
     }
 

@@ -339,4 +339,12 @@
     <string name="multicast_locked_by_both">Lo richiedono RTP e HTTP</string>
     <string name="multicast_locked_hint">Trasmettono entrambi a tutti gli ascoltatori insieme, quindi la modalità a client singolo non è possibile. Disattiva RTP e HTTP nelle impostazioni per sbloccarla.</string>
     <string name="status_unsupported_format">Impossibile riprodurre questo flusso: il server invia %1$s, non supportato da questo dispositivo.</string>
+    <string name="settings_group_developer">Sviluppatore</string>
+    <string name="settings_item_developer_title">Funzioni sviluppatore</string>
+    <string name="settings_item_developer_desc">Mostra opzioni avanzate e sperimentali</string>
+    <string name="nr_title">Riduzione del rumore</string>
+    <string name="nr_desc">Pulisce ronzio di rete e fruscio dalle sorgenti analogiche</string>
+    <string name="nr_strength">Intensità: %1$d%%</string>
+    <string name="nr_hint">Serve solo con sorgenti analogiche rumorose, ad esempio un microcontrollore che campiona un\'uscita line-out. Su audio digitale pulito può solo aggiungere artefatti. Non usarla se chi trasmette già riduce il rumore a monte.</string>
+    <string name="status_server_busy">Quel server sta già trasmettendo a un altro dispositivo.</string>
 </resources>

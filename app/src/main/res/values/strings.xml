@@ -339,4 +339,12 @@
     <string name="multicast_locked_by_both">RTP and HTTP require it</string>
     <string name="multicast_locked_hint">Both stream to every listener at once, so single-client mode is not possible. Turn RTP and HTTP off in Settings to unlock this.</string>
     <string name="status_unsupported_format">Cannot play this stream: the server sends %1$s, which this device does not support.</string>
+    <string name="settings_group_developer">Developer</string>
+    <string name="settings_item_developer_title">Developer features</string>
+    <string name="settings_item_developer_desc">Show advanced, experimental options</string>
+    <string name="nr_title">Noise reduction</string>
+    <string name="nr_desc">Cleans mains hum and hiss from analog sources</string>
+    <string name="nr_strength">Strength: %1$d%%</string>
+    <string name="nr_hint">Only for noisy analog senders, such as a microcontroller sampling a line-out. On clean digital audio it can only add artifacts. Do not use it if the sender already removes noise on its side.</string>
+    <string name="status_server_busy">That server is already streaming to another device.</string>
 </resources>

@@ -71,6 +71,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -186,7 +187,8 @@ fun ExpressiveHomeScreen(
     onToggleAutoConnectIp: (String) -> Unit,
     onSecurityChange: (String, String) -> Unit = { _, _ -> },
     onEncryptionChange: (Boolean) -> Unit = {},
-    hasMicPermission: Boolean = true
+    hasMicPermission: Boolean = true,
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> }
 ) {
     val sourceReady = appSettings.streamInternal || appSettings.streamMic
     val phase = when {
@@ -269,7 +271,11 @@ fun ExpressiveHomeScreen(
                     isServer = isServer,
                     localIp = localIp,
                     accent = accent,
-                    sendClientMicrophone = appSettings.sendClientMicrophone
+                    sendClientMicrophone = appSettings.sendClientMicrophone,
+                    developerMode = appSettings.developerMode,
+                    noiseReductionEnabled = appSettings.noiseReductionEnabled,
+                    noiseReductionStrength = appSettings.noiseReductionStrength,
+                    onNoiseReductionChange = onNoiseReductionChange
                 )
             }
 
@@ -885,7 +891,11 @@ private fun LiveControls(
     isServer: Boolean,
     localIp: String,
     accent: Color,
-    sendClientMicrophone: Boolean
+    sendClientMicrophone: Boolean,
+    developerMode: Boolean = false,
+    noiseReductionEnabled: Boolean = false,
+    noiseReductionStrength: Int = 50,
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> }
 ) {
     val clipboard = LocalClipboardManager.current
     val haptics = rememberAppHaptics()
@@ -963,6 +973,61 @@ private fun LiveControls(
                 Icon(Icons.Filled.DarkMode, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.blackout_button))
+            }
+
+            if (developerMode) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.GraphicEq,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = if (noiseReductionEnabled) accent
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.nr_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = noiseReductionEnabled,
+                                onCheckedChange = {
+                                    haptics.toggle(it)
+                                    onNoiseReductionChange(it, noiseReductionStrength)
+                                }
+                            )
+                        }
+                        AnimatedVisibility(visible = noiseReductionEnabled) {
+                            Column {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(R.string.nr_strength, noiseReductionStrength),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = accent
+                                )
+                                Slider(
+                                    value = noiseReductionStrength.toFloat(),
+                                    onValueChange = {
+                                        onNoiseReductionChange(true, it.toInt())
+                                    },
+                                    onValueChangeFinished = { haptics.gestureEnd() },
+                                    valueRange = 0f..100f,
+                                    steps = 19,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Surface(
