@@ -26,9 +26,9 @@ import android.net.Uri
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.view.View
 import android.view.animation.AccelerateInterpolator
@@ -91,6 +91,9 @@ import com.cuscus.wifiaudiostreaming.scripting.ScriptActionType
 import com.cuscus.wifiaudiostreaming.scripting.ScriptCommand
 import com.cuscus.wifiaudiostreaming.scripting.ScriptExecutor
 import kotlinx.coroutines.launch
+
+private const val SPLASH_CHOREOGRAPHY_MS = 900L
+private const val SPLASH_HANDOFF_MS = 160L
 
 class MainActivity : ComponentActivity() {
 
@@ -162,27 +165,23 @@ class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen().setOnExitAnimationListener { provider ->
+        val splashScreen = installSplashScreen()
+        val splashStartedAt = SystemClock.uptimeMillis()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setKeepOnScreenCondition {
+                SystemClock.uptimeMillis() - splashStartedAt < SPLASH_CHOREOGRAPHY_MS
+            }
+        }
+        splashScreen.setOnExitAnimationListener { provider ->
             val finish = { runCatching { provider.remove() }.let { } }
             val root = runCatching { provider.view }.getOrNull()
-            // iconView è annotato non-null ma può essere assente: il getter stesso lancia NPE
-            val icon = runCatching { provider.iconView }.getOrNull()
 
             if (root == null) {
                 finish()
             } else {
-                val animators = buildList<Animator> {
-                    icon?.let {
-                        add(ObjectAnimator.ofFloat(it, View.SCALE_X, it.scaleX, 1.45f))
-                        add(ObjectAnimator.ofFloat(it, View.SCALE_Y, it.scaleY, 1.45f))
-                        add(ObjectAnimator.ofFloat(it, View.ALPHA, 1f, 0f))
-                    }
-                    add(ObjectAnimator.ofFloat(root, View.ALPHA, 1f, 0f))
-                }
                 runCatching {
-                    AnimatorSet().apply {
-                        playTogether(animators)
-                        duration = 240
+                    ObjectAnimator.ofFloat(root, View.ALPHA, 1f, 0f).apply {
+                        duration = SPLASH_HANDOFF_MS
                         interpolator = AccelerateInterpolator(1.6f)
                         addListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) = finish()
@@ -205,8 +204,17 @@ class MainActivity : ComponentActivity() {
             WiFiAudioStreamingTheme {
                 val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
+                val blackoutActive = BlackoutController.active.value
+                val outlinedSkin = blackoutActive
+
                 CompositionLocalProvider(
-                    LocalHapticsEnabled provides (appSettings?.hapticsEnabled ?: true)
+                    LocalHapticsEnabled provides (appSettings?.hapticsEnabled ?: true),
+                    LocalOutlinedSkin provides outlinedSkin
+                ) {
+                MaterialTheme(
+                    colorScheme = if (outlinedSkin) OutlinedSkin.colorScheme else MaterialTheme.colorScheme,
+                    typography = MaterialTheme.typography,
+                    shapes = MaterialTheme.shapes
                 ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -315,6 +323,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
                 }
                 }
             }
@@ -626,6 +635,7 @@ class MainActivity : ComponentActivity() {
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
             onHapticsChange = viewModel::setHapticsEnabled,
+            onBlackoutOutlinedChange = viewModel::setBlackoutOutlinedUi,
             onDeveloperModeChange = viewModel::setDeveloperMode,
             onNoiseReductionChange = viewModel::setNoiseReduction,
             onShowDonation = {
@@ -676,7 +686,7 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        BlackoutOverlay()
+        BlackoutOverlay(outlinedUi = currentSettings.blackoutOutlinedUi)
     }
 
     private fun hasRecordAudioPermission(): Boolean {

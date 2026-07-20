@@ -236,7 +236,7 @@
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">L\'app rimarrà attiva in background per connettersi ai server con la stella.</string>
 
-    <string name="settings_group_sounds">Suoni</string>
+    <string name="settings_group_personalization">Personalizzazione</string>
     <string name="settings_item_connection_sound_title">Suono di connessione</string>
     <string name="settings_item_connection_sound_desc">Riproduci un suono quando il client si connette a un server</string>
     <string name="settings_item_custom_sound_title">Suono di connessione personalizzato</string>
@@ -314,9 +314,12 @@
     <string name="protocol_incompatible_update">Apri i download</string>
     <string name="blackout_button">Schermo nero</string>
     <string name="blackout_hint">Tocca due volte per tornare</string>
+    <string name="blackout_hint_wrong_spot">Non lì, campione, da un\'altra parte</string>
     <string name="playback_keep_open_hint">Per la massima qualità, tieni l\'app aperta sullo schermo e il telefono sbloccato. Uscire dall\'app o bloccare il dispositivo può causare artefatti audio.</string>
     <string name="settings_item_haptics_title">Feedback aptico</string>
     <string name="settings_item_haptics_desc">Vibrazione su tocchi, interruttori e azioni principali</string>
+    <string name="settings_item_blackout_outlined_title">Schermo scuro con contorni</string>
+    <string name="settings_item_blackout_outlined_desc">Mantieni i controlli visibili come contorni bianchi invece di uno schermo completamente nero</string>
     <string name="settings_item_show_donation_title">Mostra il messaggio di supporto</string>
     <string name="settings_item_show_donation_desc">Riporta il messaggio Ko-fi che hai chiuso</string>
     <string name="source_code_protocol">Protocollo WFAS v2</string>
@@ -347,4 +350,6 @@
     <string name="nr_strength">Intensità: %1$d%%</string>
     <string name="nr_hint">Serve solo con sorgenti analogiche rumorose, ad esempio un microcontrollore che campiona un\'uscita line-out. Su audio digitale pulito può solo aggiungere artefatti. Non usarla se chi trasmette già riduce il rumore a monte.</string>
     <string name="status_server_busy">Quel server sta già trasmettendo a un altro dispositivo.</string>
+    <string name="changelog_download_from_website">Scarica dal sito web</string>
+    <string name="settings_item_encryption_needs_key">Disponibile quando la modalità di sicurezza è impostata su Chiave</string>
 </resources>

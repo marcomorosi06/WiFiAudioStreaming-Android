@@ -2,7 +2,9 @@ package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.font.FontFamily
@@ -80,10 +85,13 @@ data class ChangelogItem(
     val title: Bilingual,
     val body: Bilingual,
     val linkLabel: Bilingual? = null,
-    val linkUrl: String? = null
+    val linkUrl: String? = null,
+    @StringRes val secondaryLinkLabelRes: Int? = null,
+    val secondaryLinkUrl: String? = null
 )
 
 private const val DESKTOP_RELEASES_URL = "https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop/releases"
+private const val DESKTOP_DOWNLOAD_URL = "https://www.marcomorosi.eu/wifi-audio-streaming/download/"
 
 data class ChangelogEntry(
     val version: String,
@@ -159,7 +167,9 @@ object Changelog {
                         "Anche WiFi Audio Streaming per desktop è stata aggiornata. Aggiornala anche tu, così i due lati restano compatibili."
                     ),
                     linkLabel = Bilingual("Open on GitHub", "Apri su GitHub"),
-                    linkUrl = DESKTOP_RELEASES_URL
+                    linkUrl = DESKTOP_RELEASES_URL,
+                    secondaryLinkLabelRes = R.string.changelog_download_from_website,
+                    secondaryLinkUrl = DESKTOP_DOWNLOAD_URL
                 )
             )
         )
@@ -356,31 +366,51 @@ private fun ChangelogItemCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = cs.onSurfaceVariant
             )
-            if (item.linkUrl != null && item.linkLabel != null) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                val linkHaptics = rememberAppHaptics()
+            val primaryLink = item.linkUrl?.let { url -> item.linkLabel?.let { url to it.text() } }
+            val secondaryLink = item.secondaryLinkUrl?.let { url ->
+                item.secondaryLinkLabelRes?.let { url to stringResource(it) }
+            }
+            if (primaryLink != null || secondaryLink != null) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(badge.copy(alpha = 0.16f))
-                        .clickable {
-                            linkHaptics.tap()
-                            runCatching {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.linkUrl)))
-                            }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = item.linkLabel.text(),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = badge,
-                        fontWeight = FontWeight.Bold
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    secondaryLink?.let { (url, label) -> ChangelogLinkChip(label, url, badge, filled = true) }
+                    primaryLink?.let { (url, label) -> ChangelogLinkChip(label, url, badge, filled = false) }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ChangelogLinkChip(
+    label: String,
+    url: String,
+    badge: Color,
+    filled: Boolean
+) {
+    val context = LocalContext.current
+    val linkHaptics = rememberAppHaptics()
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .then(
+                if (filled) Modifier.background(badge.copy(alpha = 0.16f))
+                else Modifier.border(1.dp, badge.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+            )
+            .clickable {
+                linkHaptics.tap()
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = badge,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

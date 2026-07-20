@@ -236,7 +236,7 @@
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
 
-    <string name="settings_group_sounds">Sounds</string>
+    <string name="settings_group_personalization">Personalization</string>
     <string name="settings_item_connection_sound_title">Connection Sound</string>
     <string name="settings_item_connection_sound_desc">Play a sound when the client connects to a server</string>
     <string name="settings_item_custom_sound_title">Custom Connection Sound</string>
@@ -314,9 +314,12 @@
     <string name="protocol_incompatible_update">Open downloads</string>
     <string name="blackout_button">Dark screen</string>
     <string name="blackout_hint">Double tap to return</string>
+    <string name="blackout_hint_wrong_spot">Not there, buddy, somewhere else</string>
     <string name="playback_keep_open_hint">For the best quality, keep this app open on screen and the phone unlocked. Leaving the app or locking the device may cause audio artifacts.</string>
     <string name="settings_item_haptics_title">Haptic feedback</string>
     <string name="settings_item_haptics_desc">Vibrate on taps, toggles and key actions</string>
+    <string name="settings_item_blackout_outlined_title">Outlined dark screen</string>
+    <string name="settings_item_blackout_outlined_desc">Keep the controls visible as white outlines instead of a fully black screen</string>
     <string name="settings_item_show_donation_title">Show support message</string>
     <string name="settings_item_show_donation_desc">Bring back the Ko-fi message you dismissed</string>
     <string name="source_code_protocol">WFAS v2 Protocol</string>
@@ -347,4 +350,6 @@
     <string name="nr_strength">Strength: %1$d%%</string>
     <string name="nr_hint">Only for noisy analog senders, such as a microcontroller sampling a line-out. On clean digital audio it can only add artifacts. Do not use it if the sender already removes noise on its side.</string>
     <string name="status_server_busy">That server is already streaming to another device.</string>
+    <string name="changelog_download_from_website">Download from the website</string>
+    <string name="settings_item_encryption_needs_key">Available when the security mode is set to Key</string>
 </resources>

@@ -62,6 +62,7 @@ data class ServerInfo(
     val ip: String,
     val isMulticast: Boolean,
     val port: Int,
+    val hostname: String = "",
     val securityMode: String? = null,
     val encrypted: Boolean = false,
     val serverSendsMic: Boolean = false,
@@ -163,12 +164,6 @@ object NetworkManager {
         const val AUTH_REQUIRED_PREFIX = "WFAS_AUTH_REQUIRED"
         const val UNAUTHORIZED_MESSAGE = "WFAS_UNAUTHORIZED"
 
-        /**
-         * Il server unicast serve un client alla volta: a chiunque altro bussi
-         * mentre e' occupato risponde subito questo, invece di lasciarlo
-         * ritentare a vuoto per 30 secondi. I client che non lo conoscono
-         * semplicemente lo ignorano e vanno in timeout come prima.
-         */
         const val BUSY_MESSAGE = "WFAS_BUSY"
     }
 
@@ -612,6 +607,7 @@ object NetworkManager {
                                             val advertisedFormat = StreamAudioFormat.fromBeaconParts(parts)
                                             val serverInfo = ServerInfo(
                                                 ip = remoteIp, isMulticast = isMulticast, port = port,
+                                                hostname = hostname,
                                                 securityMode = authMode, encrypted = encrypted,
                                                 serverSendsMic = micTok?.contains("tx") == true,
                                                 serverWantsMic = micTok?.contains("rx") == true,
@@ -1919,10 +1915,9 @@ object NetworkManager {
                         var mcLastEpoch = SettingsDataStore(context).getMcastClientEpoch(serverInfo.ip)
                         val beaconPrefixLen = WfasCrypto.MSG_MCAST_ENC.length
 
-                        val drainPacket = DatagramPacket(ByteArray(65536), 65536)
-                        val maxLagPackets = 5
                         while (isActive) {
                             try {
+                                packet.length = buffer.size
                                 multicastSocket.receive(packet)
                             } catch (_: java.net.SocketTimeoutException) {
                                 continue
@@ -1998,27 +1993,13 @@ object NetworkManager {
                             }
 
                             classify(packet.data, packet.length)
-                            multicastSocket.soTimeout = 1
-                            while (!stopLoop) {
-                                try {
-                                    multicastSocket.receive(drainPacket)
-                                } catch (_: java.net.SocketTimeoutException) {
-                                    break
-                                }
-                                classify(drainPacket.data, drainPacket.length)
-                            }
-                            multicastSocket.soTimeout = 2000
 
                             if (stopLoop) break
                             if (audioPackets.isEmpty()) continue
 
-                            if (audioPackets.size > maxLagPackets) {
-                                playMc(audioPackets[audioPackets.size - 1])
-                            } else {
-                                for (a in audioPackets) {
-                                    if (!isActive) break
-                                    playMc(a)
-                                }
+                            for (a in audioPackets) {
+                                if (!isActive) break
+                                playMc(a)
                             }
                             if (mcAbort) break
                         }

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.zIndex
@@ -81,12 +83,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cuscus.wifiaudiostreaming.data.AppScript
@@ -463,6 +469,7 @@ fun ExpressiveSettingsScreen(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
     onDeveloperModeChange: (Boolean) -> Unit = {},
     onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
@@ -504,6 +511,7 @@ fun ExpressiveSettingsScreen(
             onConnectionSoundChange = onConnectionSoundChange,
             onDisconnectionSoundChange = onDisconnectionSoundChange,
             onHapticsChange = onHapticsChange,
+            onBlackoutOutlinedChange = onBlackoutOutlinedChange,
             onShowDonation = onShowDonation,
             onDeveloperModeChange = onDeveloperModeChange,
             onNoiseReductionChange = onNoiseReductionChange,
@@ -539,6 +547,7 @@ fun SettingsScreenContent(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
     onDeveloperModeChange: (Boolean) -> Unit = {},
     onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
@@ -919,8 +928,8 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_sounds),
-                    icon = Icons.Outlined.VolumeUp
+                    title = stringResource(R.string.settings_group_personalization),
+                    icon = Icons.Outlined.Palette
                 ) {
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_connection_sound_title),
@@ -944,6 +953,14 @@ fun SettingsScreenContent(
                         icon = Icons.Outlined.Vibration,
                         isChecked = appSettings.hapticsEnabled,
                         onCheckedChange = onHapticsChange
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_blackout_outlined_title),
+                        description = stringResource(R.string.settings_item_blackout_outlined_desc),
+                        icon = Icons.Outlined.DarkMode,
+                        isChecked = appSettings.blackoutOutlinedUi,
+                        onCheckedChange = onBlackoutOutlinedChange
                     )
                 }
             }
@@ -2824,32 +2841,56 @@ fun ModeTag(isMulticast: Boolean) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun DeviceBadges(securityMode: String?, encrypted: Boolean, serverSendsMic: Boolean, serverWantsMic: Boolean) {
     val mode = securityMode?.uppercase()
     val badges = buildList {
         when {
-            encrypted -> add(Triple(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true))
-            mode == "KEY" -> add(Triple(Icons.Outlined.Key, stringResource(R.string.sec_key), true))
-            mode == "ASK" -> add(Triple(Icons.Outlined.Security, stringResource(R.string.sec_ask), true))
+            encrypted -> add(
+                DeviceBadgeSpec(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true, MaterialShapes.Gem)
+            )
+            mode == "KEY" -> add(
+                DeviceBadgeSpec(Icons.Outlined.Key, stringResource(R.string.sec_key), true, MaterialShapes.Pentagon)
+            )
+            mode == "ASK" -> add(
+                DeviceBadgeSpec(Icons.Outlined.Security, stringResource(R.string.sec_ask), true, MaterialShapes.Sunny)
+            )
         }
-        if (serverSendsMic) add(Triple(Icons.Filled.Mic, stringResource(R.string.mic_sends), false))
-        if (serverWantsMic) add(Triple(Icons.Filled.Hearing, stringResource(R.string.mic_wants), false))
+        if (serverSendsMic) add(
+            DeviceBadgeSpec(Icons.Filled.Mic, stringResource(R.string.mic_sends), false, MaterialShapes.Cookie7Sided)
+        )
+        if (serverWantsMic) add(
+            DeviceBadgeSpec(Icons.Filled.Hearing, stringResource(R.string.mic_wants), false, MaterialShapes.Clover4Leaf)
+        )
     }
     if (badges.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        badges.forEach { (icon, desc, accent) -> DeviceBadge(icon, desc, accent) }
+        badges.forEach { DeviceBadge(it) }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private data class DeviceBadgeSpec(
+    val icon: ImageVector,
+    val desc: String,
+    val accent: Boolean,
+    val shape: RoundedPolygon
+)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DeviceBadge(icon: ImageVector, desc: String, accent: Boolean) {
-    val bg = if (accent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-    val fg = if (accent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+private fun DeviceBadge(spec: DeviceBadgeSpec) {
+    val bg = if (spec.accent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+    val fg = if (spec.accent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+    val morph = remember(spec.shape) { Morph(spec.shape, spec.shape) }
     Box(
-        modifier = Modifier.size(26.dp).clip(CircleShape).background(bg),
+        modifier = Modifier
+            .size(26.dp)
+            .clip(MorphOutlineShape(morph, 1f))
+            .background(bg),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = desc, tint = fg, modifier = Modifier.size(15.dp))
+        Icon(spec.icon, contentDescription = spec.desc, tint = fg, modifier = Modifier.size(14.dp))
     }
 }
 
@@ -3457,15 +3498,25 @@ private fun OnboardingFeaturePage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
         ) {
             Spacer(modifier = Modifier.height(36.dp))
 
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(tween(500)) + scaleIn(tween(500), initialScale = 0.75f)
+            val orbEnter by animateFloatAsState(
+                targetValue = if (visible) 1f else 0f,
+                animationSpec = tween(500),
+                label = "onboardingOrbEnter"
+            )
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    alpha = orbEnter
+                    val enterScale = 0.75f + 0.25f * orbEnter
+                    scaleX = enterScale
+                    scaleY = enterScale
+                }
             ) {
                 ExpressiveOnboardingOrb(
                     size = 128.dp,
@@ -3529,6 +3580,8 @@ private fun OnboardingFeaturePage(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -4988,12 +5041,20 @@ private fun ScriptLibraryItem(
 
 object BlackoutController {
     val active = mutableStateOf(false)
+    val interactiveBounds = mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+    val interactionTick = mutableStateOf(0)
+    val wrongSpot = mutableStateOf(false)
     fun show() { active.value = true }
     fun hide() { active.value = false }
+    fun poke() { interactionTick.value++ }
+    fun signalWrongSpot() {
+        wrongSpot.value = true
+        poke()
+    }
 }
 
 @Composable
-fun BlackoutOverlay() {
+fun BlackoutOverlay(outlinedUi: Boolean = false) {
     val active = BlackoutController.active.value
     val overlayAlpha by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
@@ -5035,6 +5096,8 @@ fun BlackoutOverlay() {
         if (active) {
             pendingTapAt = 0L
             hintKey = 0
+            BlackoutController.interactionTick.value = 0
+            BlackoutController.wrongSpot.value = false
             hintAlpha.snapTo(0f)
         }
     }
@@ -5045,41 +5108,94 @@ fun BlackoutOverlay() {
         pendingTapAt = 0L
     }
 
-    LaunchedEffect(hintKey) {
-        if (hintKey == 0) return@LaunchedEffect
+    val interactionTick = BlackoutController.interactionTick.value
+    val wrongSpot = BlackoutController.wrongSpot.value
+    LaunchedEffect(hintKey, interactionTick) {
+        if (hintKey == 0 && !wrongSpot) return@LaunchedEffect
         hintAlpha.snapTo(1f)
         delay(5000)
         hintAlpha.animateTo(0f, animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing))
     }
 
-    Box(
+    val reveal = if (outlinedUi) 1f else hintAlpha.value
+
+    val tapCatcher = if (active) Modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onTap = {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (pendingTapAt != 0L && now - pendingTapAt <= 2000L) {
+                    pendingTapAt = 0L
+                    BlackoutController.hide()
+                } else {
+                    pendingTapAt = now
+                    hintKey += 1
+                    BlackoutController.wrongSpot.value = false
+                }
+            }
+        )
+    } else Modifier
+
+    val hole = if (active && reveal > 0f) BlackoutController.interactiveBounds.value else null
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(1f)
-            .graphicsLayer { alpha = overlayAlpha }
-            .background(Color.Black)
-            .then(
-                if (active) Modifier.pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            val now = android.os.SystemClock.elapsedRealtime()
-                            if (pendingTapAt != 0L && now - pendingTapAt <= 2000L) {
-                                pendingTapAt = 0L
-                                BlackoutController.hide()
-                            } else {
-                                pendingTapAt = now
-                                hintKey += 1
-                            }
-                        }
-                    )
-                } else Modifier
-            ),
+            .graphicsLayer { alpha = overlayAlpha },
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = 1f - reveal))
+        )
+
+        if (hole == null) {
+            Box(modifier = Modifier.matchParentSize().then(tapCatcher))
+        } else {
+            val d = LocalDensity.current
+            val w = maxWidth
+            val h = maxHeight
+            val left = with(d) { hole.left.toDp() }.coerceIn(0.dp, w)
+            val top = with(d) { hole.top.toDp() }.coerceIn(0.dp, h)
+            val right = with(d) { hole.right.toDp() }.coerceIn(0.dp, w)
+            val bottom = with(d) { hole.bottom.toDp() }.coerceIn(0.dp, h)
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(0.dp, 0.dp)
+                    .size(w, top)
+                    .then(tapCatcher)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(0.dp, bottom)
+                    .size(w, (h - bottom).coerceAtLeast(0.dp))
+                    .then(tapCatcher)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(0.dp, top)
+                    .size(left, (bottom - top).coerceAtLeast(0.dp))
+                    .then(tapCatcher)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(right, top)
+                    .size((w - right).coerceAtLeast(0.dp), (bottom - top).coerceAtLeast(0.dp))
+                    .then(tapCatcher)
+            )
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .padding(32.dp)
                 .graphicsLayer { alpha = hintAlpha.value }
         ) {
@@ -5090,7 +5206,9 @@ fun BlackoutOverlay() {
                 modifier = Modifier.size(22.dp)
             )
             Text(
-                text = stringResource(R.string.blackout_hint),
+                text = stringResource(
+                    if (wrongSpot) R.string.blackout_hint_wrong_spot else R.string.blackout_hint
+                ),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,

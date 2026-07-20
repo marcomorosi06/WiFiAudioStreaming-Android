@@ -22,6 +22,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,6 +111,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -593,8 +596,7 @@ private fun StateHero(
                             alpha = 0.16f + boost * 0.34f
                             rotationZ = -(spin + extraSpin) * 0.6f
                         }
-                        .clip(MorphOutlineShape(morph, morphProgress))
-                        .background(accent)
+                        .skinnedSurface(accent, MorphOutlineShape(morph, morphProgress))
                 )
             }
 
@@ -607,14 +609,14 @@ private fun StateHero(
                         scaleX = s
                         scaleY = s
                     }
-                    .clip(MorphOutlineShape(morph, morphProgress))
-                    .background(
+                    .skinnedSurface(
                         Brush.linearGradient(
                             colors = listOf(
                                 accent.copy(alpha = if (live) 0.95f else 0.30f),
                                 accent.copy(alpha = if (live) 0.45f else 0.14f)
                             )
-                        )
+                        ),
+                        MorphOutlineShape(morph, morphProgress)
                     )
                     .pointerInput(live) {
                         detectTapGestures(
@@ -809,16 +811,18 @@ private fun HeroActionButton(
         label = "HeroActionContent"
     )
 
+    val outlined = LocalOutlinedSkin.current
     Button(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(corner),
         colors = ButtonDefaults.buttonColors(
-            containerColor = container,
-            contentColor = content,
+            containerColor = if (outlined) Color.Transparent else container,
+            contentColor = if (outlined) OutlinedSkin.content else content,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         ),
+        border = if (outlined) BorderStroke(OutlinedSkin.width, OutlinedSkin.stroke) else null,
         contentPadding = ButtonDefaults.ContentPadding,
         modifier = Modifier
             .fillMaxWidth()
@@ -943,6 +947,8 @@ private fun LiveControls(
             }
         }
 
+        val outlinedSkin = LocalOutlinedSkin.current
+
         if (!isServer && sendClientMicrophone) {
             val muted by NetworkManager.isMicMuted.collectAsState()
             FilledTonalButton(
@@ -951,6 +957,7 @@ private fun LiveControls(
                     NetworkManager.isMicMuted.value = !muted
                 },
                 shape = RoundedCornerShape(24.dp),
+                border = if (outlinedSkin) BorderStroke(OutlinedSkin.width, OutlinedSkin.stroke) else null,
                 colors = if (muted) ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
@@ -963,23 +970,47 @@ private fun LiveControls(
         }
 
         if (!isServer) {
-            FilledTonalButton(
-                onClick = {
-                    haptics.longPress()
-                    BlackoutController.show()
-                },
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Icon(Icons.Filled.DarkMode, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.blackout_button))
+            if (!outlinedSkin) {
+                FilledTonalButton(
+                    onClick = {
+                        haptics.longPress()
+                        BlackoutController.show()
+                    },
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Icon(Icons.Filled.DarkMode, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.blackout_button))
+                }
             }
 
             if (developerMode) {
+                var nrLastTap by remember { mutableStateOf(0L) }
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned {
+                            BlackoutController.interactiveBounds.value = it.boundsInRoot()
+                        }
+                        .then(
+                            if (outlinedSkin) Modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = {
+                                        val now = android.os.SystemClock.elapsedRealtime()
+                                        if (nrLastTap != 0L && now - nrLastTap <= 500L) {
+                                            nrLastTap = 0L
+                                            haptics.reject()
+                                            BlackoutController.signalWrongSpot()
+                                        } else {
+                                            nrLastTap = now
+                                            BlackoutController.poke()
+                                        }
+                                    }
+                                )
+                            } else Modifier
+                        )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1002,6 +1033,7 @@ private fun LiveControls(
                                 checked = noiseReductionEnabled,
                                 onCheckedChange = {
                                     haptics.toggle(it)
+                                    BlackoutController.poke()
                                     onNoiseReductionChange(it, noiseReductionStrength)
                                 }
                             )
@@ -1014,12 +1046,29 @@ private fun LiveControls(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = accent
                                 )
+                                var lastNrStep by remember { mutableStateOf(noiseReductionStrength) }
+                                var nrDragging by remember { mutableStateOf(false) }
                                 Slider(
                                     value = noiseReductionStrength.toFloat(),
-                                    onValueChange = {
-                                        onNoiseReductionChange(true, it.toInt())
+                                    onValueChange = { v ->
+                                        if (!nrDragging) {
+                                            nrDragging = true
+                                            haptics.gestureStart()
+                                        }
+                                        val step = v.toInt()
+                                        if (step != lastNrStep) {
+                                            lastNrStep = step
+                                            BlackoutController.poke()
+                                            if (step == 0 || step == 100) haptics.confirm()
+                                            else haptics.tick()
+                                        }
+                                        onNoiseReductionChange(true, step)
                                     },
-                                    onValueChangeFinished = { haptics.gestureEnd() },
+                                    onValueChangeFinished = {
+                                        nrDragging = false
+                                        BlackoutController.poke()
+                                        haptics.gestureEnd()
+                                    },
                                     valueRange = 0f..100f,
                                     steps = 19,
                                     modifier = Modifier.fillMaxWidth()

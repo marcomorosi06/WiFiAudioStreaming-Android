@@ -71,7 +71,7 @@ Turn your computer into a wireless audio transmitter or receiver.
 1. Launch the app and select **Send (Server)**.  
 2. In **Audio Source**, enable **Internal Audio**.  
 3. Choose your preferred protocol in the settings (WFAS, RTP, or HTTP Web). Fred lives in the title!
-4. For WFAS/RTP, choose **Multicast** (multiple clients) or **Unicast** (single client).  
+4. For WFAS/RTP, choose **Multicast** (multiple clients) or **Unicast** (single client). In Unicast the server serves one client at a time: while a session is running it disappears from other devices' lists, and any other device that tries to connect is told the server is busy instead of being left waiting.  
 5. Tap **Start Server**.  
 
 ---
@@ -81,6 +81,7 @@ Turn your computer into a wireless audio transmitter or receiver.
 2. The app will automatically search for active servers on the network.  
 3. Select a server from the list to connect.  
 4. **Fallback (Manual IP)**: If your router blocks discovery, type the server's IP address into the manual input field. The app will automatically configure the correct connection mode.
+5. If the server is already streaming to someone else in Unicast, the app reports *"That server is already streaming to another device"* right away and returns to the list.
 
 ---
 

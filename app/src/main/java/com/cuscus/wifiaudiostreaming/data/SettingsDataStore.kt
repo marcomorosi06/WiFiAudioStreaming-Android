@@ -73,6 +73,7 @@ data class AppSettings(
     val authKey: String = "",
     val encryptionEnabled: Boolean = false,
     val hapticsEnabled: Boolean = true,
+    val blackoutOutlinedUi: Boolean = false,
     val developerMode: Boolean = false,
     val noiseReductionEnabled: Boolean = false,
     val noiseReductionStrength: Int = 50
@@ -112,6 +113,7 @@ class SettingsDataStore(context: Context) {
         val LAST_SEEN_CHANGELOG_VERSION = stringPreferencesKey("last_seen_changelog_version")
         val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        val BLACKOUT_OUTLINED_UI = booleanPreferencesKey("blackout_outlined_ui")
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         val NOISE_REDUCTION_ENABLED = booleanPreferencesKey("noise_reduction_enabled")
         val NOISE_REDUCTION_STRENGTH = intPreferencesKey("noise_reduction_strength")
@@ -151,6 +153,7 @@ class SettingsDataStore(context: Context) {
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
             disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
             hapticsEnabled = preferences[PreferencesKeys.HAPTICS_ENABLED] ?: true,
+            blackoutOutlinedUi = preferences[PreferencesKeys.BLACKOUT_OUTLINED_UI] ?: false,
             developerMode = preferences[PreferencesKeys.DEVELOPER_MODE] ?: false,
             noiseReductionEnabled = preferences[PreferencesKeys.NOISE_REDUCTION_ENABLED] ?: false,
             noiseReductionStrength = preferences[PreferencesKeys.NOISE_REDUCTION_STRENGTH] ?: 50,
@@ -393,6 +396,12 @@ class SettingsDataStore(context: Context) {
     suspend fun saveHapticsEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.HAPTICS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveBlackoutOutlinedUi(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BLACKOUT_OUTLINED_UI] = enabled
         }
     }
 

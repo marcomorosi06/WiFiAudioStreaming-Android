@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.EnhancedEncryption
 import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
@@ -58,6 +59,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -72,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -468,32 +471,39 @@ fun ExpressiveChoiceRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         options.forEachIndexed { index, option ->
-            val distance = if (pulseIndex < 0) Int.MAX_VALUE else kotlin.math.abs(index - pulseIndex)
+            val offset = if (pulseIndex < 0) Int.MAX_VALUE else index - pulseIndex
+            val isPressed = offset == 0
+            val isNeighbour = offset == -1 || offset == 1
 
-            val popScale by animateFloatAsState(
-                targetValue = if (distance == 0) 1.08f else 1f,
+            val pop by animateFloatAsState(
+                targetValue = if (isPressed) 1.05f else 1f,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioHighBouncy,
-                    stiffness = Spring.StiffnessMedium
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
                 ),
                 label = "PillPop"
             )
             val squeezeX by animateFloatAsState(
-                targetValue = if (distance == 1) 0.90f else 1f,
+                targetValue = if (isNeighbour) 0.94f else 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
+                    stiffness = Spring.StiffnessMediumLow
                 ),
                 label = "PillSqueeze"
             )
             val squeezeY by animateFloatAsState(
-                targetValue = if (distance == 1) 1.04f else 1f,
+                targetValue = if (isNeighbour) 1.02f else 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
+                    stiffness = Spring.StiffnessMediumLow
                 ),
                 label = "PillSqueezeY"
             )
+            val originX = when (offset) {
+                -1 -> 0f
+                1 -> 1f
+                else -> 0.5f
+            }
 
             ExpressiveChoicePill(
                 icon = option.icon,
@@ -503,8 +513,9 @@ fun ExpressiveChoiceRow(
                 modifier = Modifier
                     .weight(1f)
                     .graphicsLayer {
-                        scaleX = popScale * squeezeX
-                        scaleY = popScale * squeezeY
+                        transformOrigin = TransformOrigin(originX, 0.5f)
+                        scaleX = pop * squeezeX
+                        scaleY = pop * squeezeY
                     }
             ) {
                 haptics.confirm()
@@ -582,7 +593,6 @@ fun ExpressiveSourceSection(
     onSecurityChange: (String, String) -> Unit,
     onEncryptionChange: (Boolean) -> Unit
 ) {
-    val haptics = rememberAppHaptics()
     val secMode = securityMode.uppercase()
     // RTP e HTTP trasmettono entrambi a tutti gli ascoltatori: con uno dei due
     // attivo il multicast e' imposto e il toggle va bloccato.
@@ -729,42 +739,19 @@ fun ExpressiveSourceSection(
 
         Spacer(Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.EnhancedEncryption,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = if (secMode == "KEY") accent else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.settings_item_encryption_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = stringResource(R.string.settings_item_encryption_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = encryptionEnabled && secMode == "KEY",
-                onCheckedChange = {
-                    haptics.toggle(it)
-                    onEncryptionChange(it)
-                },
-                enabled = secMode == "KEY"
-            )
-        }
+        ExpressiveToggleTile(
+            icon = if (secMode == "KEY") Icons.Outlined.EnhancedEncryption else Icons.Outlined.LockOpen,
+            activeIcon = Icons.Filled.EnhancedEncryption,
+            title = stringResource(R.string.settings_item_encryption_title),
+            subtitle = stringResource(
+                if (secMode == "KEY") R.string.settings_item_encryption_desc
+                else R.string.settings_item_encryption_needs_key
+            ),
+            checked = encryptionEnabled && secMode == "KEY",
+            enabled = secMode == "KEY",
+            accent = accent,
+            onCheckedChange = onEncryptionChange
+        )
     }
 }
 
@@ -819,9 +806,16 @@ fun ExpressiveDiscoverySection(
                     }
                     Spacer(Modifier.width(10.dp))
                 }
+                var refreshTurns by remember { mutableStateOf(0) }
+                val refreshRotation by animateFloatAsState(
+                    targetValue = refreshTurns * 360f,
+                    animationSpec = tween(600, easing = FastOutSlowInEasing),
+                    label = "RefreshSpin"
+                )
                 FilledTonalIconButton(
                     onClick = {
                         haptics.tap()
+                        refreshTurns++
                         onRefresh()
                     },
                     modifier = Modifier.size(36.dp)
@@ -829,7 +823,9 @@ fun ExpressiveDiscoverySection(
                     Icon(
                         Icons.Outlined.Refresh,
                         contentDescription = stringResource(R.string.refresh_button_description),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { rotationZ = refreshRotation }
                     )
                 }
             }
@@ -872,9 +868,10 @@ fun ExpressiveDiscoverySection(
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    devices.values.forEach { info ->
+                    devices.forEach { (hostname, info) ->
                         ExpressiveDeviceRow(
                             info = info,
+                            hostname = info.hostname.ifBlank { hostname },
                             accent = accent,
                             onConnect = { onConnect(info) }
                         )
@@ -889,6 +886,7 @@ fun ExpressiveDiscoverySection(
 @Composable
 private fun ExpressiveDeviceRow(
     info: ServerInfo,
+    hostname: String,
     accent: Color,
     onConnect: () -> Unit
 ) {
@@ -957,19 +955,36 @@ private fun ExpressiveDeviceRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
+            val title = hostname.ifBlank { info.ip }
             Text(
-                text = info.ip,
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = stringResource(
-                    if (info.isMulticast) R.string.mode_multicast else R.string.mode_unicast
-                ).uppercase() + "  ·  " + info.port,
+                text = "${info.ip}:${info.port}",
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = buildList {
+                    add(
+                        stringResource(
+                            if (info.isMulticast) R.string.mode_multicast else R.string.mode_unicast
+                        ).uppercase()
+                    )
+                    info.audioFormat?.let { add(it.describe()) }
+                }.joinToString("  ·  "),
                 style = MaterialTheme.typography.labelSmall,
                 letterSpacing = 1.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
             DeviceBadges(
                 securityMode = info.securityMode,

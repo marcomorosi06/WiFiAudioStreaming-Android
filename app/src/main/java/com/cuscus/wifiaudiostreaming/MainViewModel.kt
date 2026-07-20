@@ -319,6 +319,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveHapticsEnabled(enabled) }
     }
 
+    fun setBlackoutOutlinedUi(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveBlackoutOutlinedUi(enabled) }
+    }
+
     // Aggiorna startListening (passando l'interfaccia)
     fun startListening() {
         val currentSettings = appSettings.value
