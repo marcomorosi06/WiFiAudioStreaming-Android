@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material.icons.filled.Notifications
@@ -429,6 +430,14 @@ class MainActivity : ComponentActivity() {
             ProtocolMismatchDialog(
                 mismatch = mismatch,
                 onUpdate = {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://www.marcomorosi.eu/wifi-audio-streaming/download/")
+                    )
+                    runCatching { context.startActivity(intent) }
+                    viewModel.clearProtocolMismatch()
+                },
+                onGithub = {
                     val updateUrl = if (mismatch.localVersion < mismatch.remoteVersion)
                         "https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases"
                     else
@@ -765,6 +774,7 @@ fun ClientDiscoveryHandler() {
 fun ProtocolMismatchDialog(
     mismatch: ProtocolMismatch,
     onUpdate: () -> Unit,
+    onGithub: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ExpressiveVersionDialog(
@@ -778,9 +788,12 @@ fun ProtocolMismatchDialog(
         ),
         fromVersion = "v${mismatch.localVersion}",
         toVersion = "v${mismatch.remoteVersion}",
-        confirmLabel = stringResource(R.string.protocol_incompatible_update),
+        confirmLabel = stringResource(R.string.protocol_incompatible_website),
         dismissLabel = stringResource(R.string.close),
         onConfirm = onUpdate,
+        secondaryLabel = stringResource(R.string.protocol_incompatible_github),
+        secondaryIcon = Icons.Outlined.Code,
+        onSecondary = onGithub,
         onDismiss = onDismiss
     )
 }
