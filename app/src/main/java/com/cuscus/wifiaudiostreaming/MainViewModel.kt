@@ -329,6 +329,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         NetworkManager.startListeningForDevices(getApplication(), currentSettings?.networkInterface ?: "Auto")
     }
 
+    suspend fun restartListening() {
+        val currentSettings = appSettings.value
+        NetworkManager.restartListeningForDevices(getApplication(), currentSettings?.networkInterface ?: "Auto")
+    }
+
     // Aggiorna startClient (passando l'interfaccia)
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startClient(serverInfo: ServerInfo) {

@@ -197,6 +197,7 @@ class MainActivity : ComponentActivity() {
         actionBar?.hide()
 
         NetworkManager.prewarmAudio()
+        NetworkManager.startNetworkWatch(applicationContext)
 
         pendingCommand.value = ScriptCommand.fromIntent(intent)
 
@@ -406,7 +407,8 @@ class MainActivity : ComponentActivity() {
         val discoveredDevices by viewModel.discoveredDevices.collectAsStateWithLifecycle()
         val isMulticastMode by viewModel.isMulticastMode.collectAsStateWithLifecycle()
         val context = LocalContext.current
-        val localIp = remember { NetworkManager.getLocalIpAddress(context) }
+        val watchedIp by NetworkManager.localIpAddress.collectAsStateWithLifecycle()
+        val localIp = watchedIp.ifEmpty { remember { NetworkManager.getLocalIpAddress(context) } }
 
         var hasMicPermission by remember { mutableStateOf(hasRecordAudioPermission()) }
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -743,11 +745,12 @@ class MainActivity : ComponentActivity() {
 fun ClientDiscoveryHandler() {
     val viewModel: MainViewModel = viewModel()
     val isServer by viewModel.isServer.collectAsStateWithLifecycle()
+    val networkRevision by NetworkManager.networkRevision.collectAsStateWithLifecycle()
 
-    LaunchedEffect(isServer) {
+    LaunchedEffect(isServer, networkRevision) {
         if (!isServer) {
             if (!NetworkManager.autoConnectOwnsListening) {
-                viewModel.startListening()
+                viewModel.restartListening()
             }
         } else {
             if (!NetworkManager.autoConnectOwnsListening) {

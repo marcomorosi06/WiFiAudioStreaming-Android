@@ -118,6 +118,7 @@ object NetworkManager {
      * non lo fa lampeggiare dentro e fuori dalla lista.
      */
     private const val DISCOVERY_TTL_MS = 10_000L
+    private const val UDP_QUEUE_SLOTS = 4
 
     // --- GESTIONE VOLUME SERVER ANDROID ---
     val serverVolume = MutableStateFlow(1.0f)
@@ -286,6 +287,75 @@ object NetworkManager {
     val isMicMuted = MutableStateFlow(false)
     var autoConnectOwnsListening = false
     val lastSeenDevices = mutableMapOf<String, Pair<ServerInfo, Long>>()
+
+    val networkRevision = MutableStateFlow(0)
+    val localIpAddress = MutableStateFlow("")
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    private data class BroadcastParams(
+        val context: Context,
+        val isMulticast: Boolean,
+        val streamingPort: Int,
+        val networkInterfaceName: String,
+        val rtpEnabled: Boolean,
+        val audioFormat: StreamAudioFormat?
+    )
+    private var lastBroadcastParams: BroadcastParams? = null
+
+    private fun restartBroadcastOnNetworkChange() {
+        val p = lastBroadcastParams ?: return
+        if (broadcastingJob?.isActive != true) return
+        scope.launch {
+            val job = broadcastingJob
+            broadcastingJob = null
+            if (job != null) runCatching { job.cancelAndJoin() }
+            Log.d(TAG, "[BROADCAST] rete cambiata: beacon riavviato sull'interfaccia nuova")
+            startBroadcastingPresence(
+                p.context, p.isMulticast, p.streamingPort,
+                p.networkInterfaceName, p.rtpEnabled, p.audioFormat
+            )
+        }
+    }
+
+    fun startNetworkWatch(context: Context) {
+        if (networkCallback != null) return
+        val app = context.applicationContext
+        val cm = app.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        localIpAddress.value = getLocalIpAddress(app)
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            private fun refresh(reason: String) {
+                val ip = getLocalIpAddress(app)
+                val changed = ip != localIpAddress.value
+                localIpAddress.value = ip
+                Log.d(TAG, "[NET] $reason ip=$ip changed=$changed")
+                if (changed) {
+                    networkRevision.value++
+                    restartBroadcastOnNetworkChange()
+                }
+            }
+            override fun onAvailable(network: android.net.Network) = refresh("available")
+            override fun onLost(network: android.net.Network) = refresh("lost")
+            override fun onCapabilitiesChanged(
+                network: android.net.Network,
+                caps: NetworkCapabilities
+            ) = refresh("caps")
+            override fun onLinkPropertiesChanged(
+                network: android.net.Network,
+                props: android.net.LinkProperties
+            ) = refresh("link")
+        }
+        networkCallback = cb
+        runCatching { cm.registerDefaultNetworkCallback(cb) }
+            .onFailure { networkCallback = null }
+    }
+
+    fun stopNetworkWatch(context: Context) {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        val cm = context.applicationContext
+            .getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        runCatching { cm.unregisterNetworkCallback(cb) }
+    }
 
     // ── Riduzione del rumore lato ricevitore (opt-in, modalita' sviluppatore) ──
     private val noiseReducer = com.cuscus.wifiaudiostreaming.dsp.NoiseReducer()
@@ -661,6 +731,10 @@ object NetworkManager {
         rtpEnabled: Boolean = false,
         audioFormat: StreamAudioFormat? = null
     ) {
+        lastBroadcastParams = BroadcastParams(
+            context.applicationContext, isMulticast, streamingPort,
+            networkInterfaceName, rtpEnabled, audioFormat
+        )
         if (broadcastingJob?.isActive == true) return
         Log.d(TAG, "[BROADCAST] startBroadcastingPresence: isMulticast=$isMulticast port=$streamingPort iface=$networkInterfaceName rtp=$rtpEnabled")
         broadcastingJob = scope.launch {
@@ -970,7 +1044,7 @@ object NetworkManager {
                 val wifiIface = getWifiNetworkInterface(networkInterfaceName)
 
                 // ── Queue: producer → UDP sender ───────────────────────────────────────
-                val udpAudioQueue = java.util.concurrent.ArrayBlockingQueue<Pair<ByteArray, Int>>(30)
+                val udpAudioQueue = java.util.concurrent.ArrayBlockingQueue<Pair<ByteArray, Int>>(UDP_QUEUE_SLOTS)
 
                 fun launchAudioProducer(): Job = launch {
                     val internalBuf = if (streamInternal) ByteArray(safeBufferSize) else null
@@ -1041,8 +1115,15 @@ object NetworkManager {
                         val chunk = raw.copyOf(aligned)
                         httpPcmQueue?.let { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         rtpPcmQueue?.let  { if (it.remainingCapacity() > 0) it.offer(chunk) }
-                        val offered = udpAudioQueue.remainingCapacity() > 0
-                        if (offered) udpAudioQueue.offer(Pair(chunk, aligned))
+                        var dropped = 0
+                        while (udpAudioQueue.remainingCapacity() == 0) {
+                            if (udpAudioQueue.poll() == null) break
+                            dropped++
+                        }
+                        val offered = udpAudioQueue.offer(Pair(chunk, aligned))
+                        if (dropped > 0) {
+                            Log.d(TAG, "[PRODUCER] coda piena: scartati $dropped blocchi vecchi per non accumulare ritardo")
+                        }
 
                         producerLoopCount++
                         producerTotalBytes += aligned
@@ -2115,6 +2196,14 @@ object NetworkManager {
     fun stopListeningForDevices() {
         listeningJob?.cancel()
         listeningJob = null
+    }
+
+    suspend fun restartListeningForDevices(context: Context, networkInterfaceName: String = "Auto") {
+        val job = listeningJob
+        listeningJob = null
+        if (job != null) runCatching { job.cancelAndJoin() }
+        discoveredDevices.value = emptyMap()
+        startListeningForDevices(context, networkInterfaceName)
     }
 
     fun isListeningActive(): Boolean = listeningJob?.isActive == true

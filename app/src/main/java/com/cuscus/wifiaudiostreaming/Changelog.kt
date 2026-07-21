@@ -104,7 +104,7 @@ object Changelog {
 
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
-            version = "1.1",
+            version = "1.1.0",
             date = Bilingual("June 2026", "Giugno 2026"),
             headline = Bilingual(
                 "Automation, a clearer microphone, smarter device matching — and connection security with end-to-end encryption.",

@@ -168,8 +168,8 @@ class NoiseReducer {
 
     private class ChannelState(val sampleRate: Int, mainsHz: Int) {
 
-        // Notch di rete: fondamentale piu' armoniche, finche' stanno sotto Nyquist.
         private var notches: Array<Biquad> = emptyArray()
+        private var notchesActive = false
         private val dcBlock = Biquad().apply { highPass(30f, 0.707f, sampleRate) }
         private var mains = mainsHz
         private var mainsDecided = false
@@ -191,29 +191,40 @@ class NoiseReducer {
         private val minTracker = FloatArray(BINS) { Float.MAX_VALUE }
         private var minFrames = 0
         private var primed = false
-        private var framesSeen = 0
 
-        init { rebuildNotches() }
+        private val gainPrev = FloatArray(BINS) { 1f }
+
+        private var humFreqs: List<Float> = emptyList()
+        private val spurCount = IntArray(BINS)
+        private val spurSum = FloatArray(BINS)
+        private val spurSumSq = FloatArray(BINS)
+        private var spurObs = 0
+        private var spursDone = false
 
         fun reset() {
             inFill = 0
             pendingHead = 0; pendingTail = 0
             java.util.Arrays.fill(noiseMag, 0f)
             java.util.Arrays.fill(minTracker, Float.MAX_VALUE)
-            minFrames = 0; primed = false; framesSeen = 0
+            minFrames = 0; primed = false
             mainsDecided = false
-            notches.forEach { it.clearState() }
+            notchesActive = false
+            notches = emptyArray()
+            humFreqs = emptyList()
+            java.util.Arrays.fill(gainPrev, 1f)
+            java.util.Arrays.fill(spurCount, 0)
+            java.util.Arrays.fill(spurSum, 0f)
+            java.util.Arrays.fill(spurSumSq, 0f)
+            spurObs = 0
+            spursDone = false
             dcBlock.clearState()
         }
 
-        private fun rebuildNotches() {
-            val list = ArrayList<Biquad>()
-            var f = mains.toFloat()
-            while (f < sampleRate / 2f * 0.9f && list.size < 8) {
-                list.add(Biquad().apply { notch(f, 12f, sampleRate) })
-                f += mains
-            }
-            notches = list.toTypedArray()
+        private fun buildNotches(freqs: List<Float>) {
+            notches = freqs.map { hz ->
+                Biquad().apply { notch(hz, hz / NOTCH_BANDWIDTH_HZ, sampleRate) }
+            }.toTypedArray()
+            notchesActive = notches.isNotEmpty()
         }
 
         fun push(
@@ -230,7 +241,7 @@ class NoiseReducer {
 
                 // Stadio 1, dominio del tempo: continua e ronzio di rete.
                 x = dcBlock.process(x)
-                for (b in notches) x = b.process(x)
+                if (notchesActive) for (b in notches) x = b.process(x)
 
                 // Stadio 2: accumula per la STFT.
                 inBuf[inFill++] = x
@@ -260,8 +271,6 @@ class NoiseReducer {
             }
             owner.fft(re, im)
 
-            framesSeen++
-
             // Aggiorna la stima del rumore con statistica di minimo: il minimo di
             // ogni bin su una finestra scorrevole e' una buona approssimazione del
             // fondo, senza dover distinguere voce da silenzio.
@@ -283,9 +292,11 @@ class NoiseReducer {
                 }
                 minFrames = 0
                 primed = true
+                observeSpurs()
             }
 
-            if (!mainsDecided && framesSeen > MIN_WINDOW_FRAMES) decideMains()
+            if (!mainsDecided && primed) calibrateHum()
+            if (!spursDone && spurObs >= SPUR_OBSERVATIONS) selectSpurs()
 
             if (primed) {
                 // Valori tarati in simulazione: a forza 1 si tolgono ~12 dB di
@@ -297,7 +308,9 @@ class NoiseReducer {
                     val mag = hypot(re[k], im[k])
                     if (mag <= 1e-9f) continue
                     val cleaned = max(mag - alpha * noiseMag[k], floorGain * mag)
-                    val gain = cleaned / mag
+                    val raw = cleaned / mag
+                    val gain = GAIN_SMOOTH * gainPrev[k] + (1f - GAIN_SMOOTH) * raw
+                    gainPrev[k] = gain
                     re[k] *= gain
                     im[k] *= gain
                     if (k > 0 && k < FFT_SIZE - k) {
@@ -327,22 +340,85 @@ class NoiseReducer {
             java.util.Arrays.fill(outBuf, FFT_SIZE - HOP, FFT_SIZE, 0f)
         }
 
-        /** Sceglie 50 o 60 Hz guardando dove il rumore di fondo ha piu' energia. */
-        private fun decideMains() {
+        private fun calibrateHum() {
             val binHz = sampleRate.toFloat() / FFT_SIZE
-            fun energyAround(f: Float): Double {
-                val k = (f / binHz).toInt()
-                if (k <= 0 || k >= BINS - 1) return 0.0
-                return (noiseMag[k - 1] + noiseMag[k] + noiseMag[k + 1]).toDouble()
+            fun lineLevel(f: Float): Float {
+                val k = (f / binHz + 0.5f).toInt()
+                if (k <= 0 || k >= BINS - 1) return 0f
+                return max(noiseMag[k - 1], max(noiseMag[k], noiseMag[k + 1]))
             }
-            val energy50 = energyAround(50f) + energyAround(100f) + energyAround(150f)
-            val energy60 = energyAround(60f) + energyAround(120f) + energyAround(180f)
-            val detected = if (energy60 > energy50 * 1.2) 60 else 50
-            if (detected != mains) {
-                mains = detected
-                rebuildNotches()
+            fun floorAround(f: Float): Float {
+                val k = (f / binHz + 0.5f).toInt()
+                var sum = 0f
+                var n = 0
+                for (j in k + 3..k + 10) if (j < BINS) { sum += noiseMag[j]; n++ }
+                for (j in k - 10..k - 3) if (j > 0) { sum += noiseMag[j]; n++ }
+                return if (n == 0) 0f else sum / n
             }
+            val e50 = lineLevel(50f) + lineLevel(100f) + lineLevel(150f)
+            val e60 = lineLevel(60f) + lineLevel(120f) + lineLevel(180f)
+            mains = if (e60 > e50 * 1.2f) 60 else 50
+
+            val hums = ArrayList<Float>()
+            var f = mains.toFloat()
+            while (f <= MAX_HUM_HZ && hums.size < 8) {
+                val fl = floorAround(f)
+                if (fl > 0f && lineLevel(f) > HUM_PEAK_RATIO * fl) hums.add(f)
+                f += mains
+            }
+            humFreqs = hums
+            buildNotches(hums)
             mainsDecided = true
+        }
+
+        private fun localFloor(k: Int): Float {
+            var sum = 0f
+            var n = 0
+            for (j in k + 3..k + 12) if (j < BINS) { sum += noiseMag[j]; n++ }
+            for (j in k - 12..k - 3) if (j > 0) { sum += noiseMag[j]; n++ }
+            return if (n == 0) 0f else sum / n
+        }
+
+        private fun observeSpurs() {
+            if (spursDone) return
+            spurObs++
+            for (k in 3 until BINS - 3) {
+                val v = noiseMag[k]
+                if (v < noiseMag[k - 1] || v < noiseMag[k + 1]) continue
+                val fl = localFloor(k)
+                if (fl <= 0f || v <= SPUR_PEAK_RATIO * fl) continue
+                spurCount[k]++
+                spurSum[k] += v
+                spurSumSq[k] += v * v
+            }
+        }
+
+        private fun refineFreq(k: Int, binHz: Float): Float {
+            val a = kotlin.math.ln(max(noiseMag[k - 1], 1e-12f).toDouble()).toFloat()
+            val b = kotlin.math.ln(max(noiseMag[k], 1e-12f).toDouble()).toFloat()
+            val c = kotlin.math.ln(max(noiseMag[k + 1], 1e-12f).toDouble()).toFloat()
+            val d = a - 2f * b + c
+            val off = if (kotlin.math.abs(d) < 1e-9f) 0f else (0.5f * (a - c) / d).coerceIn(-0.5f, 0.5f)
+            return (k + off) * binHz
+        }
+
+        private fun selectSpurs() {
+            spursDone = true
+            val binHz = sampleRate.toFloat() / FFT_SIZE
+            val found = ArrayList<Float>()
+            for (k in 3 until BINS - 3) {
+                val n = spurCount[k]
+                if (n < (SPUR_PERSISTENCE * spurObs).toInt()) continue
+                val mean = spurSum[k] / n
+                if (mean <= 0f) continue
+                val variance = (spurSumSq[k] / n - mean * mean).coerceAtLeast(0f)
+                if (sqrt(variance.toDouble()).toFloat() / mean > SPUR_MAX_CV) continue
+                val hz = refineFreq(k, binHz)
+                if (hz < SPUR_MIN_HZ || hz > sampleRate / 2f * 0.9f) continue
+                if (found.none { kotlin.math.abs(it - hz) < binHz }) found.add(hz)
+                if (found.size >= MAX_SPURS) break
+            }
+            if (found.isNotEmpty()) buildNotches(humFreqs + found)
         }
     }
 
@@ -398,5 +474,17 @@ class NoiseReducer {
 
         /** ~1,5 s a 48 kHz: finestra su cui cercare il minimo di ogni bin. */
         const val MIN_WINDOW_FRAMES = 140
+
+        const val NOTCH_BANDWIDTH_HZ = 4f
+        const val MAX_HUM_HZ = 400f
+        const val HUM_PEAK_RATIO = 4f
+        const val GAIN_SMOOTH = 0.5f
+
+        const val SPUR_OBSERVATIONS = 8
+        const val SPUR_PEAK_RATIO = 4f
+        const val SPUR_PERSISTENCE = 0.8f
+        const val SPUR_MAX_CV = 0.25f
+        const val SPUR_MIN_HZ = 250f
+        const val MAX_SPURS = 8
     }
 }
