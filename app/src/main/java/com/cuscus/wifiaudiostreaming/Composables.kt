@@ -83,6 +83,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -2038,11 +2040,26 @@ fun ExpressiveAudioSourceSelector(
                 // value, or the async save→flow→recompose round-trip resets the caret /
                 // drops characters. We persist on each change but display the local text.
                 var keyText by remember { mutableStateOf(authKey) }
+                var keyVisible by remember { mutableStateOf(false) }
+                val haptics = rememberAppHaptics()
                 OutlinedTextField(
                     value = keyText,
                     onValueChange = { keyText = it; onSecurityChange(securityMode, it) },
                     label = { Text(stringResource(R.string.settings_item_auth_key_title)) },
                     leadingIcon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            keyVisible = !keyVisible
+                            haptics.toggle(keyVisible)
+                        }) {
+                            Icon(
+                                imageVector = if (keyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()

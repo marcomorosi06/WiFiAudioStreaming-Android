@@ -39,9 +39,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +66,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -681,6 +687,7 @@ fun ExpressiveKeyRequestDialog(
     val accent =
         if (wrong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     var keyText by remember { mutableStateOf("") }
+    var keyVisible by remember { mutableStateOf(false) }
 
     val shake = remember { Animatable(0f) }
     LaunchedEffect(wrong) {
@@ -740,10 +747,25 @@ fun ExpressiveKeyRequestDialog(
                     singleLine = true,
                     label = { Text(stringResource(R.string.settings_item_auth_key_title)) },
                     leadingIcon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            keyVisible = !keyVisible
+                            haptics.toggle(keyVisible)
+                        }) {
+                            Icon(
+                                imageVector = if (keyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = FontFamily.Monospace
                     ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
                     keyboardActions = KeyboardActions(onDone = {
                         haptics.confirm()
                         onSubmit(keyText)

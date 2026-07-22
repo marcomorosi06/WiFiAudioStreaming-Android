@@ -52,11 +52,14 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Speaker
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +83,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Spring
@@ -725,11 +731,28 @@ fun ExpressiveSourceSection(
             Column {
                 Spacer(Modifier.height(12.dp))
                 var keyText by remember { mutableStateOf(authKey) }
+                var keyVisible by remember { mutableStateOf(false) }
+                val haptics = rememberAppHaptics()
                 OutlinedTextField(
                     value = keyText,
                     onValueChange = { keyText = it; onSecurityChange(securityMode, it) },
                     label = { Text(stringResource(R.string.settings_item_auth_key_title)) },
                     leadingIcon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            keyVisible = !keyVisible
+                            haptics.toggle(keyVisible)
+                        }) {
+                            Icon(
+                                imageVector = if (keyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Password
+                    ),
                     singleLine = true,
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.fillMaxWidth()
