@@ -1,0 +1,11 @@
+🎨 Full Material 3 Expressive redesign
+🌑 Dark Screen mode: black overlay or outlined theme while streaming, avoids throttling artifacts on OLED
+
+⚠️ Breaking: new WFAS Protocol v2, not compatible with v1.0. Update all devices together. Incompatible versions are now detected instantly with a clear error
+
+🔒 Password-protected servers (Off/Ask/Key) with optional end-to-end encryption
+🧠 More reliable device discovery
+⚙️ Automation: shortcuts, deep links, saved presets (Tasker/NFC)
+🔄 Optional update checker
+🎚️ Advanced audio settings, haptic feedback
+🐛 Fixed premature "streaming" state before connection was accepted
