@@ -354,4 +354,15 @@
     <string name="status_server_busy">That server is already streaming to another device.</string>
     <string name="changelog_download_from_website">Download from the website</string>
     <string name="settings_item_encryption_needs_key">Available when the security mode is set to Key</string>
+    <string name="copied">Copied!</string>
+    <string name="copied_to_clipboard">Copied to clipboard!</string>
+    <string name="tap_to_copy_ip">Tap to copy IP</string>
+    <string name="copy_uppercase">COPY</string>
+    <string name="copied_uppercase">COPIED!</string>
+    <string name="copy_url">Copy URL</string>
+    <string name="open_browser">Browser</string>
+    <string name="volume_muted">Muted</string>
+    <string name="volume_preset_mute">0% (Mute)</string>
+    <string name="volume_preset_std">100% (Std)</string>
+    <string name="volume_preset_max">200% (Max)</string>
 </resources>

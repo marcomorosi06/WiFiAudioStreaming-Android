@@ -910,41 +910,10 @@ private fun LiveControls(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (isServer && localIp.isNotEmpty() && localIp != "0.0.0.0") {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = accent.copy(alpha = 0.12f),
-                modifier = Modifier.clickable {
-                    clipboard.setText(AnnotatedString(localIp))
-                    haptics.confirm()
-                }
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.Wifi,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = accent
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = localIp,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = accent
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Icon(
-                        Icons.Filled.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = accent.copy(alpha = 0.7f)
-                    )
-                }
-            }
+            ExpressiveIpCopyButton(
+                localIp = localIp,
+                accent = accent
+            )
         }
 
         val outlinedSkin = LocalOutlinedSkin.current
@@ -1105,26 +1074,11 @@ private fun LiveControls(
 
         if (isServer) {
             val volume by NetworkManager.serverVolume.collectAsState()
-            Text(
-                text = stringResource(R.string.transmission_volume, (volume * 100).toInt()),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = accent
-            )
-            Slider(
-                value = volume,
-                onValueChange = {
-                    if (kotlin.math.abs(it - volume) > 0.04f) haptics.tick()
-                    NetworkManager.serverVolume.value = it
-                },
-                valueRange = 0f..2f,
-                modifier = Modifier.fillMaxWidth(0.85f)
-            )
-            Text(
-                text = stringResource(R.string.server_audio_restart_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+            ExpressiveVolumeSlider(
+                volume = volume,
+                onVolumeChange = { NetworkManager.serverVolume.value = it },
+                accent = accent,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

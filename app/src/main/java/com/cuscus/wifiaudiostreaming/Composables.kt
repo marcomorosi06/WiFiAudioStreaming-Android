@@ -26,6 +26,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -2448,24 +2449,10 @@ fun ExpressiveStreamingControlCenter(
                         Spacer(modifier = Modifier.height(24.dp))
                         val volume by NetworkManager.serverVolume.collectAsState()
 
-                        Text(
-                            text = stringResource(R.string.transmission_volume, (volume * 100).toInt()),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Slider(
-                            value = volume,
-                            onValueChange = { NetworkManager.serverVolume.value = it },
-                            valueRange = 0f..2f, // Da Muto a 200%
-                            modifier = Modifier.fillMaxWidth(0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.server_audio_restart_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                        ExpressiveVolumeSlider(
+                            volume = volume,
+                            onVolumeChange = { NetworkManager.serverVolume.value = it },
+                            modifier = Modifier.fillMaxWidth(0.9f)
                         )
                     }
                     // --------------------------------------
@@ -3746,6 +3733,7 @@ private fun OnboardingNavigation(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveRtpSdpBanner(
     port: Int,
@@ -3754,6 +3742,7 @@ fun ExpressiveRtpSdpBanner(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val haptics = rememberAppHaptics()
     var copied by remember { mutableStateOf(false) }
 
     val sdpContent = """
@@ -3776,39 +3765,141 @@ fun ExpressiveRtpSdpBanner(
         }
     }
 
-    ElevatedCard(
+    val iconShape = remember { MaterialShapes.Cookie6Sided }
+    val morph = remember { Morph(MaterialShapes.Circle, iconShape) }
+    val shapeProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        shapeProgress.animateTo(
+            1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Radio, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(MorphOutlineShape(morph, shapeProgress.value))
+                        .background(MaterialTheme.colorScheme.tertiary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Radio,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.settings_item_rtp_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "L16 / ${sampleRate / 1000}kHz",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.rtp_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                    )
+                }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.settings_item_rtp_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                Text(stringResource(R.string.rtp_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalIconButton(
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
                     onClick = {
+                        haptics.confirm()
                         clipboardManager.setText(AnnotatedString(sdpContent))
                         copied = true
                     },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (copied) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f),
+                        contentColor = MaterialTheme.colorScheme.onTertiary
+                    ),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_sdp))
+                    AnimatedContent(
+                        targetState = copied,
+                        transitionSpec = {
+                            (fadeIn(tween(200)) + scaleIn()).togetherWith(fadeOut(tween(140)) + scaleOut())
+                        },
+                        label = "CopySdpState"
+                    ) { isCopied ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isCopied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = if (isCopied) stringResource(R.string.copied) else stringResource(R.string.copy_sdp),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-                FilledTonalIconButton(
-                    onClick = { launcher.launch("stream.sdp") },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)
+
+                FilledTonalButton(
+                    onClick = {
+                        haptics.tap()
+                        launcher.launch("stream.sdp")
+                    },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.12f),
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
                 ) {
-                    Icon(Icons.Outlined.SaveAlt, contentDescription = stringResource(R.string.save_sdp))
+                    Icon(
+                        Icons.Outlined.SaveAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.save_sdp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -4125,49 +4216,462 @@ fun SettingsGroupCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveHttpBanner(ip: String, port: Int) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val haptics = rememberAppHaptics()
     var copied by remember { mutableStateOf(false) }
     val url = "http://$ip:$port"
 
-    ElevatedCard(
+    val iconShape = remember { MaterialShapes.Cookie7Sided }
+    val morph = remember { Morph(MaterialShapes.Circle, iconShape) }
+    val shapeProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        shapeProgress.animateTo(
+            1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(MorphOutlineShape(morph, shapeProgress.value))
+                        .background(MaterialTheme.colorScheme.secondary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Language,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_item_http_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = url,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.settings_item_http_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalIconButton(
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
                     onClick = {
+                        haptics.confirm()
                         clipboardManager.setText(AnnotatedString(url))
                         copied = true
                     },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (copied) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                        contentColor = MaterialTheme.colorScheme.onSecondary
+                    ),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy, contentDescription = "Copia URL")
+                    AnimatedContent(
+                        targetState = copied,
+                        transitionSpec = {
+                            (fadeIn(tween(200)) + scaleIn()).togetherWith(fadeOut(tween(140)) + scaleOut())
+                        },
+                        label = "CopyUrlState"
+                    ) { isCopied ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isCopied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = if (isCopied) stringResource(R.string.copied) else stringResource(R.string.copy_url),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-                FilledTonalIconButton(
+
+                FilledTonalButton(
                     onClick = {
+                        haptics.tap()
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         context.startActivity(intent)
                     },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f),
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 ) {
-                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = "Apri nel browser")
+                    Icon(
+                        Icons.Outlined.OpenInBrowser,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.open_browser),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+
+    if (copied) {
+        LaunchedEffect(Unit) {
+            delay(2000)
+            copied = false
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveVolumeSlider(
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    showPresets: Boolean = true
+) {
+    val haptics = rememberAppHaptics()
+    var isDragging by remember { mutableStateOf(false) }
+    var lastStep by remember { mutableStateOf((volume * 20).toInt()) }
+
+    val percentage = (volume * 100).toInt()
+    val volumeIcon = when {
+        volume <= 0.01f -> Icons.Outlined.VolumeOff
+        volume < 0.5f -> Icons.Outlined.VolumeMute
+        volume <= 1.0f -> Icons.Outlined.VolumeDown
+        else -> Icons.Outlined.VolumeUp
+    }
+
+    val mutedLabel = stringResource(R.string.volume_muted)
+    val volumeStateLabel = when {
+        volume <= 0.01f -> mutedLabel
+        volume < 1.0f -> "$percentage%"
+        volume == 1.0f -> "100% (Std)"
+        else -> "$percentage% (Boost)"
+    }
+
+    val badgeColor by animateColorAsState(
+        targetValue = when {
+            volume <= 0.01f -> MaterialTheme.colorScheme.error
+            volume > 1.0f -> MaterialTheme.colorScheme.tertiary
+            else -> accent
+        },
+        animationSpec = spring(),
+        label = "VolumeBadgeColor"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = badgeColor.copy(alpha = 0.15f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = volumeIcon,
+                            contentDescription = null,
+                            tint = badgeColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.transmission_volume, percentage),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.server_audio_restart_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = badgeColor.copy(alpha = 0.16f)
+                ) {
+                    Text(
+                        text = volumeStateLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Monospace,
+                        color = badgeColor,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            Slider(
+                value = volume,
+                onValueChange = { valValue ->
+                    if (!isDragging) {
+                        isDragging = true
+                        haptics.gestureStart()
+                    }
+                    val step = (valValue * 20).toInt()
+                    if (step != lastStep) {
+                        lastStep = step
+                        if (step == 0 || step == 20 || step == 40) {
+                            haptics.confirm()
+                        } else {
+                            haptics.tick()
+                        }
+                    }
+                    onVolumeChange(valValue)
+                },
+                onValueChangeFinished = {
+                    isDragging = false
+                    haptics.gestureEnd()
+                },
+                valueRange = 0f..2f,
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = badgeColor,
+                    activeTrackColor = badgeColor,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            )
+
+            if (showPresets) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val presets = listOf(
+                        0f to stringResource(R.string.volume_preset_mute),
+                        1f to stringResource(R.string.volume_preset_std),
+                        2f to stringResource(R.string.volume_preset_max)
+                    )
+                    presets.forEach { (presetValue, label) ->
+                        val isSelected = kotlin.math.abs(volume - presetValue) < 0.05f
+                        val presetColor by animateColorAsState(
+                            targetValue = if (isSelected) badgeColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            label = "PresetColor"
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) badgeColor.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    haptics.confirm()
+                                    onVolumeChange(presetValue)
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = presetColor,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveIpCopyButton(
+    localIp: String,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    modifier: Modifier = Modifier
+) {
+    val clipboard = LocalClipboardManager.current
+    val haptics = rememberAppHaptics()
+    var copied by remember { mutableStateOf(false) }
+
+    val tapScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    val iconShape = remember { MaterialShapes.Clover4Leaf }
+    val morph = remember { Morph(MaterialShapes.Circle, iconShape) }
+    val shapeProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        shapeProgress.animateTo(
+            1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    val containerColor by animateColorAsState(
+        targetValue = if (copied) accent else accent.copy(alpha = 0.14f),
+        animationSpec = spring(),
+        label = "IpCopyContainer"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (copied) MaterialTheme.colorScheme.surfaceContainerLowest else accent,
+        animationSpec = spring(),
+        label = "IpCopyContent"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = containerColor,
+        border = BorderStroke(1.5.dp, accent.copy(alpha = if (copied) 0.8f else 0.3f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = tapScale.value
+                scaleY = tapScale.value
+            }
+            .clickable {
+                haptics.confirm()
+                clipboard.setText(AnnotatedString(localIp))
+                copied = true
+                scope.launch {
+                    tapScale.snapTo(0.93f)
+                    tapScale.animateTo(
+                        1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioHighBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+            }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(MorphOutlineShape(morph, shapeProgress.value))
+                    .background(contentColor.copy(alpha = if (copied) 0.25f else 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Wifi,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = contentColor
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.server_ip_format, localIp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = contentColor
+                )
+                Text(
+                    text = if (copied) stringResource(R.string.copied_to_clipboard) else stringResource(R.string.tap_to_copy_ip),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.8f)
+                )
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = contentColor.copy(alpha = if (copied) 0.25f else 0.12f)
+            ) {
+                AnimatedContent(
+                    targetState = copied,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + scaleIn()).togetherWith(fadeOut(tween(120)) + scaleOut())
+                    },
+                    label = "CopyBadgeState"
+                ) { isCopied ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isCopied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = contentColor
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (isCopied) stringResource(R.string.copied_uppercase) else stringResource(R.string.copy_uppercase),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                            color = contentColor
+                        )
+                    }
                 }
             }
         }

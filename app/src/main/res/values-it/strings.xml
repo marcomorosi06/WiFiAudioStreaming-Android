@@ -354,4 +354,15 @@
     <string name="status_server_busy">Quel server sta già trasmettendo a un altro dispositivo.</string>
     <string name="changelog_download_from_website">Scarica dal sito web</string>
     <string name="settings_item_encryption_needs_key">Disponibile quando la modalità di sicurezza è impostata su Chiave</string>
+    <string name="copied">Copiato!</string>
+    <string name="copied_to_clipboard">Copiato negli appunti!</string>
+    <string name="tap_to_copy_ip">Tocca per copiare l\'IP</string>
+    <string name="copy_uppercase">COPIA</string>
+    <string name="copied_uppercase">COPIATO!</string>
+    <string name="copy_url">Copia URL</string>
+    <string name="open_browser">Browser</string>
+    <string name="volume_muted">Muto</string>
+    <string name="volume_preset_mute">0% (Muto)</string>
+    <string name="volume_preset_std">100% (Std)</string>
+    <string name="volume_preset_max">200% (Max)</string>
 </resources>
