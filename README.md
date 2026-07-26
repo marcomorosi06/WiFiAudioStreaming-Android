@@ -39,7 +39,7 @@ This application allows you to send your phone's audio to any device on the loca
 ## ✨ Key Features  
 
 * **Multi-Protocol Architecture**: Stream using the native low-latency protocol (**WFAS v2**), standard **RTP** for external media players, or **HTTP** to listen directly from any web browser (Chrome, Safari, Smart TVs).
-* **Password Protection & End-to-End Encryption**: Choose who can connect with **Off**, **Ask**, or **Key** authorization modes. In Key mode, the client proves it knows the shared password through a mutual HMAC-SHA256 challenge-response (the password itself never touches the wire), and the same key derives per-session **ChaCha20-Poly1305** encryption — every audio packet is sealed and authenticated end-to-end, on both unicast and multicast, no PKI required. See [`WFAS_PROTOCOL.md`](WFAS_PROTOCOL.md) §7–8.
+* **Password Protection & End-to-End Encryption**: Choose who can connect with **Off**, **Ask**, or **Key** authorization modes. In Key mode, the client proves it knows the shared password through a mutual HMAC-SHA256 challenge-response (the password itself never touches the wire), and the same key derives per-session **ChaCha20-Poly1305** encryption — every audio packet is sealed and authenticated end-to-end, on both unicast and multicast, no PKI required. See [`WFAS_PROTOCOL.md`](WFAS_PROTOCOL.md).
 * **Smart Auto-Connect**: The app can automatically connect to prioritized IP addresses as soon as they are detected on the network, even in the background.
 * **Automation & Scripting**: Trigger the app from the outside via home-screen shortcuts, deep links (`wifiaudio://`), or broadcast intents (Tasker, MacroDroid, NFC tags). Save full server/client configurations as named, one-tap presets.
 * **Widgets & Quick Settings**: Control your server or client directly from your home screen using Material You widgets, or use the Quick Settings tiles in your notification shade for instant access.
@@ -89,7 +89,7 @@ Turn your computer into a wireless audio transmitter, receiver, or web server.
 2. In **Audio Source**, enable **Internal Audio**.  
 3. Choose your preferred protocol in the settings (WFAS, RTP, or HTTP Web).  
 4. For WFAS/RTP, choose **Multicast** (multiple clients) or **Unicast** (single client). In Unicast the server serves one client at a time: while a session is running it disappears from other devices' lists, and any other device that tries to connect is told the server is busy instead of being left waiting.  
-5. Optionally set an authorization mode (**Off**, **Ask**, or **Key**) in Settings → Security to control who can connect, and enable encryption if you set a key.
+5. Optionally set an authorization mode (**Off**, **Ask**, or **Key**) in Server Mode → Security to control who can connect, and enable encryption if you set a key.
 6. Tap **Start Server**.  
 
 ---
