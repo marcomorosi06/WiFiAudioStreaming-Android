@@ -1298,7 +1298,7 @@ object NetworkManager {
                     delay(500)
                     setupAudioRecorders(safeBufferSize)
 
-                    val localAddress = InetSocketAddress(streamingPort)
+                    val localAddress = InetSocketAddress(NetAddr.wildcardHost(), streamingPort)
                     if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
                     Log.d(TAG, "[SERVER][UNICAST] socket UDP bound su $localAddress, vpnActive=$vpnActive wifiNet=$wifiNet")
