@@ -97,6 +97,7 @@
     <string name="status_idle">Idle</string>
     <string name="status_mic_permission_denied">Error: Microphone permission denied.</string>
     <string name="status_mic_send_error">Microphone sending error: %1$s</string>
+    <string name="status_mic_not_accepted">The server does not accept a microphone, mic not sent</string>
     <string name="status_waiting_for_client">Waiting for client on port %1$d…</string>
     <string name="status_client_connected">Client connected: %1$s. Starting…</string>
     <string name="status_handshake_failed_from_client">Handshake failed from client %1$s</string>
@@ -154,6 +155,10 @@
     <string name="wfas_mode_always">Always on</string>
     <string name="wfas_mode_off_on_usb">Off when USB is connected</string>
     <string name="wfas_mode_off">Off</string>
+    <string name="wfas_activate_action">Activate WFAS protocol</string>
+    <string name="script_action_usb">USB link</string>
+    <string name="link_connected_usb">Connected via USB</string>
+    <string name="link_connected_wireless">Connected wirelessly</string>
     <string name="wfas_no_protocol_title">No protocol available</string>
     <string name="wfas_no_protocol_desc">With WFAS off you need at least one other protocol enabled, or an active USB connection, to start a stream.</string>
     <string name="usb_section_title">USB cable</string>

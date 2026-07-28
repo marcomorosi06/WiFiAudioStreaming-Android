@@ -194,7 +194,8 @@ fun ExpressiveHomeScreen(
     onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
     usbLinkState: UsbLink.State = UsbLink.State(),
     onUsbModeChange: (Boolean) -> Unit = {},
-    onOpenUsbTetherSettings: () -> Unit = {}
+    onOpenUsbTetherSettings: () -> Unit = {},
+    onActivateWfas: () -> Unit = {}
 ) {
     val sourceReady = appSettings.streamInternal || appSettings.streamMic
     val phase = when {
@@ -244,6 +245,13 @@ fun ExpressiveHomeScreen(
                 connectionStatus = connectionStatus,
                 localIp = localIp,
                 hasMicPermission = hasMicPermission,
+                canStartServer = WfasPolicy.canStartServerWith(
+                    appSettings.wfasMode,
+                    usbLinkState.isReady,
+                    appSettings.rtpEnabled,
+                    appSettings.httpEnabled
+                ),
+                onActivateWfas = onActivateWfas,
                 onStartServer = onStartServer,
                 onStopServer = onStopServer
             )
@@ -278,6 +286,7 @@ fun ExpressiveHomeScreen(
                     localIp = localIp,
                     accent = accent,
                     sendClientMicrophone = appSettings.sendClientMicrophone,
+                    usbConnected = usbLinkState.isReady && NetworkManager.sessionUsesUsb(),
                     developerMode = appSettings.developerMode,
                     noiseReductionEnabled = appSettings.noiseReductionEnabled,
                     noiseReductionStrength = appSettings.noiseReductionStrength,
@@ -463,6 +472,8 @@ private fun StateHero(
     connectionStatus: String,
     localIp: String,
     hasMicPermission: Boolean,
+    canStartServer: Boolean = true,
+    onActivateWfas: () -> Unit = {},
     onStartServer: () -> Unit,
     onStopServer: () -> Unit
 ) {
@@ -798,13 +809,70 @@ private fun StateHero(
             Spacer(Modifier.height(28.dp))
             HeroActionButton(
                 live = live,
-                enabled = live || phase == HeroPhase.Ready,
+                enabled = live || (phase == HeroPhase.Ready && canStartServer),
                 accent = accent,
                 onClick = {
                     if (live) haptics.reject() else haptics.confirm()
                     if (live) onStopServer() else onStartServer()
                 }
             )
+
+            AnimatedVisibility(
+                visible = isServer && !live && !canStartServer,
+                enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+                exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+            ) {
+                Column {
+                    Spacer(Modifier.height(14.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.wfas_no_protocol_title),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.wfas_no_protocol_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                FilledTonalButton(
+                                    onClick = { haptics.confirm(); onActivateWfas() },
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.12f),
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.wfas_activate_action),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -918,6 +986,7 @@ private fun LiveControls(
     localIp: String,
     accent: Color,
     sendClientMicrophone: Boolean,
+    usbConnected: Boolean = false,
     developerMode: Boolean = false,
     noiseReductionEnabled: Boolean = false,
     noiseReductionStrength: Int = 50,
@@ -931,6 +1000,18 @@ private fun LiveControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Text(
+            text = stringResource(
+                if (usbConnected) R.string.link_connected_usb
+                else R.string.link_connected_wireless
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Black,
+            color = if (usbConnected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
         if (isServer && localIp.isNotEmpty() && localIp != "0.0.0.0") {
             ExpressiveIpCopyButton(
                 localIp = localIp,

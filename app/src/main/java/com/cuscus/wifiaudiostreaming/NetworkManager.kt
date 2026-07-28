@@ -67,13 +67,16 @@ data class ServerInfo(
     val encrypted: Boolean = false,
     val serverSendsMic: Boolean = false,
     val serverWantsMic: Boolean = false,
+    val fromBeacon: Boolean = false,
     /** Formato audio annunciato dal server nel beacon di discovery, se presente. */
     val audioFormat: StreamAudioFormat? = null,
     /** Il beacon e' arrivato sul collegamento USB, non sulla rete Wi-Fi. */
     val viaUsb: Boolean = false,
     /** Istante dell'ultimo beacon ricevuto: serve a far scadere i server spariti. */
     val lastSeen: Long = System.currentTimeMillis()
-)
+) {
+    val acceptsClientMic: Boolean get() = !fromBeacon || serverWantsMic
+}
 
 /**
  * Formato audio dichiarato da un server WFAS (campi sr/ch/bd del beacon).
@@ -125,6 +128,22 @@ object NetworkManager {
     // --- GESTIONE VOLUME SERVER ANDROID ---
     val serverVolume = MutableStateFlow(1.0f)
     var isServerStreaming = false
+
+    @Volatile var activePeerIp: String? = null
+
+    fun sessionUsesUsb(): Boolean = UsbLink.isUsbPeer(activePeerIp)
+
+    private fun peerHostOf(address: io.ktor.network.sockets.SocketAddress): String? =
+        NetAddr.literalHost(address)
+            ?: NetAddr.literalHostOfText(address.toString())
+            ?: WfasPolicy.hostOf(address.toString())
+
+
+    // Ogni avvio di stream (server o client) apre una generazione. Il blocco
+    // finally di un job superato non deve azzerare lo stato di quello nuovo.
+    @Volatile private var streamGeneration = 0L
+
+    private fun openStreamGeneration(): Long = ++streamGeneration
     @Volatile var serverStreamsMic = false
     // --------------------------------------
 
@@ -463,7 +482,7 @@ object NetworkManager {
                     intf.inetAddresses?.toList()?.forEach { addr ->
                         if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
                             val h = addr.hostAddress ?: return@forEach
-                            if (!h.startsWith("192.168.112") && !h.startsWith("192.168.42")) {
+                            if (!UsbLink.isTetherInterfaceName(intf.name)) {
                                 return h
                             }
                         }
@@ -499,7 +518,8 @@ object NetworkManager {
         return try {
             var isUnicast = false
             withTimeout(1000) { // Aspetta massimo 1 secondo
-                aSocket(SelectorManager(Dispatchers.IO)).udp().bind().use { sock ->
+                aSocket(SelectorManager(Dispatchers.IO)).udp()
+                    .bind(InetSocketAddress(NetAddr.wildcardFor(ip), 0)).use { sock ->
                     val remoteAddress = InetSocketAddress(ip, port)
                     sock.send(Datagram(buildPacket { writeText("MODE_PROBE") }, remoteAddress))
                     val ack = sock.receive()
@@ -610,11 +630,8 @@ object NetworkManager {
                     iface.isUp &&
                             !iface.isLoopback &&
                             !iface.isVirtual &&
-                            iface.inetAddresses.toList().any { addr ->
-                                !addr.isLoopbackAddress &&
-                                        !(addr.hostAddress ?: "").startsWith("192.168.112") &&
-                                        !(addr.hostAddress ?: "").startsWith("192.168.42")
-                            }
+                            !UsbLink.isTetherInterfaceName(iface.name) &&
+                            iface.inetAddresses.toList().any { !it.isLoopbackAddress }
                 }
             }
         } catch (e: Exception) {
@@ -696,14 +713,29 @@ object NetworkManager {
                                                 securityMode = authMode, encrypted = encrypted,
                                                 serverSendsMic = micTok?.contains("tx") == true,
                                                 serverWantsMic = micTok?.contains("rx") == true,
+                                                fromBeacon = true,
                                                 audioFormat = advertisedFormat,
-                                                viaUsb = UsbLink.isUsbPeer(remoteIp),
+                                                viaUsb = UsbLink.isUsbPeerDetected(remoteIp),
                                                 lastSeen = System.currentTimeMillis()
                                             )
                                             Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
 
                                             val currentMap = discoveredDevices.value
                                             val known = currentMap[hostname]
+
+                                            // Con la discovery dual stack lo stesso server
+                                            // annuncia su IPv4 e IPv6: senza arbitrato
+                                            // vincerebbe l'ultimo beacon arrivato, spesso un
+                                            // link-local IPv6 verso cui la connessione fallisce.
+                                            if (!MulticastNet.shouldAdoptPeer(
+                                                    known?.ip, known?.lastSeen ?: 0L,
+                                                    remoteIp, serverInfo.lastSeen
+                                                )
+                                            ) {
+                                                Log.d(TAG, "[DISCOVERY] $hostname: tengo ${known?.ip}, ignoro $remoteIp")
+                                                continue
+                                            }
+
                                             // lastSeen cambia a ogni beacon: confrontarlo
                                             // farebbe riemettere la lista ogni 3s. Si
                                             // aggiorna quando cambia qualcosa di reale, o
@@ -1003,6 +1035,7 @@ object NetworkManager {
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
         }
 
+        val generation = openStreamGeneration()
         streamingJob = scope.launch {
             isServerStreaming = true
             Log.d(TAG, "[SERVER] streamingJob started")
@@ -1071,22 +1104,16 @@ object NetworkManager {
                     val bufMs       = (safeBufferSize.toLong() * 1000L) / (sampleRate.toLong() * channels * 2)
                     var producerLoopCount = 0L
                     var producerTotalBytes = 0L
+                    var producerDropped = 0L
 
                     Log.d(TAG, "[PRODUCER] avviato: streamInternal=$streamInternal projNull=${projection == null} internalRecordState=${activeInternalRecord?.state} micRecordState=${activeMicRecord?.state} safeBufferSize=$safeBufferSize bufMs=$bufMs")
-                    println("DEBUG_WFAS: streamInternal=$streamInternal")
-                    println("DEBUG_WFAS: projectionIsNull=${projection == null}")
-                    println("DEBUG_WFAS: internalRecordState=${activeInternalRecord?.state}")
 
                     while (isActive) {
                         val iBytes = activeInternalRecord?.read(internalBuf!!, 0, internalBuf.size, AudioRecord.READ_NON_BLOCKING) ?: 0
                         val mBytes = activeMicRecord?.read(micBuf!!, 0, micBuf.size, AudioRecord.READ_NON_BLOCKING) ?: 0
 
-                        if (iBytes < 0) {
-                            Log.e(TAG, "[PRODUCER] iBytes ERROR=$iBytes (AudioRecord error code)")
-                            println("DEBUG_WFAS: iBytes ERROR = $iBytes")
-                        }
+                        if (iBytes < 0) Log.e(TAG, "[PRODUCER] iBytes ERROR=$iBytes (AudioRecord error code)")
                         if (mBytes < 0) Log.e(TAG, "[PRODUCER] mBytes ERROR=$mBytes (AudioRecord error code)")
-                        if (iBytes == 0 && streamInternal) println("DEBUG_WFAS: iBytes è 0")
 
                         val ei = iBytes.coerceAtLeast(0)
                         val em = mBytes.coerceAtLeast(0)
@@ -1138,17 +1165,15 @@ object NetworkManager {
                             dropped++
                         }
                         val offered = udpAudioQueue.offer(Pair(chunk, aligned))
-                        if (dropped > 0) {
-                            Log.d(TAG, "[PRODUCER] coda piena: scartati $dropped blocchi vecchi per non accumulare ritardo")
-                        }
+                        producerDropped += dropped
 
                         producerLoopCount++
                         producerTotalBytes += aligned
                         if (producerLoopCount == 1L || producerLoopCount % 300L == 0L) {
-                            Log.d(TAG, "[PRODUCER] loop #$producerLoopCount iBytes=$ei mBytes=$em aligned=$aligned offered=$offered queueSize=${udpAudioQueue.size} totalBytes=$producerTotalBytes")
+                            Log.d(TAG, "[PRODUCER] loop #$producerLoopCount iBytes=$ei mBytes=$em aligned=$aligned offered=$offered queueSize=${udpAudioQueue.size} totalBytes=$producerTotalBytes dropped=$producerDropped")
                         }
                     }
-                    Log.d(TAG, "[PRODUCER] loop terminato dopo $producerLoopCount iterazioni, totalBytes=$producerTotalBytes")
+                    Log.d(TAG, "[PRODUCER] loop terminato dopo $producerLoopCount iterazioni, totalBytes=$producerTotalBytes dropped=$producerDropped")
                 }
 
                 // ── UDP SENDER ────────────────────────────────────────────────────────
@@ -1240,11 +1265,25 @@ object NetworkManager {
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 val wifiNet = getWifiNetworkObject(context)
                 val vpnActive = isVpnActive(context)
+                val usbActive = UsbLink.isReady()
+
+                fun applyProcessNetwork() {
+                    if (usbActive) {
+                        runCatching { cm.bindProcessToNetwork(null) }
+                        Log.d(TAG, "[SERVER] link USB attivo, nessun bind di processo")
+                    } else if (!vpnActive) {
+                        wifiNet?.let { runCatching { cm.bindProcessToNetwork(it) } }
+                    }
+                }
 
                 if (isMulticast) {
-                    val targetAddress = InetSocketAddress(MulticastNet.audioGroup(getWifiNetworkInterface(networkInterfaceName)).hostAddress, streamingPort)
-                    Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress vpnActive=$vpnActive wifiNet=$wifiNet")
-                    if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
+                    val targetAddress = InetSocketAddress(
+                        MulticastNet.audioGroup(getWifiNetworkInterface(networkInterfaceName)).hostAddress
+                            ?: NetworkSettings.MULTICAST_GROUP_IP,
+                        streamingPort
+                    )
+                    Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress vpnActive=$vpnActive usbActive=$usbActive wifiNet=$wifiNet")
+                    applyProcessNetwork()
                     val wifiLocalIp = wifiIface?.inetAddresses?.toList()
                         ?.filterIsInstance<java.net.Inet4Address>()
                         ?.firstOrNull()?.hostAddress ?: "0.0.0.0"
@@ -1299,9 +1338,9 @@ object NetworkManager {
                     setupAudioRecorders(safeBufferSize)
 
                     val localAddress = InetSocketAddress(NetAddr.wildcardHost(), streamingPort)
-                    if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
+                    applyProcessNetwork()
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
-                    Log.d(TAG, "[SERVER][UNICAST] socket UDP bound su $localAddress, vpnActive=$vpnActive wifiNet=$wifiNet")
+                    Log.d(TAG, "[SERVER][UNICAST] socket UDP bound su $localAddress, vpnActive=$vpnActive usbActive=$usbActive wifiNet=$wifiNet")
 
                     // Il producer parte subito: HTTP/RTP ricevono audio anche prima che
                     // arrivi qualsiasi client UDP.
@@ -1316,6 +1355,7 @@ object NetworkManager {
                         connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
 
                         val clientDatagram = sendSocket.receive()
+                        val rxAt = System.currentTimeMillis()
                         val clientAddress = clientDatagram.address
                         val message = clientDatagram.packet.readText().trim()
                         Log.d(TAG, "[SERVER][UNICAST] datagram ricevuto da $clientAddress: '$message'")
@@ -1331,8 +1371,12 @@ object NetworkManager {
                             continue
                         }
 
-                        if (!WfasPolicy.enabledForPeerAddress(clientAddress.toString())) {
-                            Log.w(TAG, "[SERVER][UNICAST] WFAS disattivato per $clientAddress, handshake ignorato")
+                        val peerHost = peerHostOf(clientAddress)
+                        Log.d(TAG, "[SERVER][TIMING] messaggio da $peerHost, parse+policy a +${System.currentTimeMillis() - rxAt}ms")
+                        if (!WfasPolicy.enabledForPeer(peerHost)) {
+                            Log.w(TAG, "[SERVER][UNICAST] WFAS non attivo per peer=$peerHost " +
+                                    "(usbPeer=${UsbLink.isUsbPeer(peerHost)} mode=${WfasPolicy.mode}), handshake rifiutato")
+                            sendSocket.send(Datagram(buildPacket { writeText(NetworkSettings.UNAUTHORIZED_MESSAGE) }, clientAddress))
                             continue
                         }
 
@@ -1389,6 +1433,7 @@ object NetworkManager {
                         val sendDir: WfasCrypto.Dir? =
                             if (encrypting) WfasCrypto.deriveUnicast(authKey, pendCnonce, pendSnonce).second else null
 
+                        activePeerIp = peerHostOf(clientAddress)
                         Log.d(TAG, "[SERVER][UNICAST] HELLO ricevuto da $clientAddress, invio HELLO_ACK")
                         connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
 
@@ -1398,7 +1443,7 @@ object NetworkManager {
                         val ackText = helloAckMessage() + if (encrypting) ";enc=1" else ""
                         val ackPacket = buildPacket { writeText(ackText) }
                         sendSocket.send(Datagram(ackPacket, clientAddress))
-                        Log.d(TAG, "[SERVER][UNICAST] HELLO_ACK inviato a $clientAddress")
+                        Log.d(TAG, "[SERVER][TIMING] HELLO_ACK inviato a $clientAddress a +${System.currentTimeMillis() - rxAt}ms dalla ricezione")
 
                         // In unicast il server serve un client solo: finche' e' occupato
                         // non deve annunciarsi, altrimenti un terzo dispositivo lo vede
@@ -1413,7 +1458,7 @@ object NetworkManager {
                         if (rtpEnabled) {
                             rtpJob?.cancel()
 
-                            val clientInetAddress = (clientAddress as? InetSocketAddress)?.hostname
+                            val clientInetAddress = peerHostOf(clientAddress)
 
                             rtpJob = scope.launchRtpSidecar(
                                 sampleRate = sampleRate,
@@ -1514,7 +1559,12 @@ object NetworkManager {
                 }
             } finally {
                 Log.d(TAG, "[SERVER] finally: cleanup, hasError=$hasError isServerStreaming=$isServerStreaming")
-                isServerStreaming = false
+                // Se nel frattempo e' partito un altro stream questo job e' superato:
+                // azzerare lo stato globale spegnerebbe quello nuovo.
+                if (streamGeneration == generation) {
+                    isServerStreaming = false
+                    isStreamingCurrent.value = false
+                }
                 runCatching {
                     (context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).bindProcessToNetwork(null)
                 }
@@ -1572,7 +1622,9 @@ object NetworkManager {
         }
 
         stopStreaming(context)
+        openStreamGeneration()
         isServerStreaming = false
+        activePeerIp = serverInfo.ip
         isStreamingCurrent.value = true
         startDonationTimer(context)
 
@@ -1580,7 +1632,12 @@ object NetworkManager {
 
         // Il microfono e' un flusso nostro in salita: resta sulle impostazioni locali.
         if (sendMicrophone) {
-            micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
+            if (serverInfo.acceptsClientMic) {
+                micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
+            } else {
+                Log.i(TAG, "[CLIENT] mic richiesto ma ${serverInfo.ip} annuncia mic senza rx, non lo invio")
+                connectionStatus.value = context.getString(R.string.status_mic_not_accepted)
+            }
         }
 
         // Da qui in poi 'sampleRate' e 'channelConfig' sono quelli del flusso in arrivo.
@@ -1653,12 +1710,12 @@ object NetworkManager {
                         if (prerollLen > 0) audioTrack!!.write(ByteArray(prerollLen), 0, prerollLen, AudioTrack.WRITE_BLOCKING)
                         audioTrack!!.play()
                         LinkMetrics.start(
-                            if (UsbLink.isReady()) "USB" else "WIFI",
+                            if (sessionUsesUsb()) "USB" else "WIFI",
                             sampleRate
                         )
 
                         connectionStatus.value = context.getString(R.string.status_contacting_server, serverInfo.ip)
-                        socket = aSocket(selectorManager).udp().bind { receiveBufferSize = 1 shl 20 }
+                        socket = aSocket(selectorManager).udp().bind(InetSocketAddress(NetAddr.wildcardFor(serverInfo.ip), 0)) { receiveBufferSize = 1 shl 20 }
                         val sock = socket!!
                         val remoteAddress = InetSocketAddress(serverInfo.ip, serverInfo.port)
 
@@ -1685,11 +1742,17 @@ object NetworkManager {
                             return true
                         }
 
+                        var helloWaitMs = 150L
+                        var helloAttempts = 0
+                        val handshakeStartedAt = System.currentTimeMillis()
                         while (System.currentTimeMillis() < handshakeDeadline) {
                             val ackMsg = try {
-                                withTimeout(2000) { socket.receive() }.packet.readText().trim()
+                                withTimeout(helloWaitMs) { socket.receive() }.packet.readText().trim()
                             } catch (e: TimeoutCancellationException) {
+                                helloAttempts++
+                                helloWaitMs = (helloWaitMs * 2).coerceAtMost(2000L)
                                 socket.send(Datagram(buildPacket { writeText(helloMsg) }, remoteAddress))
+                                Log.d(TAG, "[CLIENT] nessuna risposta, reinvio #$helloAttempts, prossima attesa ${helloWaitMs}ms")
                                 continue
                             }
                             when {
@@ -2016,7 +2079,7 @@ object NetworkManager {
                             .build()
 
                         audioTrack.play()
-                        LinkMetrics.start(if (UsbLink.isReady()) "USB" else "WIFI", sampleRate)
+                        LinkMetrics.start(if (sessionUsesUsb()) "USB" else "WIFI", sampleRate)
                         connectionStatus.value = context.getString(R.string.status_streaming)
                         if (connectionSoundEnabled) playConnectionSound(context)
                         connectedSuccessfully = true
@@ -2186,6 +2249,7 @@ object NetworkManager {
     }
 
     fun stopStreaming(context: Context) {
+        activePeerIp = null
         // Va letto prima dell'azzeramento: serve a sapere se eravamo noi il server.
         val wasServing = isServerStreaming
         isServerStreaming = false

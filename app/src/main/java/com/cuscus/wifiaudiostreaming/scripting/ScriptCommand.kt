@@ -25,7 +25,8 @@ enum class ScriptActionType(val id: String) {
     CONNECT("connect"),
     STOP("stop"),
     TOGGLE("toggle"),
-    SET("set");
+    SET("set"),
+    USB("usb");
 
     companion object {
         fun fromId(id: String?): ScriptActionType? {
@@ -63,11 +64,15 @@ object ScriptParams {
     const val MODE = "mode"
     const val AUTHMODE = "authmode"
     const val AUTHKEY = "authkey"
+    const val USB = "usb"
+    const val USBLATENCY = "usblatency"
+    const val WFASMODE = "wfasmode"
 
     val ALL = listOf(
         INTERNAL, MIC, SAMPLERATE, CHANNELS, BUFFER, PORT, MICPORT, MULTICAST,
         RTP, RTPPORT, HTTP, HTTPPORT, HTTPSAFARI, IFACE, IP, CLIENTMIC, CLIENTIP,
-        AUTOCONNECT, CONNSOUND, DISCSOUND, MODE, AUTHMODE, AUTHKEY
+        AUTOCONNECT, CONNSOUND, DISCSOUND, MODE, AUTHMODE, AUTHKEY,
+        USB, USBLATENCY, WFASMODE
     )
 
     fun parseBool(value: String?): Boolean? {
@@ -155,5 +160,7 @@ data class ResolvedServerParams(
     val rtpEnabled: Boolean,
     val rtpPort: Int,
     val httpEnabled: Boolean,
-    val httpPort: Int
+    val httpPort: Int,
+    val usbMode: Boolean = false,
+    val usbLatencyMs: Int = 20
 )

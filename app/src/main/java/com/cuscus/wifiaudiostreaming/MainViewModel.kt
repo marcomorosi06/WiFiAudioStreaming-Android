@@ -35,12 +35,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsDataStore = SettingsDataStore(application)
 
     private val _isServer = MutableStateFlow(true)
-    val isServer: StateFlow<Boolean> = combine(
-        _isServer,
-        NetworkManager.isStreamingCurrent
-    ) { serverMode, streaming ->
-        if (streaming) NetworkManager.isServerStreaming else serverMode
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    // Il ruolo si fissa quando lo stream parte e non cambia piu' finche' dura.
+    // Derivarlo di continuo da NetworkManager.isServerStreaming, che e' un var
+    // normale e viene azzerato durante il teardown, faceva saltare la UI in
+    // modalita' client a stream ancora vivo (per esempio alla caduta del WiFi).
+    val isServer: StateFlow<Boolean> = _isServer.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            NetworkManager.isStreamingCurrent.collect { streaming ->
+                if (streaming) _isServer.value = NetworkManager.isServerStreaming
+            }
+        }
+    }
 
     val isStreaming: StateFlow<Boolean> = NetworkManager.isStreamingCurrent.asStateFlow()
 

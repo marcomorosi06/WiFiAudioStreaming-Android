@@ -364,6 +364,22 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
+    private fun startClientChecked(start: () -> Unit) {
+        val needsMic = viewModel.appSettings.value?.sendClientMicrophone == true
+        if (needsMic && !hasRecordAudioPermission()) {
+            onMicPermissionGranted = start
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED || !needsMic
+        ) {
+            runCatching { start() }
+                .onFailure { viewModel.updateStatus(getString(R.string.mic_permission_denied)) }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun executeScriptCommand(command: ScriptCommand) {
         val settings = viewModel.appSettings.value ?: return
         when (command.action) {
@@ -389,6 +405,9 @@ class MainActivity : ComponentActivity() {
 
             ScriptActionType.SET ->
                 lifecycleScope.launch { ScriptExecutor.applySet(this@MainActivity, command) }
+
+            ScriptActionType.USB ->
+                lifecycleScope.launch { ScriptExecutor.applyUsbAction(this@MainActivity, command) }
         }
     }
 
@@ -568,32 +587,25 @@ class MainActivity : ComponentActivity() {
             localIp = localIp,
             onToggleMode = viewModel::toggleMode,
             onStartServer = {
-                if (!WfasPolicy.canStartServer(currentSettings.rtpEnabled, currentSettings.httpEnabled)) {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.wfas_no_protocol_desc),
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    startMediaProjectionRequest()
-                }
+                startMediaProjectionRequest()
             },
             onStopServer = {
-                if (isServer) {
+                // Lo stato autorevole e' quello di NetworkManager, non il ruolo
+                // mostrato dalla UI: se i due divergono va fermato comunque tutto,
+                // altrimenti il servizio in foreground resta acceso a vuoto.
+                if (NetworkManager.isServerStreaming || isServer) {
                     val intent = Intent(this, AudioCaptureService::class.java).apply {
                         action = AudioCaptureService.ACTION_STOP
                     }
                     startService(intent)
-                    viewModel.setIsStreaming(false)
-                } else {
-                    viewModel.stopStreaming()
                 }
+                viewModel.stopStreaming()
             },
             onConnect = { serverInfo ->
-                viewModel.startClient(serverInfo)
+                startClientChecked { viewModel.startClient(serverInfo) }
             },
             onConnectManual = { ip ->
-                viewModel.startClientManually(ip)
+                startClientChecked { viewModel.startClientManually(ip) }
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
@@ -636,7 +648,8 @@ class MainActivity : ComponentActivity() {
             onNoiseReductionChange = viewModel::setNoiseReduction,
             usbLinkState = usbLinkState,
             onUsbModeChange = viewModel::setUsbMode,
-            onOpenUsbTetherSettings = viewModel::openUsbTetherSettings
+            onOpenUsbTetherSettings = viewModel::openUsbTetherSettings,
+            onActivateWfas = { viewModel.setWfasMode(WfasPolicy.MODE_OFF_ON_USB) }
         )
 
         ExpressiveSettingsScreen(

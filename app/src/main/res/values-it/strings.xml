@@ -26,6 +26,7 @@
     <string name="status_idle">Inattivo</string>
     <string name="status_mic_permission_denied">Errore: Permesso microfono negato.</string>
     <string name="status_mic_send_error">Errore invio microfono: %1$s</string>
+    <string name="status_mic_not_accepted">Il server non accetta un microfono, mic non inviato</string>
     <string name="status_waiting_for_client">In attesa di client sulla porta %1$d…</string>
     <string name="status_client_connected">Client connesso: %1$s. Avvio…</string>
     <string name="status_handshake_failed_from_client">Handshake fallito dal client %1$s</string>
@@ -154,6 +155,10 @@
     <string name="wfas_mode_always">Sempre attivo</string>
     <string name="wfas_mode_off_on_usb">Spento quando l\'USB è collegato</string>
     <string name="wfas_mode_off">Spento</string>
+    <string name="wfas_activate_action">Attiva il protocollo WFAS</string>
+    <string name="script_action_usb">Collegamento USB</string>
+    <string name="link_connected_usb">Collegato via USB</string>
+    <string name="link_connected_wireless">Collegato senza fili</string>
     <string name="wfas_no_protocol_title">Nessun protocollo disponibile</string>
     <string name="wfas_no_protocol_desc">Con WFAS spento serve almeno un altro protocollo attivo, oppure una connessione USB attiva, per avviare uno stream.</string>
     <string name="usb_section_title">Cavo USB</string>

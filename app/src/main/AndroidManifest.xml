@@ -69,6 +69,7 @@
                 <action android:name="com.cuscus.wifiaudiostreaming.action.STOP" />
                 <action android:name="com.cuscus.wifiaudiostreaming.action.TOGGLE" />
                 <action android:name="com.cuscus.wifiaudiostreaming.action.SET" />
+                <action android:name="com.cuscus.wifiaudiostreaming.action.USB" />
             </intent-filter>
         </receiver>
 

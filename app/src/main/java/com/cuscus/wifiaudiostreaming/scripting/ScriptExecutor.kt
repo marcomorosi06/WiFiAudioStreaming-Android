@@ -25,12 +25,60 @@ import com.cuscus.wifiaudiostreaming.AudioCaptureService
 import com.cuscus.wifiaudiostreaming.ClientService
 import com.cuscus.wifiaudiostreaming.NetworkManager
 import com.cuscus.wifiaudiostreaming.SecurityMode
+import com.cuscus.wifiaudiostreaming.UsbLink
+import com.cuscus.wifiaudiostreaming.WfasPolicy
 import com.cuscus.wifiaudiostreaming.ServerInfo
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import kotlinx.coroutines.flow.first
 
 object ScriptExecutor {
+
+    // I comandi possono pilotare il collegamento USB senza passare dalle
+    // impostazioni: applicato prima di aprire qualsiasi socket, altrimenti
+    // la scelta dell'interfaccia sarebbe gia' stata fatta.
+    fun applyLinkOverrides(settings: AppSettings, command: ScriptCommand, context: Context) {
+        val usb = command.bool(ScriptParams.USB) ?: settings.usbModeEnabled
+        val latency = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
+        UsbLink.configure(context.applicationContext, usb, latency)
+        WfasPolicy.configure(resolveWfasMode(command) ?: settings.wfasMode)
+    }
+
+    fun resolveWfasMode(command: ScriptCommand): String? = when (
+        command.str(ScriptParams.WFASMODE)?.lowercase()?.replace("_", "-")
+    ) {
+        "always" -> WfasPolicy.MODE_ALWAYS
+        "not-on-usb", "notonusb", "offonusb" -> WfasPolicy.MODE_OFF_ON_USB
+        "off" -> WfasPolicy.MODE_OFF
+        else -> null
+    }
+
+    suspend fun applyUsbAction(context: Context, command: ScriptCommand) {
+        val store = SettingsDataStore(context.applicationContext)
+        val settings = store.settingsFlow.first()
+        val enable = command.bool(ScriptParams.USB) ?: !settings.usbModeEnabled
+        store.saveUsbMode(enable)
+        command.int(ScriptParams.USBLATENCY)?.let { store.saveUsbLatency(it) }
+        resolveWfasMode(command)?.let { store.saveWfasMode(it) }
+        UsbLink.configure(
+            context.applicationContext,
+            enable,
+            command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
+        )
+    }
+
+    // Con usb=true e nessun IP il target e' il peer trovato sul cavo: il suo
+    // indirizzo cambia a ogni sessione di tethering, quindi non si puo' fissare
+    // in uno script.
+    suspend fun resolveUsbPeer(timeoutMs: Long = 6000): String? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            NetworkManager.discoveredDevices.value.values
+                .firstOrNull { it.viaUsb }?.let { return it.ip }
+            kotlinx.coroutines.delay(300)
+        }
+        return null
+    }
 
     private fun resolveAuthMode(command: ScriptCommand, fallback: String): String = when {
         command.str(ScriptParams.AUTHMODE) != null ->
@@ -67,11 +115,14 @@ object ScriptExecutor {
             rtpEnabled = rtpEnabled,
             rtpPort = command.int(ScriptParams.RTPPORT) ?: settings.rtpPort,
             httpEnabled = httpEnabled,
-            httpPort = command.int(ScriptParams.HTTPPORT) ?: settings.httpPort
+            httpPort = command.int(ScriptParams.HTTPPORT) ?: settings.httpPort,
+            usbMode = command.bool(ScriptParams.USB) ?: settings.usbModeEnabled,
+            usbLatencyMs = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
         )
     }
 
     fun startServerMicOnly(context: Context, params: ResolvedServerParams) {
+        UsbLink.configure(context.applicationContext, params.usbMode, params.usbLatencyMs)
         val intent = Intent(context, AudioCaptureService::class.java).apply {
             action = AudioCaptureService.ACTION_START
             putExtra(AudioCaptureService.EXTRA_STREAM_INTERNAL, false)
@@ -107,7 +158,12 @@ object ScriptExecutor {
     suspend fun connect(context: Context, command: ScriptCommand) {
         val store = SettingsDataStore(context.applicationContext)
         val settings = store.settingsFlow.first()
-        val ip = command.str(ScriptParams.IP) ?: command.str(ScriptParams.CLIENTIP) ?: return
+        applyLinkOverrides(settings, command, context)
+        val wantsUsb = command.bool(ScriptParams.USB) == true
+        val ip = command.str(ScriptParams.IP)
+            ?: command.str(ScriptParams.CLIENTIP)
+            ?: (if (wantsUsb) resolveUsbPeer() else null)
+            ?: return
         val port = command.int(ScriptParams.PORT) ?: settings.streamingPort
         val clientMic = command.bool(ScriptParams.CLIENTMIC) ?: settings.sendClientMicrophone
 
@@ -177,6 +233,10 @@ object ScriptExecutor {
         command.bool(ScriptParams.AUTOCONNECT)?.let { store.setAutoConnectEnabled(it) }
         command.bool(ScriptParams.CONNSOUND)?.let { store.saveConnectionSoundEnabled(it) }
         command.bool(ScriptParams.DISCSOUND)?.let { store.saveDisconnectionSoundEnabled(it) }
+
+        command.bool(ScriptParams.USB)?.let { store.saveUsbMode(it) }
+        command.int(ScriptParams.USBLATENCY)?.let { store.saveUsbLatency(it) }
+        resolveWfasMode(command)?.let { store.saveWfasMode(it) }
 
         persistSecurityIfPresent(store, s, command)
     }

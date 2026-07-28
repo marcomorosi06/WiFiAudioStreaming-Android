@@ -69,6 +69,17 @@ class ScriptCommandReceiver : BroadcastReceiver() {
             }
 
             ScriptActionType.START_SERVER -> handleServerStart(appContext, command)
+
+            ScriptActionType.USB -> {
+                val pending = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        ScriptExecutor.applyUsbAction(appContext, command)
+                    } finally {
+                        pending.finish()
+                    }
+                }
+            }
         }
     }
 
@@ -79,6 +90,7 @@ class ScriptCommandReceiver : BroadcastReceiver() {
                 val store = SettingsDataStore(context)
                 val settings = store.settingsFlow.first()
                 ScriptExecutor.persistSecurityIfPresent(store, settings, command)
+                ScriptExecutor.applyLinkOverrides(settings, command, context)
                 val resolved = ScriptExecutor.resolveServerParams(settings, command)
                 if (resolved.streamInternal) {
                     launchActivityForProjection(context, command)

@@ -58,13 +58,14 @@ object UsbLink {
     fun configure(context: Context, on: Boolean, presetLatencyMs: Int = DEFAULT_USB_LATENCY_MS) {
         latencyMs = presetLatencyMs.coerceIn(MIN_USB_LATENCY_MS, MAX_USB_LATENCY_MS)
         if (on == enabled) {
-            if (on) refresh()
+            if (on) refresh(force = true)
             return
         }
         enabled = on
         if (on) {
             attach(context.applicationContext)
-            refresh()
+            NetAddr.invalidateScan()
+            refresh(force = true)
         } else {
             detach()
             cachedInterface = null
@@ -81,7 +82,8 @@ object UsbLink {
                 cableConnected = intent.getBooleanExtra("connected", false)
                 tetherFunctionActive =
                     intent.getBooleanExtra("rndis", false) || intent.getBooleanExtra("ncm", false)
-                refresh()
+                NetAddr.invalidateScan()
+                refresh(force = true)
             }
         }
         receiver = r
@@ -103,11 +105,18 @@ object UsbLink {
         receiver = null
     }
 
-    fun refresh(): State {
+    private const val SCAN_THROTTLE_MS = 1000L
+
+    @Volatile private var lastScanAt = 0L
+
+    fun refresh(force: Boolean = false): State {
         if (!enabled) {
             _state.value = State()
             return _state.value
         }
+        val now = System.currentTimeMillis()
+        if (!force && now - lastScanAt < SCAN_THROTTLE_MS) return _state.value
+        lastScanAt = now
         val iface = findInterface()
         cachedInterface = iface
         val addr = iface?.let { firstIpv4(it) }
@@ -146,18 +155,21 @@ object UsbLink {
     fun effectiveLatencyMs(configured: Int): Int =
         if (isReady()) minOf(configured, latencyMs) else configured
 
+    fun isTetherInterfaceName(name: String?): Boolean {
+        val n = name?.lowercase().orEmpty()
+        return IFACE_TOKENS.any { n.startsWith(it) }
+    }
+
     fun isUsbAddress(host: String?): Boolean {
         if (host == null) return false
         return TETHER_SUBNETS.any { host.startsWith(it) }
     }
 
-    fun isUsbPeer(host: String?): Boolean {
-        if (host.isNullOrBlank()) return false
-        val iface = activeInterface() ?: return false
+    private fun sharesSubnet(iface: NetworkInterface, host: String): Boolean {
         val peer = runCatching { java.net.InetAddress.getByName(host) }.getOrNull() ?: return false
         if (peer !is java.net.Inet4Address) return false
         val peerBits = toInt(peer.address)
-        val same = runCatching {
+        return runCatching {
             iface.interfaceAddresses.any { ia ->
                 val local = ia.address
                 if (local !is java.net.Inet4Address) return@any false
@@ -167,7 +179,31 @@ object UsbLink {
                 (toInt(local.address) and mask) == (peerBits and mask)
             }
         }.getOrDefault(false)
-        return same || isUsbAddress(host)
+    }
+
+    fun isUsbPeer(host: String?): Boolean {
+        if (host.isNullOrBlank()) return false
+        val iface = activeInterface() ?: return false
+        return sharesSubnet(iface, host) || isUsbAddress(host)
+    }
+
+    @Volatile private var detectedCache: NetworkInterface? = null
+    @Volatile private var detectedAt = 0L
+
+    fun detectedInterface(): NetworkInterface? {
+        if (enabled) activeInterface()?.let { return it }
+        val now = System.currentTimeMillis()
+        if (detectedAt != 0L && now - detectedAt < SCAN_THROTTLE_MS) return detectedCache
+        detectedAt = now
+        detectedCache = findInterface()
+        return detectedCache
+    }
+
+    fun isUsbPeerDetected(host: String?): Boolean {
+        if (host.isNullOrBlank()) return false
+        if (isUsbAddress(host)) return true
+        val iface = detectedInterface() ?: return false
+        return sharesSubnet(iface, host)
     }
 
     private fun toInt(bytes: ByteArray): Int =
@@ -206,14 +242,22 @@ object UsbLink {
         var s = 0
         val name = iface.name?.lowercase().orEmpty()
         val display = runCatching { iface.displayName?.lowercase() }.getOrNull().orEmpty()
-        if (IFACE_TOKENS.any { name.startsWith(it) }) s += 100
-        if (IFACE_TOKENS.any { display.contains(it) }) s += 40
-        if (display.contains("remote ndis")) s += 60
-        val addresses = ipv4List(iface)
-        if (addresses.any { host -> TETHER_SUBNETS.any { host.startsWith(it) } }) s += 60
-        if (name.startsWith("wlan") || name.startsWith("p2p") || name.startsWith("ap")) s -= 300
-        if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("tun")) s -= 300
-        if (display.contains("wi-fi") || display.contains("wireless")) s -= 300
+        if (display.contains("remote ndis")) s += 120
+        if (display.contains("ndis")) s += 60
+        if (display.contains("internet sharing")) s += 60
+        if (display.contains("tether")) s += 60
+        if (display.contains("android")) s += 40
+        if (IFACE_TOKENS.any { display.contains(it) }) s += 70
+        if (IFACE_TOKENS.any { name.startsWith(it) }) s += 70
+        if (ipv4List(iface).any { host -> TETHER_SUBNETS.any { host.startsWith(it) } }) s += 90
+        if (display.contains("virtual") || display.contains("vmware") ||
+            display.contains("hyper-v") || display.contains("wsl") ||
+            display.contains("loopback") || display.contains("tap") ||
+            display.contains("tunnel")
+        ) s -= 300
+        if (display.contains("wi-fi") || display.contains("wireless") ||
+            name.startsWith("wlan") || name.startsWith("wl")
+        ) s -= 300
         return s
     }
 
@@ -225,6 +269,29 @@ object UsbLink {
     }.getOrDefault(emptyList())
 
     private fun firstIpv4(iface: NetworkInterface): String? = ipv4List(iface).firstOrNull()
+
+    fun inspect(): List<String> {
+        val all = runCatching { NetworkInterface.getNetworkInterfaces()?.toList() }.getOrNull()
+            ?: return listOf("enumeration failed: NetworkInterface.getNetworkInterfaces() returned nothing")
+        if (all.isEmpty()) return listOf("enumeration returned no interfaces")
+        return all.map { iface ->
+            runCatching {
+                val name = runCatching { iface.name }.getOrDefault("?")
+                val display = runCatching { iface.displayName }.getOrNull() ?: "-"
+                val v4 = ipv4List(iface).joinToString(",").ifBlank { "-" }
+                val v6 = runCatching {
+                    iface.inetAddresses.toList()
+                        .filterIsInstance<java.net.Inet6Address>()
+                        .mapNotNull { it.hostAddress }
+                        .joinToString(",")
+                }.getOrNull()?.ifBlank { "-" } ?: "-"
+                val up = runCatching { iface.isUp }.getOrDefault(false)
+                val virt = runCatching { iface.isVirtual }.getOrDefault(false)
+                val mcast = runCatching { iface.supportsMulticast() }.getOrDefault(false)
+                "$name | $display | v4=$v4 | v6=$v6 | up=$up virtual=$virt mcast=$mcast | score=${score(iface)}"
+            }.getOrElse { "interface unreadable: ${it.javaClass.simpleName}: ${it.message}" }
+        }
+    }
 
     fun openTetherSettings(context: Context): Boolean {
         val intents = listOf(

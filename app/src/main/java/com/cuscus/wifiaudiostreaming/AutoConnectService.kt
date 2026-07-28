@@ -181,8 +181,13 @@ class AutoConnectService : Service() {
 
                                     if (isMatch) {
                                         Log.d("AutoConnect", "MATCH POSITIVO. Preparo la connessione a $remoteIp:$port")
+                                        val micTok = parts.firstOrNull { it.startsWith("mic=") }
+                                            ?.removePrefix("mic=")
                                         targetServer = ServerInfo(
                                             remoteIp, isMulticast, port,
+                                            serverSendsMic = micTok?.contains("tx") == true,
+                                            serverWantsMic = micTok?.contains("rx") == true,
+                                            fromBeacon = true,
                                             audioFormat = StreamAudioFormat.fromBeaconParts(parts)
                                         )
                                         break

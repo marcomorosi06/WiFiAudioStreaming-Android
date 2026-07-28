@@ -879,8 +879,12 @@ fun SettingsScreenContent(
                         },
                         onSelect = { onWfasModeChange(it) }
                     )
-                    if (appSettings.wfasMode != WfasPolicy.MODE_ALWAYS &&
-                        !appSettings.rtpEnabled && !appSettings.httpEnabled && !appSettings.usbModeEnabled
+                    if (!WfasPolicy.canStartServerWith(
+                            appSettings.wfasMode,
+                            usbLinkState.isReady,
+                            appSettings.rtpEnabled,
+                            appSettings.httpEnabled
+                        )
                     ) {
                         SettingsInfoItem(
                             title = stringResource(R.string.wfas_no_protocol_title),
@@ -4849,7 +4853,7 @@ fun ExpressiveIpCopyButton(
     }
 }
 
-private enum class ScriptFieldType { BOOL, INT, TEXT, SAMPLERATE, CHANNELS, AUTHMODE }
+private enum class ScriptFieldType { BOOL, INT, TEXT, SAMPLERATE, CHANNELS, AUTHMODE, WFASMODE }
 
 private data class ScriptField(val key: String, val type: ScriptFieldType)
 
@@ -4867,6 +4871,9 @@ private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when 
         ScriptField(ScriptParams.HTTP, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.HTTPPORT, ScriptFieldType.INT),
         ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.USB, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.USBLATENCY, ScriptFieldType.INT),
+        ScriptField(ScriptParams.WFASMODE, ScriptFieldType.WFASMODE),
         ScriptField(ScriptParams.AUTHMODE, ScriptFieldType.AUTHMODE),
         ScriptField(ScriptParams.AUTHKEY, ScriptFieldType.TEXT)
     )
@@ -4874,8 +4881,15 @@ private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when 
         ScriptField(ScriptParams.IP, ScriptFieldType.TEXT),
         ScriptField(ScriptParams.PORT, ScriptFieldType.INT),
         ScriptField(ScriptParams.CLIENTMIC, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.USB, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.USBLATENCY, ScriptFieldType.INT),
         ScriptField(ScriptParams.AUTHMODE, ScriptFieldType.AUTHMODE),
         ScriptField(ScriptParams.AUTHKEY, ScriptFieldType.TEXT)
+    )
+    ScriptActionType.USB -> listOf(
+        ScriptField(ScriptParams.USB, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.USBLATENCY, ScriptFieldType.INT),
+        ScriptField(ScriptParams.WFASMODE, ScriptFieldType.WFASMODE)
     )
     ScriptActionType.STOP -> emptyList()
     ScriptActionType.SET -> listOf(
@@ -4894,6 +4908,9 @@ private fun scriptFieldsFor(action: ScriptActionType): List<ScriptField> = when 
         ScriptField(ScriptParams.HTTPSAFARI, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.IFACE, ScriptFieldType.TEXT),
         ScriptField(ScriptParams.CLIENTIP, ScriptFieldType.TEXT),
+        ScriptField(ScriptParams.USB, ScriptFieldType.BOOL),
+        ScriptField(ScriptParams.USBLATENCY, ScriptFieldType.INT),
+        ScriptField(ScriptParams.WFASMODE, ScriptFieldType.WFASMODE),
         ScriptField(ScriptParams.AUTOCONNECT, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.CONNSOUND, ScriptFieldType.BOOL),
         ScriptField(ScriptParams.DISCSOUND, ScriptFieldType.BOOL),
@@ -4909,6 +4926,7 @@ private fun scriptActionLabel(action: ScriptActionType): String = when (action) 
     ScriptActionType.STOP -> stringResource(R.string.script_action_stop)
     ScriptActionType.TOGGLE -> stringResource(R.string.script_action_toggle)
     ScriptActionType.SET -> stringResource(R.string.script_action_set)
+    ScriptActionType.USB -> stringResource(R.string.script_action_usb)
 }
 
 @Composable
@@ -4918,6 +4936,7 @@ private fun scriptActionIcon(action: ScriptActionType): ImageVector = when (acti
     ScriptActionType.STOP         -> Icons.Outlined.StopCircle
     ScriptActionType.TOGGLE       -> Icons.Outlined.SwapHoriz
     ScriptActionType.SET          -> Icons.Outlined.Tune
+    ScriptActionType.USB          -> Icons.Outlined.Usb
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -5483,6 +5502,18 @@ private fun ScriptParamField(
                 stringResource(R.string.security_off) to "OFF",
                 stringResource(R.string.security_ask) to "ASK",
                 stringResource(R.string.security_key) to "KEY"
+            ),
+            onValueChange = onValueChange
+        )
+        ScriptFieldType.WFASMODE -> ScriptTriStateRow(
+            label = field.key,
+            value = value?.lowercase(),
+            accent = accent,
+            options = listOf(
+                stringResource(R.string.scripting_value_default) to null,
+                stringResource(R.string.wfas_mode_always_short) to "always",
+                stringResource(R.string.wfas_mode_off_on_usb_short) to "not-on-usb",
+                stringResource(R.string.wfas_mode_off_short) to "off"
             ),
             onValueChange = onValueChange
         )
