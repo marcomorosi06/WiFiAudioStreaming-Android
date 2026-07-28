@@ -55,8 +55,14 @@ import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnKey
+import androidx.compose.material.icons.outlined.Usb
+import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -798,6 +804,185 @@ fun ExpressiveClientOptionsSection(
     }
 }
 
+@Composable
+fun ExpressiveUsbSection(
+    isServer: Boolean,
+    enabled: Boolean,
+    linkState: UsbLink.State,
+    accent: Color,
+    onEnabledChange: (Boolean) -> Unit,
+    onOpenTetherSettings: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(stringResource(R.string.usb_section_title), accent)
+        ExpressiveToggleTile(
+            icon = Icons.Outlined.Usb,
+            activeIcon = Icons.Filled.Usb,
+            title = stringResource(
+                if (isServer) R.string.usb_tile_send_title else R.string.usb_tile_receive_title
+            ),
+            subtitle = stringResource(
+                if (isServer) R.string.usb_tile_send_subtitle else R.string.usb_tile_receive_subtitle
+            ),
+            checked = enabled,
+            accent = accent,
+            onCheckedChange = onEnabledChange
+        )
+
+        AnimatedVisibility(
+            visible = enabled,
+            enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column(modifier = Modifier.padding(top = 10.dp)) {
+                ExpressiveUsbStatusCard(
+                    linkState = linkState,
+                    accent = accent,
+                    onOpenTetherSettings = onOpenTetherSettings
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveUsbStatusCard(
+    linkState: UsbLink.State,
+    accent: Color,
+    onOpenTetherSettings: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+    val ready = linkState.isReady
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+
+    val corner by animateDpAsState(
+        targetValue = when {
+            pressed -> 14.dp
+            ready -> 30.dp
+            else -> 24.dp
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "UsbCardCorner"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.975f else 1f,
+        animationSpec = tween(160, easing = FastOutSlowInEasing),
+        label = "UsbCardScale"
+    )
+    val container by animateColorAsState(
+        targetValue = if (ready) accent.copy(alpha = 0.16f)
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "UsbCardContainer"
+    )
+    val titleColor by animateColorAsState(
+        targetValue = if (ready) accent else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "UsbCardTitle"
+    )
+
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clip(RoundedCornerShape(corner))
+        .background(container)
+        .let {
+            if (ready) it
+            else it.clickable(interactionSource = interaction, indication = null) {
+                haptics.confirm()
+                onOpenTetherSettings()
+            }
+        }
+        .padding(16.dp)
+
+    Row(modifier = rowModifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(contentAlignment = Alignment.Center) {
+            if (!ready) {
+                LoadingIndicator(
+                    modifier = Modifier.size(52.dp),
+                    color = accent.copy(alpha = 0.45f)
+                )
+            }
+            MorphIconBadge(
+                icon = if (ready) Icons.Filled.Usb else Icons.Outlined.Usb,
+                active = ready,
+                activeColor = accent,
+                idleColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentActive = MaterialTheme.colorScheme.surfaceContainerLowest,
+                contentIdle = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 44.dp
+            )
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = when (linkState.stage) {
+                    UsbLink.Stage.READY -> stringResource(R.string.usb_status_ready_short)
+                    UsbLink.Stage.CABLE_NO_TETHER -> stringResource(R.string.usb_status_cable_no_tether)
+                    else -> stringResource(R.string.usb_status_no_cable)
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = titleColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (ready) {
+                Text(
+                    text = "${linkState.displayName ?: "usb"}  ·  ${linkState.localAddress ?: "-"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = stringResource(
+                    if (ready) R.string.usb_hint_ready else R.string.usb_action_open_tethering
+                ).uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.sp,
+                fontWeight = if (ready) FontWeight.Normal else FontWeight.Black,
+                color = if (ready) MaterialTheme.colorScheme.onSurfaceVariant else accent,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (!ready) {
+            Spacer(Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(accent),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = stringResource(R.string.usb_action_open_tethering),
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveDiscoverySection(
@@ -965,7 +1150,11 @@ private fun ExpressiveDeviceRow(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = if (info.isMulticast) Icons.Outlined.Groups else Icons.Outlined.Person,
+                imageVector = when {
+                    info.viaUsb -> Icons.Filled.Usb
+                    info.isMulticast -> Icons.Outlined.Groups
+                    else -> Icons.Outlined.Person
+                },
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
                 tint = accent
@@ -987,7 +1176,7 @@ private fun ExpressiveDeviceRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${info.ip}:${info.port}",
+                text = NetAddr.hostPort(info.ip, info.port),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -996,6 +1185,7 @@ private fun ExpressiveDeviceRow(
             )
             Text(
                 text = buildList {
+                    if (info.viaUsb) add(stringResource(R.string.usb_device_transport).uppercase())
                     add(
                         stringResource(
                             if (info.isMulticast) R.string.mode_multicast else R.string.mode_unicast
@@ -1005,7 +1195,8 @@ private fun ExpressiveDeviceRow(
                 }.joinToString("  ·  "),
                 style = MaterialTheme.typography.labelSmall,
                 letterSpacing = 1.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (info.viaUsb) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (info.viaUsb) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1013,7 +1204,8 @@ private fun ExpressiveDeviceRow(
                 securityMode = info.securityMode,
                 encrypted = info.encrypted,
                 serverSendsMic = info.serverSendsMic,
-                serverWantsMic = info.serverWantsMic
+                serverWantsMic = info.serverWantsMic,
+                viaUsb = info.viaUsb
             )
         }
 

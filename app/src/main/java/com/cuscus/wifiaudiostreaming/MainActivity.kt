@@ -550,6 +550,14 @@ class MainActivity : ComponentActivity() {
             showSettingsScreen.value = false
         }
 
+        val usbLinkState by viewModel.usbLinkState.collectAsStateWithLifecycle()
+        LaunchedEffect(currentSettings.usbModeEnabled) {
+            while (currentSettings.usbModeEnabled) {
+                viewModel.refreshUsbLink()
+                kotlinx.coroutines.delay(1500)
+            }
+        }
+
         ExpressiveHomeScreen(
             appSettings = currentSettings,
             isServer = isServer,
@@ -560,7 +568,15 @@ class MainActivity : ComponentActivity() {
             localIp = localIp,
             onToggleMode = viewModel::toggleMode,
             onStartServer = {
-                startMediaProjectionRequest()
+                if (!WfasPolicy.canStartServer(currentSettings.rtpEnabled, currentSettings.httpEnabled)) {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.wfas_no_protocol_desc),
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    startMediaProjectionRequest()
+                }
             },
             onStopServer = {
                 if (isServer) {
@@ -617,7 +633,10 @@ class MainActivity : ComponentActivity() {
             onSecurityChange = viewModel::setSecurity,
             onEncryptionChange = viewModel::setEncryption,
             hasMicPermission = hasMicPermission,
-            onNoiseReductionChange = viewModel::setNoiseReduction
+            onNoiseReductionChange = viewModel::setNoiseReduction,
+            usbLinkState = usbLinkState,
+            onUsbModeChange = viewModel::setUsbMode,
+            onOpenUsbTetherSettings = viewModel::openUsbTetherSettings
         )
 
         ExpressiveSettingsScreen(
@@ -659,7 +678,12 @@ class MainActivity : ComponentActivity() {
             onOpenScripting = { showScriptingScreen.value = true },
             onAutoUpdateCheckChange = viewModel::setAutoUpdateCheckEnabled,
             onCheckForUpdates = viewModel::checkForUpdatesManual,
-            checkingForUpdate = checkingForUpdate
+            checkingForUpdate = checkingForUpdate,
+            usbLinkState = usbLinkState,
+            onUsbModeChange = viewModel::setUsbMode,
+            onUsbLatencyChange = viewModel::setUsbLatency,
+            onOpenUsbTetherSettings = viewModel::openUsbTetherSettings,
+            onWfasModeChange = viewModel::setWfasMode
         )
 
         ScriptingScreen(

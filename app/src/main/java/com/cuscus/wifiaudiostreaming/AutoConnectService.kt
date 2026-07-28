@@ -141,7 +141,7 @@ class AutoConnectService : Service() {
                         }
                     } catch (e: Exception) {}
 
-                    socket.joinGroup(groupAddress)
+                    MulticastNet.joinAllGroups(socket)
                     Log.d("AutoConnect", "Socket Multicast APERTO e in ASCOLTO sulla porta 9091")
 
                     val buffer = ByteArray(1024)
@@ -197,7 +197,7 @@ class AutoConnectService : Service() {
                     }
 
                     try {
-                        socket.leaveGroup(groupAddress)
+                        MulticastNet.leaveAllGroups(socket)
                         socket.close()
                         Log.d("AutoConnect", "Socket CHIUSO correttamente.")
                     } catch (e: Exception) {}

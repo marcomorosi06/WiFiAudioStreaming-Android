@@ -21,6 +21,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.cuscus.wifiaudiostreaming.UsbLink
+import com.cuscus.wifiaudiostreaming.WfasPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -76,7 +78,10 @@ data class AppSettings(
     val blackoutOutlinedUi: Boolean = false,
     val developerMode: Boolean = false,
     val noiseReductionEnabled: Boolean = false,
-    val noiseReductionStrength: Int = 50
+    val noiseReductionStrength: Int = 50,
+    val usbModeEnabled: Boolean = false,
+    val usbLatencyMs: Int = 20,
+    val wfasMode: String = WfasPolicy.MODE_OFF_ON_USB
 )
 
 class SettingsDataStore(context: Context) {
@@ -117,6 +122,9 @@ class SettingsDataStore(context: Context) {
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         val NOISE_REDUCTION_ENABLED = booleanPreferencesKey("noise_reduction_enabled")
         val NOISE_REDUCTION_STRENGTH = intPreferencesKey("noise_reduction_strength")
+        val USB_MODE_ENABLED = booleanPreferencesKey("usb_mode_enabled")
+        val USB_LATENCY_MS = intPreferencesKey("usb_latency_ms")
+        val WFAS_MODE = stringPreferencesKey("wfas_mode")
     }
 
     val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
@@ -163,7 +171,10 @@ class SettingsDataStore(context: Context) {
             maxPayloadBytes = preferences[PreferencesKeys.MAX_PAYLOAD] ?: 1390,
             securityMode = preferences[PreferencesKeys.SECURITY_MODE] ?: "OFF",
             authKey = preferences[PreferencesKeys.AUTH_KEY] ?: "",
-            encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: false
+            encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: false,
+            usbModeEnabled = preferences[PreferencesKeys.USB_MODE_ENABLED] ?: false,
+            usbLatencyMs = preferences[PreferencesKeys.USB_LATENCY_MS] ?: UsbLink.DEFAULT_USB_LATENCY_MS,
+            wfasMode = preferences[PreferencesKeys.WFAS_MODE] ?: WfasPolicy.MODE_OFF_ON_USB
         )
     }
 
@@ -202,6 +213,27 @@ class SettingsDataStore(context: Context) {
     suspend fun saveBufferSize(bufferSize: Int) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.BUFFER_SIZE] = bufferSize
+        }
+    }
+
+    suspend fun saveWfasMode(mode: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.WFAS_MODE] =
+                if (mode in WfasPolicy.MODES) mode else WfasPolicy.MODE_OFF_ON_USB
+        }
+    }
+
+    suspend fun saveUsbMode(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USB_MODE_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveUsbLatency(latencyMs: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USB_LATENCY_MS] = latencyMs.coerceIn(
+                UsbLink.MIN_USB_LATENCY_MS, UsbLink.MAX_USB_LATENCY_MS
+            )
         }
     }
 

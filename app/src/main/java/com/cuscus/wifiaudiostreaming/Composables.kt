@@ -480,6 +480,11 @@ fun ExpressiveSettingsScreen(
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     checkingForUpdate: Boolean = false,
+    usbLinkState: UsbLink.State = UsbLink.State(),
+    onUsbModeChange: (Boolean) -> Unit = {},
+    onUsbLatencyChange: (Int) -> Unit = {},
+    onOpenUsbTetherSettings: () -> Unit = {},
+    onWfasModeChange: (String) -> Unit = {},
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -521,7 +526,12 @@ fun ExpressiveSettingsScreen(
             onOpenScripting = onOpenScripting,
             onAutoUpdateCheckChange = onAutoUpdateCheckChange,
             onCheckForUpdates = onCheckForUpdates,
-            checkingForUpdate = checkingForUpdate
+            checkingForUpdate = checkingForUpdate,
+            usbLinkState = usbLinkState,
+            onUsbModeChange = onUsbModeChange,
+            onUsbLatencyChange = onUsbLatencyChange,
+            onOpenUsbTetherSettings = onOpenUsbTetherSettings,
+            onWfasModeChange = onWfasModeChange
         )
     }
 }
@@ -558,6 +568,11 @@ fun SettingsScreenContent(
     onAutoUpdateCheckChange: (Boolean) -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     checkingForUpdate: Boolean = false,
+    usbLinkState: UsbLink.State = UsbLink.State(),
+    onUsbModeChange: (Boolean) -> Unit = {},
+    onUsbLatencyChange: (Int) -> Unit = {},
+    onOpenUsbTetherSettings: () -> Unit = {},
+    onWfasModeChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val settingsHaptics = rememberAppHaptics()
@@ -793,6 +808,40 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_usb),
+                    icon = Icons.Outlined.SettingsEthernet
+                ) {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_usb_mode_title),
+                        description = stringResource(R.string.settings_item_usb_mode_desc),
+                        icon = Icons.Outlined.Usb,
+                        isChecked = appSettings.usbModeEnabled,
+                        onCheckedChange = onUsbModeChange
+                    )
+                    if (appSettings.usbModeEnabled) {
+                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            ExpressiveUsbStatusCard(
+                                linkState = usbLinkState,
+                                accent = MaterialTheme.colorScheme.primary,
+                                onOpenTetherSettings = onOpenUsbTetherSettings
+                            )
+                        }
+                        SettingsSliderItem(
+                            title = stringResource(R.string.settings_item_usb_latency_title),
+                            description = stringResource(R.string.settings_item_usb_latency_desc),
+                            icon = Icons.Outlined.Timer,
+                            value = appSettings.usbLatencyMs.toFloat(),
+                            range = UsbLink.MIN_USB_LATENCY_MS.toFloat()..UsbLink.MAX_USB_LATENCY_MS.toFloat(),
+                            steps = ((UsbLink.MAX_USB_LATENCY_MS - UsbLink.MIN_USB_LATENCY_MS) / 5) - 1,
+                            valueSuffix = "ms",
+                            onValueChange = { onUsbLatencyChange(it.toInt()) }
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsGroupCard(
                     title = stringResource(R.string.settings_group_server_protocols),
                     icon = Icons.Outlined.Hub
                 ) {
@@ -801,6 +850,44 @@ fun SettingsScreenContent(
                         description = stringResource(R.string.settings_item_wfas_desc),
                         painter = painterResource(id = R.drawable.wfas_protocol)
                     )
+                    SettingsChoiceItem(
+                        title = stringResource(R.string.settings_item_wfas_mode_title),
+                        description = stringResource(R.string.settings_item_wfas_mode_desc),
+                        icon = Icons.Outlined.Hub,
+                        options = listOf(
+                            ChoiceOption(
+                                Icons.Outlined.AllInclusive,
+                                stringResource(R.string.wfas_mode_always_short),
+                                WfasPolicy.MODE_ALWAYS
+                            ),
+                            ChoiceOption(
+                                Icons.Outlined.Usb,
+                                stringResource(R.string.wfas_mode_off_on_usb_short),
+                                WfasPolicy.MODE_OFF_ON_USB
+                            ),
+                            ChoiceOption(
+                                Icons.Outlined.Block,
+                                stringResource(R.string.wfas_mode_off_short),
+                                WfasPolicy.MODE_OFF
+                            )
+                        ),
+                        selectedValue = appSettings.wfasMode,
+                        selectedDescription = when (appSettings.wfasMode) {
+                            WfasPolicy.MODE_OFF -> stringResource(R.string.wfas_mode_off_desc)
+                            WfasPolicy.MODE_ALWAYS -> stringResource(R.string.wfas_mode_always_desc)
+                            else -> stringResource(R.string.wfas_mode_off_on_usb_desc)
+                        },
+                        onSelect = { onWfasModeChange(it) }
+                    )
+                    if (appSettings.wfasMode != WfasPolicy.MODE_ALWAYS &&
+                        !appSettings.rtpEnabled && !appSettings.httpEnabled && !appSettings.usbModeEnabled
+                    ) {
+                        SettingsInfoItem(
+                            title = stringResource(R.string.wfas_no_protocol_title),
+                            description = stringResource(R.string.wfas_no_protocol_desc),
+                            icon = Icons.Outlined.WarningAmber
+                        )
+                    }
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_rtp_title),
                         description = stringResource(R.string.settings_item_rtp_desc),
@@ -1283,7 +1370,7 @@ fun ExpressiveDeviceList(
         devices.forEach { (hostname, serverInfo) ->
             ExpressiveDeviceCard(
                 hostname = hostname,
-                ipAddress = "${serverInfo.ip}:${serverInfo.port}",
+                ipAddress = NetAddr.hostPort(serverInfo.ip, serverInfo.port),
                 isMulticast = serverInfo.isMulticast,
                 securityMode = serverInfo.securityMode,
                 encrypted = serverInfo.encrypted,
@@ -1415,6 +1502,49 @@ fun SettingsSwitchItem(
 }
 
 
+@Composable
+fun SettingsChoiceItem(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    options: List<ChoiceOption>,
+    selectedValue: String,
+    selectedDescription: String,
+    onSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        ExpressiveChoiceRow(
+            options = options,
+            selectedValue = selectedValue,
+            accent = MaterialTheme.colorScheme.primary,
+            onSelect = onSelect
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = selectedDescription,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> SettingsSelectionItem(
@@ -1447,7 +1577,15 @@ fun <T> SettingsSelectionItem(
             }
             Spacer(Modifier.width(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = currentValue, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = currentValue,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.End,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 150.dp)
+                )
                 Icon(
                     imageVector = Icons.Default.ArrowDropDown,
                     contentDescription = stringResource(R.string.open_selection_desc)
@@ -2846,9 +2984,18 @@ fun ModeTag(isMulticast: Boolean) {
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-fun DeviceBadges(securityMode: String?, encrypted: Boolean, serverSendsMic: Boolean, serverWantsMic: Boolean) {
+fun DeviceBadges(
+    securityMode: String?,
+    encrypted: Boolean,
+    serverSendsMic: Boolean,
+    serverWantsMic: Boolean,
+    viaUsb: Boolean = false
+) {
     val mode = securityMode?.uppercase()
     val badges = buildList {
+        if (viaUsb) add(
+            DeviceBadgeSpec(Icons.Filled.Usb, stringResource(R.string.usb_device_transport), true, MaterialShapes.Sunny)
+        )
         when {
             encrypted -> add(
                 DeviceBadgeSpec(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true, MaterialShapes.Gem)

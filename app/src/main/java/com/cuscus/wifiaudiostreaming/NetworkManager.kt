@@ -69,6 +69,8 @@ data class ServerInfo(
     val serverWantsMic: Boolean = false,
     /** Formato audio annunciato dal server nel beacon di discovery, se presente. */
     val audioFormat: StreamAudioFormat? = null,
+    /** Il beacon e' arrivato sul collegamento USB, non sulla rete Wi-Fi. */
+    val viaUsb: Boolean = false,
     /** Istante dell'ultimo beacon ricevuto: serve a far scadere i server spariti. */
     val lastSeen: Long = System.currentTimeMillis()
 )
@@ -408,6 +410,14 @@ object NetworkManager {
 
     @SuppressLint("DefaultLocale", "MissingPermission")
     fun getLocalIpAddress(context: Context): String {
+        UsbLink.activeInterface()?.let { iface ->
+            runCatching {
+                iface.inetAddresses.toList()
+                    .filterIsInstance<java.net.Inet4Address>()
+                    .firstOrNull { !it.isLoopbackAddress }
+                    ?.hostAddress
+            }.getOrNull()?.let { return it }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -461,7 +471,7 @@ object NetworkManager {
                 }
             }
         } catch (e: Exception) {}
-        return "0.0.0.0"
+        return NetAddr.bestLocalAddress()
     }
 
     @SuppressLint("MissingPermission")
@@ -522,7 +532,7 @@ object NetworkManager {
         val socket = if (isMulticast) {
             MulticastSocket().apply {
                 timeToLive = 4
-                wifiIface?.let { networkInterface = it }
+                MulticastNet.chooseSendInterface(wifiIface)?.let { networkInterface = it }
             }
         } else DatagramSocket()
 
@@ -574,8 +584,10 @@ object NetworkManager {
         try {
             NetworkInterface.getNetworkInterfaces().toList().forEach { iface ->
                 iface.inetAddresses.toList().forEach { addr ->
-                    if (!addr.isLoopbackAddress && addr.hostAddress.indexOf(':') < 0) {
-                        ipSet.add(addr.hostAddress)
+                    if (!addr.isLoopbackAddress) {
+                        val h = addr.hostAddress ?: return@forEach
+                        ipSet.add(h)
+                        ipSet.add(h.substringBefore('%'))
                     }
                 }
             }
@@ -585,6 +597,9 @@ object NetworkManager {
 
     private fun getWifiNetworkInterface(preferredName: String = "Auto"): NetworkInterface? {
         return try {
+            if (preferredName == "Auto") {
+                UsbLink.activeInterface()?.let { return it }
+            }
             val interfaces = NetworkInterface.getNetworkInterfaces().toList()
 
             if (preferredName != "Auto") {
@@ -596,10 +611,9 @@ object NetworkManager {
                             !iface.isLoopback &&
                             !iface.isVirtual &&
                             iface.inetAddresses.toList().any { addr ->
-                                addr is java.net.Inet4Address &&
-                                        !addr.isLoopbackAddress &&
-                                        !addr.hostAddress.startsWith("192.168.112") &&
-                                        !addr.hostAddress.startsWith("192.168.42")
+                                !addr.isLoopbackAddress &&
+                                        !(addr.hostAddress ?: "").startsWith("192.168.112") &&
+                                        !(addr.hostAddress ?: "").startsWith("192.168.42")
                             }
                 }
             }
@@ -642,8 +656,9 @@ object NetworkManager {
                         val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
 
                         socket = MulticastSocket(NetworkSettings.DISCOVERY_PORT).apply {
+                            reuseAddress = true
                             getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
-                            joinGroup(groupAddress)
+                            MulticastNet.joinAllGroups(this)
                             soTimeout = 5000
                         }
 
@@ -682,6 +697,7 @@ object NetworkManager {
                                                 serverSendsMic = micTok?.contains("tx") == true,
                                                 serverWantsMic = micTok?.contains("rx") == true,
                                                 audioFormat = advertisedFormat,
+                                                viaUsb = UsbLink.isUsbPeer(remoteIp),
                                                 lastSeen = System.currentTimeMillis()
                                             )
                                             Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
@@ -712,7 +728,7 @@ object NetworkManager {
                         delay(5000)
                     } finally {
                         try {
-                            socket?.leaveGroup(InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP))
+                            socket?.let { MulticastNet.leaveAllGroups(it) }
                             socket?.close()
                         } catch (e: Exception) {}
                     }
@@ -779,9 +795,8 @@ object NetworkManager {
                             groupAddress,
                             NetworkSettings.DISCOVERY_PORT
                         )
-                        socket.send(packet)
-                        Log.d(TAG, "[BROADCAST] Sent: $message  iface=${wifiIface?.name ?: "default"}")
-                        println("Broadcasting presence: $message on iface ${wifiIface?.name ?: "default"}")
+                        val sent = MulticastNet.sendAll(socket, messageBytes, NetworkSettings.DISCOVERY_PORT, wifiIface) { WfasPolicy.enabledOn(it) }
+                        Log.d(TAG, "[BROADCAST] Sent: $message  interfaces=$sent")
                     } catch (e: Exception) {
                         if (e !is CancellationException) println("Broadcasting error: ${e.message}")
                     }
@@ -822,9 +837,11 @@ object NetworkManager {
                 val group = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                 MulticastSocket().use { sock ->
                     sock.timeToLive = 4
-                    getWifiNetworkInterface(networkInterfaceName)?.let { sock.networkInterface = it }
+                    val preferred = getWifiNetworkInterface(networkInterfaceName)
+                    preferred?.let { sock.networkInterface = it }
+                    val packet = DatagramPacket(bytes, bytes.size, group, NetworkSettings.DISCOVERY_PORT)
                     repeat(2) {
-                        sock.send(DatagramPacket(bytes, bytes.size, group, NetworkSettings.DISCOVERY_PORT))
+                        MulticastNet.sendAll(sock, bytes, NetworkSettings.DISCOVERY_PORT, preferred)
                         delay(120)
                     }
                 }
@@ -1225,7 +1242,7 @@ object NetworkManager {
                 val vpnActive = isVpnActive(context)
 
                 if (isMulticast) {
-                    val targetAddress = InetSocketAddress(NetworkSettings.MULTICAST_GROUP_IP, streamingPort)
+                    val targetAddress = InetSocketAddress(MulticastNet.audioGroup(getWifiNetworkInterface(networkInterfaceName)).hostAddress, streamingPort)
                     Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress vpnActive=$vpnActive wifiNet=$wifiNet")
                     if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
                     val wifiLocalIp = wifiIface?.inetAddresses?.toList()
@@ -1281,7 +1298,7 @@ object NetworkManager {
                     delay(500)
                     setupAudioRecorders(safeBufferSize)
 
-                    val localAddress = InetSocketAddress("0.0.0.0", streamingPort)
+                    val localAddress = InetSocketAddress(streamingPort)
                     if (!vpnActive) wifiNet?.let { cm.bindProcessToNetwork(it) }
                     sendSocket = aSocket(SelectorManager(Dispatchers.IO)).udp().bind(localAddress) { reuseAddress = true }
                     Log.d(TAG, "[SERVER][UNICAST] socket UDP bound su $localAddress, vpnActive=$vpnActive wifiNet=$wifiNet")
@@ -1311,6 +1328,11 @@ object NetworkManager {
 
                         if (!message.startsWith(NetworkSettings.CLIENT_HELLO_MESSAGE)) {
                             Log.w(TAG, "[SERVER][UNICAST] messaggio ignorato (non HELLO): '$message'")
+                            continue
+                        }
+
+                        if (!WfasPolicy.enabledForPeerAddress(clientAddress.toString())) {
+                            Log.w(TAG, "[SERVER][UNICAST] WFAS disattivato per $clientAddress, handshake ignorato")
                             continue
                         }
 
@@ -1596,7 +1618,8 @@ object NetworkManager {
                             withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
                             return@launch
                         }
-                        val targetLatencyFrames = advSettings.latencyMs * sampleRate / 1000
+                        val effectiveLatencyMs = UsbLink.effectiveLatencyMs(advSettings.latencyMs)
+                        val targetLatencyFrames = effectiveLatencyMs * sampleRate / 1000
                         val marginFrames = sampleRate * 30 / 1000
                         var playbackBufferSize = minBuffer.coerceAtLeast((targetLatencyFrames + marginFrames * 2) * frameSize)
                         if (playbackBufferSize % frameSize != 0) {
@@ -1629,6 +1652,10 @@ object NetworkManager {
                             .let { it - (it % frameSize) }
                         if (prerollLen > 0) audioTrack!!.write(ByteArray(prerollLen), 0, prerollLen, AudioTrack.WRITE_BLOCKING)
                         audioTrack!!.play()
+                        LinkMetrics.start(
+                            if (UsbLink.isReady()) "USB" else "WIFI",
+                            sampleRate
+                        )
 
                         connectionStatus.value = context.getString(R.string.status_contacting_server, serverInfo.ip)
                         socket = aSocket(selectorManager).udp().bind { receiveBufferSize = 1 shl 20 }
@@ -1804,6 +1831,14 @@ object NetworkManager {
                             val seq       = ((data[4].toInt() and 0xFF) shl 8) or (data[5].toInt() and 0xFF)
                             val isSilence = (flags and 0x01) != 0
 
+                            LinkMetrics.onPacket(
+                                seq,
+                                ((data[6].toLong() and 0xFF) shl 24) or
+                                        ((data[7].toLong() and 0xFF) shl 16) or
+                                        ((data[8].toLong() and 0xFF) shl 8) or
+                                        (data[9].toLong() and 0xFF)
+                            )
+
                             if (expectedSeq == -1) {
                                 expectedSeq = seq
                             } else {
@@ -1910,6 +1945,7 @@ object NetworkManager {
                             watchdogJob.cancel()
                         }
                     } finally {
+                        LinkMetrics.stop()
                         audioTrack?.stop()
                         audioTrack?.release()
                         if (connectedSuccessfully) {
@@ -1931,8 +1967,9 @@ object NetworkManager {
                         connectionStatus.value = context.getString(R.string.status_joining_multicast)
                         val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                         multicastSocket = MulticastSocket(serverInfo.port).apply {
+                            reuseAddress = true
                             getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
-                            joinGroup(groupAddress)
+                            MulticastNet.joinAllGroups(this)
                         }
 
                         val channelConfigOut = if (channelConfig == "STEREO") AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
@@ -1950,7 +1987,10 @@ object NetworkManager {
                             withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
                             return@launch
                         }
-                        var playbackBufferSize = minBuffer.coerceAtLeast(SettingsDataStore(context).settingsFlow.first().latencyMs * sampleRate / 1000 * (if (channelConfig == "STEREO") 4 else 2))
+                        val mcLatencyMs = UsbLink.effectiveLatencyMs(
+                            SettingsDataStore(context).settingsFlow.first().latencyMs
+                        )
+                        var playbackBufferSize = minBuffer.coerceAtLeast(mcLatencyMs * sampleRate / 1000 * (if (channelConfig == "STEREO") 4 else 2))
 
                         val frameSize = if (channelConfig == "STEREO") 4 else 2
                         if (playbackBufferSize % frameSize != 0) {
@@ -1976,6 +2016,7 @@ object NetworkManager {
                             .build()
 
                         audioTrack.play()
+                        LinkMetrics.start(if (UsbLink.isReady()) "USB" else "WIFI", sampleRate)
                         connectionStatus.value = context.getString(R.string.status_streaming)
                         if (connectionSoundEnabled) playConnectionSound(context)
                         connectedSuccessfully = true
@@ -2041,6 +2082,13 @@ object NetworkManager {
                             suspend fun playMc(audio: ByteArray) {
                                 val len = audio.size
                                 if (len >= MC_HEADER_SIZE && audio[0] == MC_MAGIC_0 && audio[1] == MC_MAGIC_1) {
+                                    LinkMetrics.onPacket(
+                                        ((audio[4].toInt() and 0xFF) shl 8) or (audio[5].toInt() and 0xFF),
+                                        ((audio[6].toLong() and 0xFF) shl 24) or
+                                                ((audio[7].toLong() and 0xFF) shl 16) or
+                                                ((audio[8].toLong() and 0xFF) shl 8) or
+                                                (audio[9].toLong() and 0xFF)
+                                    )
                                     if (!mcVersionChecked) {
                                         mcVersionChecked = true
                                         val packetVersion = audio[2].toInt() and 0xFF
@@ -2085,11 +2133,12 @@ object NetworkManager {
                             if (mcAbort) break
                         }
                     } finally {
+                        LinkMetrics.stop()
                         audioTrack?.stop()
                         audioTrack?.release()
                         try {
                             val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
-                            multicastSocket?.leaveGroup(groupAddress)
+                            multicastSocket?.let { MulticastNet.leaveAllGroups(it) }
                         } catch (_: Exception) {}
                         multicastSocket?.close()
                         if (multicastLock.isHeld) multicastLock.release()

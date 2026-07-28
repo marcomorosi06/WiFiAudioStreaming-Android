@@ -57,6 +57,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = null
         )
 
+    val usbLinkState: StateFlow<UsbLink.State> = UsbLink.state
+
+    val linkMetrics: StateFlow<LinkMetrics.Snapshot> = LinkMetrics.snapshot
+
+    init {
+        viewModelScope.launch {
+            settingsDataStore.settingsFlow
+                .map { Triple(it.usbModeEnabled, it.usbLatencyMs, it.wfasMode) }
+                .distinctUntilChanged()
+                .collect { (enabled, latency, wfas) ->
+                    UsbLink.configure(getApplication(), enabled, latency)
+                    WfasPolicy.configure(wfas)
+                }
+        }
+    }
+
+    fun setWfasMode(mode: String) {
+        viewModelScope.launch { settingsDataStore.saveWfasMode(mode) }
+    }
+
+    fun refreshUsbLink() { UsbLink.refresh() }
+
+    fun setUsbMode(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveUsbMode(enabled) }
+    }
+
+    fun setUsbLatency(latencyMs: Int) {
+        viewModelScope.launch { settingsDataStore.saveUsbLatency(latencyMs) }
+    }
+
+    fun openUsbTetherSettings() {
+        UsbLink.openTetherSettings(getApplication())
+    }
+
     val connectionStatus: StateFlow<String> = NetworkManager.connectionStatus.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
@@ -368,11 +402,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @SuppressLint("MissingPermission")
-    fun startClientManually(ip: String) {
+    fun startClientManually(rawIp: String) {
         val currentSettings = appSettings.value ?: return
+        val ip = NetAddr.normalize(rawIp)
+        if (ip.isBlank()) return
 
         viewModelScope.launch {
-            updateStatus("Detecting mode for $ip...")
+            updateStatus("Detecting mode for ${NetAddr.display(ip)}...")
             val port = currentSettings.streamingPort
 
             val knownServer = discoveredDevices.value.values.find { it.ip == ip }

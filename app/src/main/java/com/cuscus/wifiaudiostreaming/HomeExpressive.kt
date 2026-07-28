@@ -191,7 +191,10 @@ fun ExpressiveHomeScreen(
     onSecurityChange: (String, String) -> Unit = { _, _ -> },
     onEncryptionChange: (Boolean) -> Unit = {},
     hasMicPermission: Boolean = true,
-    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> }
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
+    usbLinkState: UsbLink.State = UsbLink.State(),
+    onUsbModeChange: (Boolean) -> Unit = {},
+    onOpenUsbTetherSettings: () -> Unit = {}
 ) {
     val sourceReady = appSettings.streamInternal || appSettings.streamMic
     val phase = when {
@@ -287,22 +290,32 @@ fun ExpressiveHomeScreen(
                 enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(280, delayMillis = 60)),
                 exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
             ) {
-                ExpressiveSourceSection(
-                    streamInternal = appSettings.streamInternal,
-                    streamMic = appSettings.streamMic,
-                    isMulticast = isMulticastMode,
-                    rtpEnabled = appSettings.rtpEnabled,
-                    httpEnabled = appSettings.httpEnabled,
-                    securityMode = appSettings.securityMode,
-                    authKey = appSettings.authKey,
-                    encryptionEnabled = appSettings.encryptionEnabled,
-                    accent = accent,
-                    onStreamInternalChange = onStreamInternalChange,
-                    onStreamMicChange = onStreamMicChange,
-                    onMulticastChange = onMulticastModeChange,
-                    onSecurityChange = onSecurityChange,
-                    onEncryptionChange = onEncryptionChange
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                    ExpressiveSourceSection(
+                        streamInternal = appSettings.streamInternal,
+                        streamMic = appSettings.streamMic,
+                        isMulticast = isMulticastMode,
+                        rtpEnabled = appSettings.rtpEnabled,
+                        httpEnabled = appSettings.httpEnabled,
+                        securityMode = appSettings.securityMode,
+                        authKey = appSettings.authKey,
+                        encryptionEnabled = appSettings.encryptionEnabled,
+                        accent = accent,
+                        onStreamInternalChange = onStreamInternalChange,
+                        onStreamMicChange = onStreamMicChange,
+                        onMulticastChange = onMulticastModeChange,
+                        onSecurityChange = onSecurityChange,
+                        onEncryptionChange = onEncryptionChange
+                    )
+                    ExpressiveUsbSection(
+                        isServer = true,
+                        enabled = appSettings.usbModeEnabled,
+                        linkState = usbLinkState,
+                        accent = accent,
+                        onEnabledChange = onUsbModeChange,
+                        onOpenTetherSettings = onOpenUsbTetherSettings
+                    )
+                }
             }
 
             AnimatedVisibility(
@@ -343,6 +356,15 @@ fun ExpressiveHomeScreen(
                         onSendMicrophoneChange = onSendClientMicrophoneChange
                     )
 
+                    ExpressiveUsbSection(
+                        isServer = false,
+                        enabled = appSettings.usbModeEnabled,
+                        linkState = usbLinkState,
+                        accent = accent,
+                        onEnabledChange = onUsbModeChange,
+                        onOpenTetherSettings = onOpenUsbTetherSettings
+                    )
+
                     Column {
                         SectionHeader(stringResource(R.string.manual_ip_hint), accent)
                         var manualIp by remember { mutableStateOf("") }
@@ -354,7 +376,7 @@ fun ExpressiveHomeScreen(
                             OutlinedTextField(
                                 value = manualIp,
                                 onValueChange = { manualIp = it },
-                                placeholder = { Text("192.168.1.10") },
+                                placeholder = { Text("192.168.1.10  /  [fd00::1]") },
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                                     fontFamily = FontFamily.Monospace
                                 ),
