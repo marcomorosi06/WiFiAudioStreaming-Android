@@ -116,6 +116,10 @@ object ScriptExecutor {
             rtpPort = command.int(ScriptParams.RTPPORT) ?: settings.rtpPort,
             httpEnabled = httpEnabled,
             httpPort = command.int(ScriptParams.HTTPPORT) ?: settings.httpPort,
+            dlnaEnabled = settings.dlnaEnabled,
+            dlnaPort = settings.dlnaPort,
+            dlnaFormat = settings.dlnaFormat,
+            dlnaDevices = settings.dlnaDevices,
             usbMode = command.bool(ScriptParams.USB) ?: settings.usbModeEnabled,
             usbLatencyMs = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
         )
@@ -137,6 +141,10 @@ object ScriptExecutor {
             putExtra("rtp_port", params.rtpPort)
             putExtra("http_enabled", params.httpEnabled)
             putExtra("http_port", params.httpPort)
+            putExtra("dlna_enabled", params.dlnaEnabled)
+            putExtra("dlna_port", params.dlnaPort)
+            putExtra("dlna_format", params.dlnaFormat)
+            putExtra("dlna_devices", params.dlnaDevices.toTypedArray())
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)

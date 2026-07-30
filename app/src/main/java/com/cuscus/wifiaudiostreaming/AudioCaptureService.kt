@@ -57,6 +57,15 @@ class AudioCaptureService : Service() {
                 val rtpPort = intent.getIntExtra("rtp_port", 9094)
                 val httpEnabled = intent.getBooleanExtra("http_enabled", false)
                 val httpPort = intent.getIntExtra("http_port", 8080)
+                val dlnaConfig = DlnaServerConfig(
+                    enabled = intent.getBooleanExtra("dlna_enabled", false),
+                    port = intent.getIntExtra("dlna_port", 8081),
+                    preference = DlnaFormatPreference.fromId(intent.getStringExtra("dlna_format")),
+                    selectedUdns = DlnaSelection.udns(
+                        intent.getStringArrayExtra("dlna_devices")?.toList() ?: emptyList()
+                    ),
+                    title = getString(R.string.app_name)
+                )
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
 
@@ -88,6 +97,7 @@ class AudioCaptureService : Service() {
                         rtpPort = rtpPort,
                         httpEnabled = httpEnabled,
                         httpPort = httpPort,
+                        dlnaConfig = dlnaConfig,
                         onClientDisconnected = { stopCapture() }
                     )
                 }

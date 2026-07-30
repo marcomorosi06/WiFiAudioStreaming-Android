@@ -173,7 +173,7 @@
     <string name="settings_item_usb_mode_title">USB mode</string>
     <string name="settings_item_usb_mode_desc">Stream over the USB cable instead of Wi-Fi. Requires USB tethering enabled on this phone.</string>
     <string name="settings_item_usb_latency_title">USB buffer</string>
-    <string name="settings_item_usb_latency_desc">Jitter buffer used only while the USB link is active. Lower means less latency but more risk of dropouts.</string>
+    <string name="settings_item_usb_latency_desc">Jitter buffer used instead of the audio one while the USB link is active. Lower means less latency but more risk of dropouts. Some devices deliver USB packets in bursts and need more buffer here than over Wi-Fi, not less.</string>
     <string name="usb_status_ready_short">Connected over USB</string>
     <string name="usb_status_ready">Connected via %1$s (%2$s)</string>
     <string name="usb_status_cable_no_tether">Cable detected, USB tethering is off</string>
@@ -402,4 +402,38 @@
     <string name="volume_preset_mute">0% (Mute)</string>
     <string name="volume_preset_std">100% (Std)</string>
     <string name="volume_preset_max">200% (Max)</string>
+
+    <string name="settings_item_dlna_title">DLNA / UPnP renderers</string>
+    <string name="settings_item_dlna_desc">Push audio to AV receivers, soundbars and smart TVs — no app needed</string>
+    <string name="settings_item_dlna_port_title">DLNA media port</string>
+    <string name="settings_item_dlna_port_desc">TCP port the renderer connects back to</string>
+    <string name="dlna_format_label">Audio format</string>
+    <string name="dlna_format_auto">Automatic (negotiated)</string>
+    <string name="dlna_format_auto_desc">Ask each renderer what it supports and pick the best match. Recommended.</string>
+    <string name="dlna_format_lpcm_desc">Uncompressed 16 bit PCM, ~1.4 Mbps. Lowest latency, widest compatibility.</string>
+    <string name="dlna_format_wav_desc">Uncompressed PCM inside a streaming WAV header. Helps some older firmware.</string>
+    <string name="dlna_format_mp3_desc">Compressed, ~320 kbps. Not available on Android.</string>
+    <string name="dlna_format_adts_desc">Compressed AAC. Efficient, but renderer support is the least consistent.</string>
+    <string name="dlna_devices_label">Renderers on the network</string>
+    <string name="dlna_rescan">Rescan</string>
+    <string name="dlna_scanning">Searching for renderers…</string>
+    <string name="dlna_no_devices">No DLNA renderer found. Make sure the device is on and on the same network.</string>
+    <string name="dlna_selection_hint">Selected renderers are remembered and reconnected automatically when streaming starts.</string>
+    <string name="dlna_offline">Offline</string>
+    <string name="dlna_fallback">fallback</string>
+    <string name="dlna_state_playing">Playing</string>
+    <string name="dlna_state_connecting">Connecting…</string>
+    <string name="dlna_state_retrying">Retrying…</string>
+    <string name="dlna_state_error">Handshake failed</string>
+    <string name="dlna_copy_diagnostics">Copy diagnostics</string>
+    <string name="dlna_clear_selection">Clear selection</string>
+    <string name="dlna_diagnostics_copied">DLNA diagnostics copied to clipboard</string>
+    <string name="list_and">and</string>
+    <string name="status_serving_protocols">Streaming with %1$s</string>
+    <string name="dlna_card_title">DLNA output</string>
+    <string name="dlna_card_endpoint">Media endpoint</string>
+    <string name="dlna_card_format">Format</string>
+    <string name="dlna_card_no_targets">No renderer selected. Pick one in Settings.</string>
+    <string name="dlna_card_connections">%1$d active connection(s)</string>
+
 </resources>

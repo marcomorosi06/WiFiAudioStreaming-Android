@@ -61,6 +61,10 @@ data class AppSettings(
     val httpEnabled: Boolean,
     val httpPort: Int,
     val httpSafariMode: Boolean,
+    val dlnaEnabled: Boolean = false,
+    val dlnaPort: Int = 8081,
+    val dlnaFormat: String = "auto",
+    val dlnaDevices: List<String> = emptyList(),
     val lastMulticastMode: Boolean = false,
     val clientTileIp: String = "",
     val autoConnectEnabled: Boolean = false,
@@ -109,6 +113,10 @@ class SettingsDataStore(context: Context) {
         val HTTP_ENABLED = booleanPreferencesKey("http_enabled")
         val HTTP_PORT = intPreferencesKey("http_port")
         val HTTP_SAFARI_MODE = booleanPreferencesKey("http_safari_mode")
+        val DLNA_ENABLED = booleanPreferencesKey("dlna_enabled")
+        val DLNA_PORT = intPreferencesKey("dlna_port")
+        val DLNA_FORMAT = stringPreferencesKey("dlna_format")
+        val DLNA_DEVICES = stringPreferencesKey("dlna_devices")
         val CLIENT_TILE_IP = stringPreferencesKey("client_tile_ip")
         val AUTO_CONNECT_ENABLED = booleanPreferencesKey("auto_connect_enabled")
         val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
@@ -154,6 +162,11 @@ class SettingsDataStore(context: Context) {
             rtpPort = preferences[PreferencesKeys.RTP_PORT] ?: 9094,
             httpEnabled = preferences[PreferencesKeys.HTTP_ENABLED] ?: false,
             httpPort = preferences[PreferencesKeys.HTTP_PORT] ?: 8080,
+            dlnaEnabled = preferences[PreferencesKeys.DLNA_ENABLED] ?: false,
+            dlnaPort = preferences[PreferencesKeys.DLNA_PORT] ?: 8081,
+            dlnaFormat = preferences[PreferencesKeys.DLNA_FORMAT] ?: "auto",
+            dlnaDevices = (preferences[PreferencesKeys.DLNA_DEVICES] ?: "")
+                .split('\n').map { it.trim() }.filter { it.isNotEmpty() },
             httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false,
             clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: "",
             autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
@@ -361,6 +374,25 @@ class SettingsDataStore(context: Context) {
             preferences[PreferencesKeys.RTP_ENABLED] = rtpEnabled
             preferences[PreferencesKeys.RTP_PORT] = rtpPort
             preferences[PreferencesKeys.HTTP_ENABLED] = httpEnabled
+        }
+    }
+
+    suspend fun saveDlnaEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DLNA_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveDlnaSettings(port: Int, format: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DLNA_PORT] = port
+            preferences[PreferencesKeys.DLNA_FORMAT] = format
+        }
+    }
+
+    suspend fun saveDlnaDevices(entries: List<String>) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DLNA_DEVICES] = entries.joinToString("\n")
         }
     }
 

@@ -161,6 +161,10 @@ data class ResolvedServerParams(
     val rtpPort: Int,
     val httpEnabled: Boolean,
     val httpPort: Int,
+    val dlnaEnabled: Boolean = false,
+    val dlnaPort: Int = 8081,
+    val dlnaFormat: String = "auto",
+    val dlnaDevices: List<String> = emptyList(),
     val usbMode: Boolean = false,
     val usbLatencyMs: Int = 20
 )

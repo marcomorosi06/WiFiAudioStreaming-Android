@@ -45,6 +45,7 @@ import io.ktor.network.sockets.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.first
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import java.net.BindException
@@ -169,6 +170,53 @@ object NetworkManager {
     private var rtpJob: Job? = null
 
     @Volatile private var httpPcmQueue: java.util.concurrent.ArrayBlockingQueue<ByteArray>? = null
+    @Volatile private var dlnaManager: DlnaSessionManager? = null
+    private val dlnaLifecycleMutex = kotlinx.coroutines.sync.Mutex()
+    private const val DLNA_STOP_TIMEOUT_MS = 4000L
+
+    val dlnaTargets: kotlinx.coroutines.flow.StateFlow<List<DlnaTargetState>>
+        get() = DlnaStatus.targets
+
+    fun dlnaClientCount(): Int = dlnaManager?.activeClientCount() ?: 0
+
+    private suspend fun stopDlnaSession() {
+        dlnaLifecycleMutex.withLock { stopDlnaSessionLocked() }
+    }
+
+    private suspend fun stopDlnaSessionLocked() {
+        val manager = dlnaManager
+        dlnaManager = null
+        if (manager != null) {
+            runCatching { withTimeoutOrNull(DLNA_STOP_TIMEOUT_MS) { manager.stop() } }
+        }
+    }
+
+    private suspend fun restartDlnaSession(
+        context: Context,
+        config: DlnaServerConfig,
+        sampleRate: Int,
+        channels: Int,
+        networkInterfaceName: String
+    ) {
+        dlnaLifecycleMutex.withLock {
+            stopDlnaSessionLocked()
+            if (!config.enabled) return@withLock
+            DlnaMulticastLock.install(context)
+            val manager = DlnaSessionManager(
+                scope = scope,
+                sampleRate = sampleRate,
+                channels = channels,
+                mediaPort = config.port,
+                preference = config.preference,
+                selectedUdns = config.selectedUdns,
+                streamTitle = config.title,
+                localAddressProvider = { getLocalIpAddress(context) },
+                preferredInterfaceProvider = { getWifiNetworkInterface(networkInterfaceName) }
+            )
+            dlnaManager = manager
+            manager.start()
+        }
+    }
 
     @Volatile private var activeInternalRecord: AudioRecord? = null
     @Volatile private var activeMicRecord: AudioRecord? = null
@@ -615,7 +663,7 @@ object NetworkManager {
         return ipSet
     }
 
-    private fun getWifiNetworkInterface(preferredName: String = "Auto"): NetworkInterface? {
+    fun getWifiNetworkInterface(preferredName: String = "Auto"): NetworkInterface? {
         return try {
             if (preferredName == "Auto") {
                 UsbLink.activeInterface()?.let { return it }
@@ -626,17 +674,48 @@ object NetworkManager {
                 // Se l'utente ha forzato una scheda, ignoriamo i filtri (fondamentale per le VPN)
                 interfaces.firstOrNull { it.displayName == preferredName || it.name == preferredName }
             } else {
-                interfaces.firstOrNull { iface ->
-                    iface.isUp &&
-                            !iface.isLoopback &&
-                            !iface.isVirtual &&
-                            !UsbLink.isTetherInterfaceName(iface.name) &&
-                            iface.inetAddresses.toList().any { !it.isLoopbackAddress }
-                }
+                val usable = interfaces.filter { isStreamingInterface(it) }
+                usable.maxByOrNull { streamingInterfaceScore(it) }
+                    ?: interfaces.firstOrNull { iface ->
+                        runCatching {
+                            iface.isUp &&
+                                    !iface.isLoopback &&
+                                    !iface.isVirtual &&
+                                    !UsbLink.isTetherInterfaceName(iface.name) &&
+                                    iface.inetAddresses.toList().any { !it.isLoopbackAddress }
+                        }.getOrDefault(false)
+                    }
             }
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun isStreamingInterface(iface: NetworkInterface): Boolean = runCatching {
+        iface.isUp &&
+                !iface.isLoopback &&
+                !iface.isVirtual &&
+                !UsbLink.isTetherInterfaceName(iface.name) &&
+                iface.inetAddresses.toList().any {
+                    !it.isLoopbackAddress && !it.isLinkLocalAddress
+                }
+    }.getOrDefault(false)
+
+    private fun streamingInterfaceScore(iface: NetworkInterface): Int {
+        val name = iface.name?.lowercase().orEmpty()
+        var s = 0
+        if (name.startsWith("wlan") || name.startsWith("wifi") || name.startsWith("ap")) s += 200
+        if (name.startsWith("eth") || name.startsWith("en")) s += 120
+        if (name.startsWith("rmnet") || name.startsWith("ccmni") ||
+            name.startsWith("pdp") || name.startsWith("radio")
+        ) s -= 150
+        if (name.startsWith("dummy") || name.startsWith("tun") ||
+            name.startsWith("ppp") || name.startsWith("sit") || name.startsWith("clat")
+        ) s -= 400
+        if (runCatching { iface.supportsMulticast() }.getOrDefault(false)) s += 60
+        if (NetAddr.interfaceHasV4(iface)) s += 80
+        if (NetAddr.interfaceHasV6(iface)) s += 20
+        return s
     }
 
     fun startListeningForDevices(context: Context, networkInterfaceName: String = "Auto") {
@@ -1016,6 +1095,7 @@ object NetworkManager {
         rtpPort: Int = 9094,
         httpEnabled: Boolean = false,
         httpPort: Int = 8080,
+        dlnaConfig: DlnaServerConfig? = null,
         onClientDisconnected: (() -> Unit)? = null
     ) {
         if (streamingJob?.isActive == true) return
@@ -1159,6 +1239,7 @@ object NetworkManager {
                         val chunk = raw.copyOf(aligned)
                         httpPcmQueue?.let { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         rtpPcmQueue?.let  { if (it.remainingCapacity() > 0) it.offer(chunk) }
+                        dlnaManager?.submitPcm(chunk)
                         var dropped = 0
                         while (udpAudioQueue.remainingCapacity() == 0) {
                             if (udpAudioQueue.poll() == null) break
@@ -1262,6 +1343,32 @@ object NetworkManager {
                     httpJob = scope.launchHttpSidecar(sampleRate, channels, httpPort)
                 }
 
+                val wfasOnNetwork = WfasPolicy.enabledOnNetwork()
+                if (!wfasOnNetwork) {
+                    val summary = ProtocolStatus.summary(
+                        wfas = false,
+                        rtp = rtpEnabled,
+                        http = httpEnabled,
+                        dlna = dlnaConfig?.enabled == true,
+                        conjunction = context.getString(R.string.list_and)
+                    )
+                    if (summary.isNotEmpty()) {
+                        connectionStatus.value = context.getString(R.string.status_serving_protocols, summary)
+                    }
+                }
+
+                scope.launch {
+                    runCatching {
+                        restartDlnaSession(
+                            context = context,
+                            config = dlnaConfig ?: DlnaServerConfig(),
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            networkInterfaceName = networkInterfaceName
+                        )
+                    }.onFailure { Log.e(TAG, "[DLNA] avvio sessione fallito: ${it.message}", it) }
+                }
+
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 val wifiNet = getWifiNetworkObject(context)
                 val vpnActive = isVpnActive(context)
@@ -1277,17 +1384,24 @@ object NetworkManager {
                 }
 
                 if (isMulticast) {
-                    val targetAddress = InetSocketAddress(
-                        MulticastNet.audioGroup(getWifiNetworkInterface(networkInterfaceName)).hostAddress
-                            ?: NetworkSettings.MULTICAST_GROUP_IP,
-                        streamingPort
-                    )
-                    Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress vpnActive=$vpnActive usbActive=$usbActive wifiNet=$wifiNet")
+                    val sendIface = MulticastNet.chooseSendInterface(wifiIface) { WfasPolicy.enabledOn(it) }
+                    val audioGroup = MulticastNet.audioGroup(sendIface)
+                    val groupIsV6 = audioGroup is java.net.Inet6Address
+                    val groupHost = audioGroup.hostAddress?.substringBefore('%')
+                        ?: NetworkSettings.MULTICAST_GROUP_IP
+                    val scopedGroupHost =
+                        if (groupIsV6 && sendIface != null) "$groupHost%${sendIface.name}" else groupHost
+                    val targetAddress = InetSocketAddress(scopedGroupHost, streamingPort)
+                    Log.d(TAG, "[SERVER][MULTICAST] modalità multicast, target=$targetAddress iface=${sendIface?.name} vpnActive=$vpnActive usbActive=$usbActive wifiNet=$wifiNet")
                     applyProcessNetwork()
-                    val wifiLocalIp = wifiIface?.inetAddresses?.toList()
-                        ?.filterIsInstance<java.net.Inet4Address>()
-                        ?.firstOrNull()?.hostAddress ?: "0.0.0.0"
-                    Log.d(TAG, "[SERVER][MULTICAST] bindando socket su $wifiLocalIp:0")
+                    val wifiLocalIp = sendIface?.inetAddresses?.toList()
+                        ?.filter { !it.isLoopbackAddress }
+                        ?.firstOrNull {
+                            if (groupIsV6) it is java.net.Inet6Address else it is java.net.Inet4Address
+                        }
+                        ?.hostAddress?.substringBefore('%')
+                        ?: if (groupIsV6) "::" else "0.0.0.0"
+                    Log.d(TAG, "[SERVER][MULTICAST] bindando socket su $wifiLocalIp:0 (groupV6=$groupIsV6)")
                     sendSocket = aSocket(selectorManager).udp().bind(InetSocketAddress(wifiLocalIp, 0))
                     Log.d(TAG, "[SERVER][MULTICAST] socket bound, setupAudioRecorders...")
                     delay(500)
@@ -1333,7 +1447,9 @@ object NetworkManager {
                     }
                 } else {
                     Log.d(TAG, "[SERVER][UNICAST] modalità unicast, in ascolto su porta $streamingPort")
-                    connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                    if (wfasOnNetwork) {
+                        connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                    }
                     delay(500)
                     setupAudioRecorders(safeBufferSize)
 
@@ -1352,7 +1468,9 @@ object NetworkManager {
                     var pendSnonce = ""
                     while (isActive) {
                         startBroadcastingPresence(context, isMulticast = false, streamingPort, networkInterfaceName, rtpEnabled, serverFormat)
-                        connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                        if (wfasOnNetwork) {
+                            connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                        }
 
                         val clientDatagram = sendSocket.receive()
                         val rxAt = System.currentTimeMillis()
@@ -1856,10 +1974,13 @@ object NetworkManager {
                             }
                         }
 
-                        val maxLagPackets = 3
+                        var maxLagPackets = 3
+                        var packetMs = 0
                         val driftTargetBacklog = 2
                         var driftAvgBacklog = driftTargetBacklog.toFloat()
                         var driftCurrentRate = sampleRate
+                        var silenceRunMs = 0
+                        var silenceRunLogged = false
 
                         suspend fun playPacket(bytes: ByteArray, smooth: Boolean = false) {
                             if (bytes.size < HEADER_SIZE) return
@@ -1932,9 +2053,20 @@ object NetworkManager {
                             if (isSilence || data.size <= HEADER_SIZE) {
                                 val silenceLen = lastGoodPcm?.size ?: 3840
                                 val silenceBuffer = ByteArray(silenceLen)
+                                silenceRunMs += packetMs
+                                if (silenceRunMs > 10_000 && !silenceRunLogged) {
+                                    silenceRunLogged = true
+                                    Log.w(TAG, "[CLIENT] the server has been sending silence-flagged packets for over 10s: " +
+                                            "the stream is alive but the capture side has nothing to send")
+                                }
                                 audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
                             } else {
+                                silenceRunMs = 0
+                                silenceRunLogged = false
                                 val pcmLen = data.size - HEADER_SIZE
+                                if (frameSize > 0 && sampleRate > 0) {
+                                    packetMs = (pcmLen * 1000) / (sampleRate * frameSize)
+                                }
                                 val ref = lastGoodPcm
                                 if (smooth && ref != null && ref.size >= 2 && pcmLen >= 2) {
                                     val outBuf = ByteArray(pcmLen)
@@ -1989,13 +2121,16 @@ object NetworkManager {
                                 if (byeReceived) { streamingJob?.cancel(); break }
                                 if (audio.isEmpty()) continue
 
+                                if (packetMs > 0) {
+                                    maxLagPackets = (effectiveLatencyMs / packetMs).coerceIn(3, 128)
+                                }
                                 val skip = (audio.size - maxLagPackets).coerceAtLeast(0)
                                 if (skip > 0) expectedSeq = -1
                                 for (i in skip until audio.size) {
                                     if (!isActive) break
                                     playPacket(audio[i], smooth = (i == skip && skip > 0))
                                 }
-                                driftAvgBacklog = driftAvgBacklog * 0.9f + audio.size * 0.1f
+                                driftAvgBacklog = driftAvgBacklog * 0.98f + audio.size * 0.02f
                                 val err = driftAvgBacklog - driftTargetBacklog
                                 val factor = (1.0 + err * 0.0004).coerceIn(0.997, 1.003)
                                 val newRate = (sampleRate * factor).toInt()
@@ -2262,6 +2397,7 @@ object NetworkManager {
         micStreamingJob?.cancel()
         rtpJob?.cancel()
         httpJob?.cancel()
+        scope.launch { stopDlnaSession() }
 
         try { activeInternalRecord?.release() } catch (_: Exception) {}
         activeInternalRecord = null

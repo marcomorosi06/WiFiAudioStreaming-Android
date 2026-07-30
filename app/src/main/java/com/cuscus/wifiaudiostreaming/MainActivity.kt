@@ -129,6 +129,10 @@ class MainActivity : ComponentActivity() {
                         putExtra("rtp_port", it.rtpPort)
                         putExtra("http_enabled", it.httpEnabled)
                         putExtra("http_port", it.httpPort)
+                        putExtra("dlna_enabled", it.dlnaEnabled)
+                        putExtra("dlna_port", it.dlnaPort)
+                        putExtra("dlna_format", it.dlnaFormat)
+                        putExtra("dlna_devices", it.dlnaDevices.toTypedArray())
                     }
                 }
                 startForegroundService(intent)

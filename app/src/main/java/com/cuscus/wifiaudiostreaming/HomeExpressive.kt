@@ -249,7 +249,8 @@ fun ExpressiveHomeScreen(
                     appSettings.wfasMode,
                     usbLinkState.isReady,
                     appSettings.rtpEnabled,
-                    appSettings.httpEnabled
+                    appSettings.httpEnabled,
+                    appSettings.dlnaEnabled
                 ),
                 onActivateWfas = onActivateWfas,
                 onStartServer = onStartServer,
@@ -350,6 +351,22 @@ fun ExpressiveHomeScreen(
                 Column {
                     Spacer(Modifier.height(20.dp))
                     ExpressiveHttpBanner(ip = localIp, port = appSettings.httpPort)
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.dlnaEnabled,
+                enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(280, delayMillis = 60)),
+                exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
+            ) {
+                Column {
+                    Spacer(Modifier.height(20.dp))
+                    ExpressiveDlnaBanner(
+                        ip = localIp,
+                        port = appSettings.dlnaPort,
+                        formatPreference = DlnaFormatPreference.fromId(appSettings.dlnaFormat),
+                        hasSelection = appSettings.dlnaDevices.isNotEmpty()
+                    )
                 }
             }
 

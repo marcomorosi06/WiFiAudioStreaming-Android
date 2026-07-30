@@ -313,6 +313,19 @@ fun WiFiAudioStreamingApp(
             }
 
             AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.dlnaEnabled,
+                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+            ) {
+                ExpressiveDlnaBanner(
+                    ip = localIp,
+                    port = appSettings.dlnaPort,
+                    formatPreference = DlnaFormatPreference.fromId(appSettings.dlnaFormat),
+                    hasSelection = appSettings.dlnaDevices.isNotEmpty()
+                )
+            }
+
+            AnimatedVisibility(
                 visible = !isServer && !isStreaming,
                 enter = expandVertically(
                     animationSpec = spring(
@@ -883,7 +896,8 @@ fun SettingsScreenContent(
                             appSettings.wfasMode,
                             usbLinkState.isReady,
                             appSettings.rtpEnabled,
-                            appSettings.httpEnabled
+                            appSettings.httpEnabled,
+                            appSettings.dlnaEnabled
                         )
                     ) {
                         SettingsInfoItem(
@@ -951,6 +965,8 @@ fun SettingsScreenContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    DlnaSettingsSection(appSettings = appSettings)
                 }
             }
 
