@@ -65,6 +65,7 @@ object MulticastNet {
                 @Suppress("DEPRECATION")
                 socket.joinGroup(group)
                 joined = 1
+                Log.d("WFAS-MCAST", ("joined $group on the default interface (per-interface join failed)"))
             }
         }
         return joined
@@ -96,6 +97,7 @@ object MulticastNet {
         accept: (NetworkInterface) -> Boolean = { true }
     ): Int {
         var sent = 0
+        val reached = LinkedHashSet<String>()
         val ifaces = sendCandidates(preferred).filter(accept)
         groups().forEach { group ->
             ifaces.filter { supports(it, group) }.forEach { iface ->
@@ -103,13 +105,42 @@ object MulticastNet {
                     socket.networkInterface = iface
                     socket.send(DatagramPacket(payload, payload.size, group, port))
                     sent++
+                    reached.add("${iface.name}/$group")
                 }.onFailure {
                     Log.d("WFAS-MCAST", ("send $group on ${iface.name} failed: ${it.message}"))
                 }
             }
         }
+        ifaces.filter { isTetherLink(it) }.forEach { iface ->
+            broadcastAddresses(iface).forEach { addr ->
+                runCatching {
+                    socket.broadcast = true
+                    socket.send(DatagramPacket(payload, payload.size, addr, port))
+                    sent++
+                    reached.add("${iface.name}/$addr")
+                }.onFailure {
+                    Log.d("WFAS-MCAST", ("broadcast $addr on ${iface.name} failed: ${it.message}"))
+                }
+            }
+        }
+        val summary = reached.joinToString(",").ifEmpty { "nothing" }
+        if (summary != lastSendSummary) {
+            lastSendSummary = summary
+            Log.d("WFAS-MCAST", ("beacon now going out on: $summary"))
+        }
         return sent
     }
+
+    @Volatile private var lastSendSummary = ""
+
+    private fun isTetherLink(iface: NetworkInterface): Boolean {
+        val usb = UsbLink.detectedInterface() ?: return false
+        return usb.name == iface.name
+    }
+
+    fun broadcastAddresses(iface: NetworkInterface): List<InetAddress> = runCatching {
+        iface.interfaceAddresses.mapNotNull { it.broadcast }
+    }.getOrDefault(emptyList())
 
     fun audioGroup(iface: NetworkInterface?): InetAddress {
         val v6 = groupV6

@@ -74,9 +74,16 @@ data class ServerInfo(
     /** Il beacon e' arrivato sul collegamento USB, non sulla rete Wi-Fi. */
     val viaUsb: Boolean = false,
     /** Istante dell'ultimo beacon ricevuto: serve a far scadere i server spariti. */
-    val lastSeen: Long = System.currentTimeMillis()
+    val lastSeen: Long = System.currentTimeMillis(),
+    /**
+     * Porta annunciata dal server per l'estensione sottotitoli (WFAS-CAP), oppure null.
+     * Suggerimento di sola visualizzazione: il beacon non e' autenticato, quindi le
+     * richieste vanno sempre inviate all'IP della sessione gia' stabilita.
+     */
+    val captionPort: Int? = null
 ) {
     val acceptsClientMic: Boolean get() = !fromBeacon || serverWantsMic
+    val offersCaptions: Boolean get() = captionPort != null
 }
 
 /**
@@ -785,6 +792,9 @@ object NetworkManager {
                                             val encrypted = parts.firstOrNull { it.startsWith("enc=") }
                                                 ?.removePrefix("enc=") == "1"
                                             val micTok = parts.firstOrNull { it.startsWith("mic=") }?.removePrefix("mic=")
+                                            val capPort = parts.firstOrNull { it.startsWith("cap=") }
+                                                ?.removePrefix("cap=")?.toIntOrNull()
+                                                ?.takeIf { it in 1..65535 }
                                             val advertisedFormat = StreamAudioFormat.fromBeaconParts(parts)
                                             val serverInfo = ServerInfo(
                                                 ip = remoteIp, isMulticast = isMulticast, port = port,
@@ -795,7 +805,8 @@ object NetworkManager {
                                                 fromBeacon = true,
                                                 audioFormat = advertisedFormat,
                                                 viaUsb = UsbLink.isUsbPeerDetected(remoteIp),
-                                                lastSeen = System.currentTimeMillis()
+                                                lastSeen = System.currentTimeMillis(),
+                                                captionPort = capPort
                                             )
                                             Log.d(TAG, "[DISCOVERY] Found server: hostname=$hostname ip=$remoteIp isMulticast=$isMulticast port=$port")
 
@@ -1952,6 +1963,20 @@ object NetworkManager {
                         if (connectionSoundEnabled) playConnectionSound(context)
                         connectedSuccessfully = true
 
+                        runCatching {
+                            CaptionClientController.start(
+                                context = context,
+                                serverIp = serverInfo.ip,
+                                captionPort = serverInfo.captionPort,
+                                authKey = clientKey,
+                                encrypting = sessionEncrypted,
+                                proved = proved,
+                                cnonceHex = cnonce,
+                                snonceHex = clientSnonce,
+                                sampleRate = sampleRate
+                            )
+                        }.onFailure { Log.w(TAG, "[CLIENT] captions not started: ${it.message}") }
+
                         var lastPingReceived = System.currentTimeMillis()
                         val pingTimeoutMs = 3000L
 
@@ -2015,13 +2040,13 @@ object NetworkManager {
                             val seq       = ((data[4].toInt() and 0xFF) shl 8) or (data[5].toInt() and 0xFF)
                             val isSilence = (flags and 0x01) != 0
 
-                            LinkMetrics.onPacket(
-                                seq,
-                                ((data[6].toLong() and 0xFF) shl 24) or
-                                        ((data[7].toLong() and 0xFF) shl 16) or
-                                        ((data[8].toLong() and 0xFF) shl 8) or
-                                        (data[9].toLong() and 0xFF)
-                            )
+                            val packetSamplePos = ((data[6].toLong() and 0xFF) shl 24) or
+                                    ((data[7].toLong() and 0xFF) shl 16) or
+                                    ((data[8].toLong() and 0xFF) shl 8) or
+                                    (data[9].toLong() and 0xFF)
+
+                            LinkMetrics.onPacket(seq, packetSamplePos)
+                            CaptionClientController.onAudioPacket(packetSamplePos)
 
                             if (expectedSeq == -1) {
                                 expectedSeq = seq
@@ -2384,6 +2409,7 @@ object NetworkManager {
     }
 
     fun stopStreaming(context: Context) {
+        runCatching { CaptionClientController.stop(context) }
         activePeerIp = null
         // Va letto prima dell'azzeramento: serve a sapere se eravamo noi il server.
         val wasServing = isServerStreaming

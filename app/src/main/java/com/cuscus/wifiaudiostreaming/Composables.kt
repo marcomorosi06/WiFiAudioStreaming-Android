@@ -971,6 +971,10 @@ fun SettingsScreenContent(
             }
 
             item {
+                CaptionsSettingsSection()
+            }
+
+            item {
                 SettingsGroupCard(
                     title = stringResource(R.string.auto_connect_priorities_title),
                     icon = Icons.Outlined.Autorenew
