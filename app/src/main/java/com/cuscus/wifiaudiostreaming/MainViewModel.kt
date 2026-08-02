@@ -110,6 +110,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearProtocolMismatch() = NetworkManager.clearProtocolMismatch()
 
+    val unresponsiveServer: StateFlow<String?> = NetworkManager.unresponsiveServer
+
+    fun clearUnresponsiveServer() = NetworkManager.clearUnresponsiveServer()
+
     private val _updateBanner = MutableStateFlow<UpdateChecker.Result.Available?>(null)
     val updateBanner: StateFlow<UpdateChecker.Result.Available?> = _updateBanner.asStateFlow()
 

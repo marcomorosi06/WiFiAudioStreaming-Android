@@ -321,6 +321,7 @@
     <string name="script_action_set">Change settings</string>
     <string name="close">Close</string>
     <string name="status_protocol_incompatible">Incompatible protocol version</string>
+    <string name="status_server_silent_maybe_outdated">The server is not answering the connection request. If you can see it in the list but it will not connect, it is probably running an older version of the app: update it on that device.</string>
     <string name="status_group_rekeyed">Group key changed by the sender</string>
     <string name="status_unauthorized">Connection refused by the server</string>
     <string name="status_awaiting_approval">Waiting for the other device to approve…</string>
@@ -347,6 +348,8 @@
     <string name="key_dialog_wrong">Wrong key. Try again:</string>
     <string name="key_dialog_connect">Connect</string>
     <string name="key_dialog_cancel">Cancel</string>
+    <string name="server_silent_title">The other device is not answering</string>
+    <string name="server_silent_body">“%1$s” never answered the connection request. The most likely reason is that it is running an older version of the app, which cannot talk to this one — update the app on that device. Otherwise, check that a firewall is not blocking the port.</string>
     <string name="protocol_incompatible_title">The other device needs an update</string>
     <string name="protocol_incompatible_title_local">This device needs an update</string>
     <string name="protocol_incompatible_body">The two apps are running incompatible WFAS protocol versions (this device: v%1$d, other end: v%2$d). The connection was closed. Please update so both devices run the latest version.</string>

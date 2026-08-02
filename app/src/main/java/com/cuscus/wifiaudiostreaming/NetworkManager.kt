@@ -393,11 +393,13 @@ object NetworkManager {
         }
     }
 
-    private const val LEGACY_HELLO_PROBE_DELAY_MS = 2500L
-
-    private val versionedHelloPeers = java.util.Collections.synchronizedSet(HashSet<String>())
+    private const val SILENT_PEER_TIMEOUT_MS = 6000L
 
     fun clearProtocolMismatch() { protocolMismatch.value = null }
+
+    val unresponsiveServer = MutableStateFlow<String?>(null)
+
+    fun clearUnresponsiveServer() { unresponsiveServer.value = null }
 
     val connectionStatus = MutableStateFlow("")
     val discoveredDevices = MutableStateFlow<Map<String, ServerInfo>>(emptyMap())
@@ -1585,17 +1587,10 @@ object NetworkManager {
                         }
 
                         val clientVersion = parseProtocolVersion(message)
-                        if (clientVersion == WFAS_PROTOCOL_VERSION) {
-                            versionedHelloPeers.add(peerHost ?: clientAddress.toString())
-                        } else {
+                        if (clientVersion != WFAS_PROTOCOL_VERSION) {
                             Log.w(TAG, "[SERVER][UNICAST] client incompatibile v=$clientVersion (mio v=$WFAS_PROTOCOL_VERSION), rifiuto $clientAddress")
                             sendSocket.send(Datagram(buildPacket { writeText(incompatibleMessage()) }, clientAddress))
-                            val probeFromModernPeer =
-                                clientVersion == 0 &&
-                                    versionedHelloPeers.contains(peerHost ?: clientAddress.toString())
-                            if (!probeFromModernPeer) {
-                                signalProtocolMismatch(clientVersion, PeerRole.RECEIVER)
-                            }
+                            signalProtocolMismatch(clientVersion, PeerRole.RECEIVER)
                             continue
                         }
 
@@ -1959,9 +1954,20 @@ object NetworkManager {
 
                         var helloWaitMs = 150L
                         var helloAttempts = 0
-                        var legacyProbeSent = false
+                        var anyReplyReceived = false
                         val handshakeStartedAt = System.currentTimeMillis()
                         while (System.currentTimeMillis() < handshakeDeadline) {
+                            if (!anyReplyReceived &&
+                                System.currentTimeMillis() - handshakeStartedAt >= SILENT_PEER_TIMEOUT_MS
+                            ) {
+                                Log.w(TAG, "[CLIENT] nessuna risposta dopo ${SILENT_PEER_TIMEOUT_MS}ms, rinuncio")
+                                connectionStatus.value = context.getString(R.string.status_server_silent_maybe_outdated)
+                                unresponsiveServer.value =
+                                    serverInfo.hostname.ifBlank { serverInfo.ip }
+                                isStreamingCurrent.value = false
+                                withContext(Dispatchers.Main) { onServerDisconnected?.invoke() }
+                                return@launch
+                            }
                             val ackMsg = try {
                                 withTimeout(helloWaitMs) { socket.receive() }.packet.readText().trim()
                             } catch (e: TimeoutCancellationException) {
@@ -1969,28 +1975,12 @@ object NetworkManager {
                                 helloWaitMs = (helloWaitMs * 2).coerceAtMost(2000L)
                                 socket.send(Datagram(buildPacket { writeText(helloMsg) }, remoteAddress))
                                 Log.d(TAG, "[CLIENT] nessuna risposta, reinvio #$helloAttempts, prossima attesa ${helloWaitMs}ms")
-                                if (!legacyProbeSent &&
-                                    System.currentTimeMillis() - handshakeStartedAt >= LEGACY_HELLO_PROBE_DELAY_MS
-                                ) {
-                                    legacyProbeSent = true
-                                    Log.d(TAG, "[CLIENT] nessuna risposta all'HELLO versionato, invio sonda legacy")
-                                    socket.send(
-                                        Datagram(
-                                            buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) },
-                                            remoteAddress
-                                        )
-                                    )
-                                }
                                 continue
                             }
+                            anyReplyReceived = true
                             when {
                                 ackMsg.startsWith(NetworkSettings.INCOMPATIBLE_PREFIX) -> {
-                                    val rejectedBy = parseProtocolVersion(ackMsg)
-                                    if (rejectedBy == WFAS_PROTOCOL_VERSION) {
-                                        Log.d(TAG, "[CLIENT] rifiuto causato dalla sonda legacy, ignoro")
-                                        continue
-                                    }
-                                    signalProtocolMismatch(rejectedBy, PeerRole.SENDER)
+                                    signalProtocolMismatch(parseProtocolVersion(ackMsg), PeerRole.SENDER)
                                     connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
                                     return@launch
                                 }

@@ -504,6 +504,22 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        val unresponsiveServer by viewModel.unresponsiveServer.collectAsStateWithLifecycle()
+        unresponsiveServer?.let { peerName ->
+            UnresponsiveServerDialog(
+                peerName = peerName,
+                onUpdate = {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://www.marcomorosi.eu/wifi-audio-streaming/download/")
+                    )
+                    runCatching { context.startActivity(intent) }
+                    viewModel.clearUnresponsiveServer()
+                },
+                onDismiss = { viewModel.clearUnresponsiveServer() }
+            )
+        }
+
         LaunchedEffect(Unit) { viewModel.autoCheckForUpdates() }
 
         val checkingForUpdate by viewModel.checkingForUpdate.collectAsStateWithLifecycle()
@@ -983,6 +999,26 @@ fun ProtocolMismatchDialog(
         secondaryLabel = stringResource(R.string.protocol_incompatible_github),
         secondaryIcon = Icons.Outlined.Code,
         onSecondary = onGithub,
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+fun UnresponsiveServerDialog(
+    peerName: String,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ExpressiveVersionDialog(
+        icon = Icons.Outlined.SyncProblem,
+        accent = MaterialTheme.colorScheme.error,
+        title = stringResource(R.string.server_silent_title),
+        body = stringResource(R.string.server_silent_body, peerName),
+        fromVersion = null,
+        toVersion = null,
+        confirmLabel = stringResource(R.string.protocol_incompatible_website),
+        dismissLabel = stringResource(R.string.close),
+        onConfirm = onUpdate,
         onDismiss = onDismiss
     )
 }

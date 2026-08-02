@@ -321,6 +321,7 @@
     <string name="script_action_set">Cambia impostazioni</string>
     <string name="close">Chiudi</string>
     <string name="status_protocol_incompatible">Versione del protocollo incompatibile</string>
+    <string name="status_server_silent_maybe_outdated">Il server non risponde alla richiesta di connessione. Se lo vedi nell\'elenco ma non si connette, probabilmente usa una versione precedente dell\'app: aggiornala su quel dispositivo.</string>
     <string name="status_group_rekeyed">Chiave del gruppo cambiata dal trasmettitore</string>
     <string name="status_unauthorized">Connessione rifiutata dal server</string>
     <string name="status_awaiting_approval">In attesa di approvazione dall\'altro dispositivo…</string>
@@ -347,6 +348,8 @@
     <string name="key_dialog_wrong">Chiave errata. Riprova:</string>
     <string name="key_dialog_connect">Connetti</string>
     <string name="key_dialog_cancel">Annulla</string>
+    <string name="server_silent_title">L\'altro dispositivo non risponde</string>
+    <string name="server_silent_body">«%1$s» non ha risposto alla richiesta di connessione. Il motivo più probabile è che usi una versione precedente dell\'app, che non riesce a comunicare con questa: aggiornala su quel dispositivo. Altrimenti controlla che un firewall non stia bloccando la porta.</string>
     <string name="protocol_incompatible_title">L\'altro dispositivo va aggiornato</string>
     <string name="protocol_incompatible_title_local">Questo dispositivo va aggiornato</string>
     <string name="protocol_incompatible_body">Le due app usano versioni incompatibili del protocollo WFAS (questo dispositivo: v%1$d, altro dispositivo: v%2$d). La connessione è stata chiusa. Aggiorna entrambi i dispositivi all\'ultima versione.</string>
