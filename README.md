@@ -1,4 +1,7 @@
-# WiFi Audio Streaming (Android)  
+<div align="center">
+  <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true" alt="WiFi Audio Streaming Icon" width="120" />
+  <h1>WiFi Audio Streaming (Android)</h1>
+</div>
 <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases">  
 <img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" height="80">  
 </a>  
