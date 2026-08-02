@@ -22,12 +22,31 @@ import android.content.Context
 import android.content.Intent
 
 class StreamingActionReceiver : BroadcastReceiver() {
+
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == "com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING") {
-            NetworkManager.stopStreaming(context)
-            context.stopService(Intent(context, AudioCaptureService::class.java))
-            context.stopService(Intent(context, ClientService::class.java))
-            context.stopService(Intent(context, AutoConnectService::class.java))
+        when (intent.action) {
+            ACTION_STOP_STREAMING -> stopEverything(context)
+            ACTION_VOLUME_UP -> shiftVolume(NotificationCenter.VOLUME_STEP)
+            ACTION_VOLUME_DOWN -> shiftVolume(-NotificationCenter.VOLUME_STEP)
         }
+    }
+
+    private fun stopEverything(context: Context) {
+        NetworkManager.stopStreaming(context)
+        context.stopService(Intent(context, AudioCaptureService::class.java))
+        context.stopService(Intent(context, ClientService::class.java))
+        context.stopService(Intent(context, AutoConnectService::class.java))
+        NotificationCenter.cancelAll(context)
+    }
+
+    private fun shiftVolume(delta: Float) {
+        NetworkManager.serverVolume.value =
+            NotificationCenter.nudgeVolume(NetworkManager.serverVolume.value, delta)
+    }
+
+    companion object {
+        const val ACTION_STOP_STREAMING = "com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING"
+        const val ACTION_VOLUME_UP = "com.cuscus.wifiaudiostreaming.ACTION_VOLUME_UP"
+        const val ACTION_VOLUME_DOWN = "com.cuscus.wifiaudiostreaming.ACTION_VOLUME_DOWN"
     }
 }

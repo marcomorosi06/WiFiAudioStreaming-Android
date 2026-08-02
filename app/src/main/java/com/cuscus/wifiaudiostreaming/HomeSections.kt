@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.EnhancedEncryption
 import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Mic
@@ -722,12 +723,24 @@ fun ExpressiveSourceSection(
             options = listOf(
                 ChoiceOption(Icons.Outlined.LockOpen, stringResource(R.string.sec_mode_off), "OFF"),
                 ChoiceOption(Icons.Outlined.PersonAdd, stringResource(R.string.sec_mode_ask), "ASK"),
-                ChoiceOption(Icons.Outlined.Key, stringResource(R.string.sec_mode_key), "KEY")
+                ChoiceOption(Icons.Outlined.Key, stringResource(R.string.sec_mode_key), "KEY"),
+                ChoiceOption(Icons.Outlined.QrCode2, stringResource(R.string.sec_mode_qr), "QR")
             ),
             selectedValue = secMode,
             accent = accent,
             onSelect = { onSecurityChange(it, authKey) }
         )
+
+        AnimatedVisibility(
+            visible = secMode == "QR",
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                QrSecurityInfoCard(accent = accent)
+            }
+        }
 
         AnimatedVisibility(
             visible = secMode == "KEY",
@@ -768,16 +781,18 @@ fun ExpressiveSourceSection(
 
         Spacer(Modifier.height(10.dp))
 
+        val keyBased = secMode == "KEY" || secMode == "QR"
+
         ExpressiveToggleTile(
-            icon = if (secMode == "KEY") Icons.Outlined.EnhancedEncryption else Icons.Outlined.LockOpen,
+            icon = if (keyBased) Icons.Outlined.EnhancedEncryption else Icons.Outlined.LockOpen,
             activeIcon = Icons.Filled.EnhancedEncryption,
             title = stringResource(R.string.settings_item_encryption_title),
             subtitle = stringResource(
-                if (secMode == "KEY") R.string.settings_item_encryption_desc
+                if (keyBased) R.string.settings_item_encryption_desc
                 else R.string.settings_item_encryption_needs_key
             ),
-            checked = encryptionEnabled && secMode == "KEY",
-            enabled = secMode == "KEY",
+            checked = encryptionEnabled && keyBased,
+            enabled = keyBased,
             accent = accent,
             onCheckedChange = onEncryptionChange
         )

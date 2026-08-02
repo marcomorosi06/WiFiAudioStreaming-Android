@@ -10,4 +10,7 @@
     <color name="splash_background_bottom">#141218</color>
     <color name="splash_accent">#D0BCFF</color>
     <color name="splash_icon_bg">#4F378B</color>
+    <color name="notif_accent">#D0BCFF</color>
+    <color name="notif_volume_primary">#D0BCFF</color>
+    <color name="notif_volume_boost">#EFB8C8</color>
 </resources>

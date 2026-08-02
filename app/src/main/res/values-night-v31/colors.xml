@@ -5,4 +5,7 @@
     <color name="splash_icon_bg">@android:color/system_accent1_700</color>
     <color name="splash_background_top">@android:color/system_neutral2_800</color>
     <color name="splash_background_bottom">@android:color/system_neutral2_900</color>
+    <color name="notif_accent">@android:color/system_accent1_200</color>
+    <color name="notif_volume_primary">@android:color/system_accent1_200</color>
+    <color name="notif_volume_boost">@android:color/system_accent3_200</color>
 </resources>

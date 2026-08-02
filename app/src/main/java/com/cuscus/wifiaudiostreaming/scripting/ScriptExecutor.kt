@@ -82,7 +82,7 @@ object ScriptExecutor {
 
     private fun resolveAuthMode(command: ScriptCommand, fallback: String): String = when {
         command.str(ScriptParams.AUTHMODE) != null ->
-            SecurityMode.fromStringSafe(command.str(ScriptParams.AUTHMODE)).name
+            SecurityMode.storedMode(command.str(ScriptParams.AUTHMODE).orEmpty())
         command.str(ScriptParams.AUTHKEY) != null -> SecurityMode.KEY.name
         else -> fallback
     }
@@ -95,7 +95,10 @@ object ScriptExecutor {
         val authMode = command.str(ScriptParams.AUTHMODE)
         val authKey = command.str(ScriptParams.AUTHKEY)
         if (authMode == null && authKey == null) return
-        store.saveSecurity(resolveAuthMode(command, current.securityMode), authKey ?: current.authKey)
+        val resolvedKey = authKey ?: current.authKey
+        store.saveSecurity(resolveAuthMode(command, current.securityMode), resolvedKey)
+        store.saveQrPairing(false)
+        if (authKey != null) store.saveManualAuthKey(resolvedKey)
     }
 
     fun resolveServerParams(settings: AppSettings, command: ScriptCommand): ResolvedServerParams {

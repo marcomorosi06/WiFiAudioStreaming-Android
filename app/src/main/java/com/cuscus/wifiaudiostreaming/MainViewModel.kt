@@ -46,6 +46,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             NetworkManager.isStreamingCurrent.collect { streaming ->
                 if (streaming) _isServer.value = NetworkManager.isServerStreaming
+                else restoreForcedEncryption()
             }
         }
     }
@@ -248,15 +249,232 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setSecurity(mode: String, key: String) {
+    fun setSecurity(uiMode: String, key: String) {
         viewModelScope.launch {
-            settingsDataStore.saveSecurity(mode, key)
+            val settings = settingsDataStore.settingsFlow.first()
+            val wasQr = settings.qrPairingEnabled && SecurityMode.requiresKey(settings.securityMode)
+            val nowQr = SecurityMode.isQrUiMode(uiMode)
+
+            if (nowQr) {
+                if (!wasQr && settings.manualAuthKey.isBlank() &&
+                    SecurityMode.requiresKey(settings.securityMode)
+                ) {
+                    settingsDataStore.saveManualAuthKey(settings.authKey)
+                }
+                settingsDataStore.saveSecurity(SecurityMode.KEY.name, key)
+                settingsDataStore.saveQrPairing(true)
+                return@launch
+            }
+
+            val effectiveKey = if (wasQr) settings.manualAuthKey else key
+            settingsDataStore.saveManualAuthKey(effectiveKey)
+            settingsDataStore.saveSecurity(SecurityMode.storedMode(uiMode), effectiveKey)
+            settingsDataStore.saveQrPairing(false)
         }
     }
 
     fun setEncryption(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.saveEncryption(enabled)
+        }
+    }
+
+    @Volatile private var encryptionForcedByInvite = false
+
+    private val _qrInvite = MutableStateFlow<QrInvite?>(null)
+    val qrInvite: StateFlow<QrInvite?> = _qrInvite.asStateFlow()
+
+    private val _pendingPairing = MutableStateFlow<PairingPayload?>(null)
+    val pendingPairing: StateFlow<PairingPayload?> = _pendingPairing.asStateFlow()
+
+    private val _pairingError = MutableStateFlow<PairingError?>(null)
+    val pairingError: StateFlow<PairingError?> = _pairingError.asStateFlow()
+
+    enum class PairingError { INVALID, EXPIRED, SELF }
+
+    private fun isOwnInvite(payload: PairingPayload): Boolean {
+        if (payload.isMulticast) {
+            val ourKey = NetworkManager.mcastSession.value?.key
+            return !ourKey.isNullOrBlank() && ourKey == payload.keyBase64
+        }
+        return NetAddr.isSelfAddress(payload.ip)
+    }
+
+    private val _scannerVisible = MutableStateFlow(false)
+    val scannerVisible: StateFlow<Boolean> = _scannerVisible.asStateFlow()
+
+    private val _noCameraVisible = MutableStateFlow(false)
+    val noCameraVisible: StateFlow<Boolean> = _noCameraVisible.asStateFlow()
+
+    fun openScanner() { _scannerVisible.value = true }
+    fun closeScanner() { _scannerVisible.value = false }
+    fun showNoCamera() { _noCameraVisible.value = true }
+    fun dismissNoCamera() { _noCameraVisible.value = false }
+
+    val epochMismatch: StateFlow<Boolean> = NetworkManager.pendingEpochMismatch
+
+    fun clearEpochMismatch() = NetworkManager.clearEpochMismatch()
+
+    val inviteRejected: StateFlow<Boolean> = NetworkManager.pendingInviteRejected
+
+    fun clearInviteRejected() = NetworkManager.clearInviteRejected()
+
+    fun dismissQrInvite() { _qrInvite.value = null }
+
+    fun dismissPendingPairing() { _pendingPairing.value = null }
+
+    fun clearPairingError() { _pairingError.value = null }
+
+    private suspend fun persistPairingKey(key: String) {
+        settingsDataStore.saveSecurity(SecurityMode.KEY.name, key)
+        settingsDataStore.saveQrPairing(true)
+        val encryption = settingsDataStore.settingsFlow.first().encryptionEnabled
+        NetworkManager.configureSecurity(SecurityMode.KEY.name, key, encryption)
+    }
+
+    fun generateInvite(localIp: String, multicast: Boolean, forceNewKey: Boolean = false) {
+        viewModelScope.launch {
+            val settings = settingsDataStore.settingsFlow.first()
+            val port = settings.streamingPort
+
+            val ip = if (multicast) {
+                NetworkManager.MULTICAST_GROUP
+            } else {
+                localIp.ifBlank { NetworkManager.getLocalIpAddress(getApplication()) }
+            }
+            if (ip.isBlank() || ip == "0.0.0.0") {
+                updateStatus(getApplication<Application>().getString(R.string.qr_invite_no_ip))
+                return@launch
+            }
+
+            var encryptionForced = false
+            if (multicast && !settings.encryptionEnabled) {
+                settingsDataStore.saveEncryption(true)
+                encryptionForced = true
+                encryptionForcedByInvite = true
+            }
+
+            val currentIsGenerated = settings.authKey.isNotBlank() &&
+                    settings.authKey != settings.manualAuthKey &&
+                    settings.qrPairingEnabled
+
+            val reuse = multicast && !forceNewKey && currentIsGenerated
+
+            val key = if (reuse) {
+                NetworkManager.mcastSession.value?.key?.takeIf { it.isNotBlank() }
+                    ?: settings.authKey
+            } else {
+                WfasAuth.randomPairingKey()
+            }
+            if (!reuse) persistPairingKey(key)
+
+            var epoch: Long? = null
+            if (multicast) {
+                if (!reuse || encryptionForced) NetworkManager.rekeyMulticast(key)
+                epoch = NetworkManager.mcastSession.value?.takeIf { it.encrypted }?.epoch
+            }
+
+            val mode = if (multicast) WfasPairingUri.MODE_MULTICAST else WfasPairingUri.MODE_UNICAST
+            val exp = System.currentTimeMillis() / 1000 + WfasPairingUri.PAIRING_TTL_SECONDS
+            val uri = WfasPairingUri.buildAppLink(ip, port, mode, key, exp, epoch)
+
+            _qrInvite.value = QrInvite(
+                uri = uri,
+                key = key,
+                ip = ip,
+                port = port,
+                multicast = multicast,
+                expEpochSeconds = exp,
+                encryptionForced = encryptionForced
+            )
+        }
+    }
+
+    fun regenerateGroupKey(localIp: String) {
+        generateInvite(localIp, multicast = true, forceNewKey = true)
+    }
+
+    fun submitScannedCode(raw: String) {
+        _scannerVisible.value = false
+        val payload = WfasPairingUri.parse(raw)
+        if (payload == null) {
+            _pairingError.value =
+                if (WfasPairingUri.isExpiredUri(raw)) PairingError.EXPIRED else PairingError.INVALID
+            return
+        }
+        if (isOwnInvite(payload)) {
+            _pairingError.value = PairingError.SELF
+            return
+        }
+        _pendingPairing.value = null
+        applyPairing(payload)
+    }
+
+    fun submitDeepLink(raw: String): Boolean {
+        val payload = WfasPairingUri.parse(raw)
+        if (payload == null) {
+            if (WfasPairingUri.isExpiredUri(raw)) {
+                _pairingError.value = PairingError.EXPIRED
+                return true
+            }
+            return false
+        }
+        if (isOwnInvite(payload)) {
+            _pairingError.value = PairingError.SELF
+            return true
+        }
+        _pendingPairing.value = payload
+        return true
+    }
+
+    fun confirmPendingPairing() {
+        val payload = _pendingPairing.value ?: return
+        _pendingPairing.value = null
+        if (isOwnInvite(payload)) {
+            _pairingError.value = PairingError.SELF
+            return
+        }
+        applyPairing(payload)
+    }
+
+    val serverRunning: Boolean
+        get() = NetworkManager.isServerStreaming
+
+    private fun stopCaptureServiceIfRunning() {
+        if (!NetworkManager.isServerStreaming) return
+        val app = getApplication<Application>()
+        val yieldIntent = Intent(app, AudioCaptureService::class.java).apply {
+            action = AudioCaptureService.ACTION_YIELD
+        }
+        runCatching { app.startService(yieldIntent) }
+    }
+
+    private fun isPayloadExpired(payload: PairingPayload): Boolean {
+        val now = System.currentTimeMillis() / 1000
+        return now - WfasPairingUri.CLOCK_SKEW_SECONDS > payload.expEpochSeconds
+    }
+
+    @SuppressLint("MissingPermission")
+    fun applyPairing(payload: PairingPayload) {
+        if (isPayloadExpired(payload)) {
+            _pairingError.value = PairingError.EXPIRED
+            return
+        }
+        viewModelScope.launch {
+            NetworkManager.clearEpochMismatch()
+            NetworkManager.expectedMcastEpoch = payload.mcastEpoch
+
+            stopCaptureServiceIfRunning()
+
+            _isServer.value = false
+            _isMulticastMode.value = payload.isMulticast
+
+            val serverInfo = ServerInfo(
+                ip = NetAddr.normalize(payload.ip),
+                isMulticast = payload.isMulticast,
+                port = payload.port
+            )
+            startClient(serverInfo, presharedKey = payload.keyBase64)
         }
     }
 
@@ -378,7 +596,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Aggiorna startClient (passando l'interfaccia)
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startClient(serverInfo: ServerInfo) {
+    fun startClient(serverInfo: ServerInfo, presharedKey: String? = null) {
         val intent = Intent(getApplication(), ClientService::class.java)
         getApplication<Application>().startService(intent)
         // Niente ottimismo: lo stato "in riproduzione" lo alza NetworkManager
@@ -388,7 +606,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentSettings = appSettings.value
         if (currentSettings != null) {
             NetworkManager.configureSecurity(currentSettings.securityMode, currentSettings.authKey, currentSettings.encryptionEnabled)
-            NetworkManager.clientPresharedKey = ""   // interactive client: key comes from the on-connect dialog
+            NetworkManager.clientPresharedKey = presharedKey ?: ""   // interactive client: key comes from the on-connect dialog
+            NetworkManager.clientKeyFromInvite = presharedKey != null
+            NetworkManager.clearInviteRejected()
+            if (presharedKey == null) NetworkManager.expectedMcastEpoch = null
             NetworkManager.startClient(
                 context = getApplication(),
                 serverInfo = serverInfo,
@@ -434,7 +655,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopStreaming() {
         setIsStreaming(false)
-        NetworkManager.stopStreaming(getApplication())
+        val app = getApplication<Application>()
+        NetworkManager.stopStreaming(app)
+        app.stopService(Intent(app, ClientService::class.java))
+        app.stopService(Intent(app, AudioCaptureService::class.java))
+        NotificationCenter.cancel(app, NotificationCenter.ID_SERVER)
+        NotificationCenter.cancel(app, NotificationCenter.ID_CLIENT)
+        restoreForcedEncryption()
+    }
+
+    fun restoreForcedEncryption() {
+        if (!encryptionForcedByInvite) return
+        encryptionForcedByInvite = false
+        _qrInvite.value = null
+        viewModelScope.launch { settingsDataStore.saveEncryption(false) }
     }
 
     fun updateStatus(message: String) {

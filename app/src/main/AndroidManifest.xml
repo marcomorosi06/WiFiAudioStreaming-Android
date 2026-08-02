@@ -15,6 +15,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -46,6 +51,35 @@
                 <data android:scheme="wifiaudio" />
             </intent-filter>
 
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="wifiaudio" android:host="pair" />
+            </intent-filter>
+
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.marcomorosi.eu"
+                    android:pathPrefix="/wifi-audio-streaming/pair" />
+                <data
+                    android:scheme="https"
+                    android:host="www.marcomorosi.eu"
+                    android:pathPrefix="/it/wifi-audio-streaming/pair" />
+                <data
+                    android:scheme="https"
+                    android:host="marcomorosi.eu"
+                    android:pathPrefix="/wifi-audio-streaming/pair" />
+                <data
+                    android:scheme="https"
+                    android:host="marcomorosi.eu"
+                    android:pathPrefix="/it/wifi-audio-streaming/pair" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -57,6 +91,8 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING" />
+                <action android:name="com.cuscus.wifiaudiostreaming.ACTION_VOLUME_UP" />
+                <action android:name="com.cuscus.wifiaudiostreaming.ACTION_VOLUME_DOWN" />
             </intent-filter>
         </receiver>
 

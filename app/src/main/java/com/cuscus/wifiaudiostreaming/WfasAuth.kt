@@ -18,16 +18,45 @@ import javax.crypto.spec.SecretKeySpec
 enum class SecurityMode {
     OFF, ASK, KEY;
 
+    val requiresKey: Boolean get() = this == KEY
+
     companion object {
+        const val UI_MODE_QR = "QR"
+
         fun fromStringSafe(s: String?): SecurityMode =
             runCatching { valueOf((s ?: "OFF").uppercase()) }.getOrDefault(OFF)
+
+        fun requiresKey(s: String?): Boolean = fromStringSafe(s).requiresKey
+
+        fun uiMode(stored: String?, qrPairing: Boolean): String =
+            if (qrPairing && fromStringSafe(stored) == KEY) UI_MODE_QR
+            else fromStringSafe(stored).name
+
+        fun storedMode(uiMode: String): String =
+            if (uiMode.equals(UI_MODE_QR, ignoreCase = true)) KEY.name
+            else fromStringSafe(uiMode).name
+
+        fun isQrUiMode(uiMode: String): Boolean = uiMode.equals(UI_MODE_QR, ignoreCase = true)
     }
 }
 
 object WfasAuth {
     private val rng = SecureRandom()
 
+    const val PAIRING_KEY_BYTES = 32
+
     fun nonceHex(): String = ByteArray(16).also { rng.nextBytes(it) }.toHex()
+
+    fun randomPairingKey(): String {
+        val raw = ByteArray(PAIRING_KEY_BYTES).also { rng.nextBytes(it) }
+        return android.util.Base64.encodeToString(
+            raw,
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
+        )
+    }
+
+    fun groupKeyForDisplay(key: String, blockSize: Int = 5): String =
+        key.chunked(blockSize).joinToString("-")
 
     fun proof(key: String, side: Char, cnonce: String, snonce: String): String {
         val mac = Mac.getInstance("HmacSHA256")

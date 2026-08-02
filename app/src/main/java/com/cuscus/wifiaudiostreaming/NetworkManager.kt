@@ -111,7 +111,15 @@ data class StreamAudioFormat(
     }
 }
 
-data class ProtocolMismatch(val localVersion: Int, val remoteVersion: Int)
+enum class PeerRole { SENDER, RECEIVER }
+
+data class ProtocolMismatch(
+    val localVersion: Int,
+    val remoteVersion: Int,
+    val remoteRole: PeerRole
+) {
+    val localIsOutdated: Boolean get() = remoteVersion > localVersion
+}
 
 @SuppressLint("MissingPermission")
 object NetworkManager {
@@ -131,6 +139,10 @@ object NetworkManager {
     var isServerStreaming = false
 
     @Volatile var activePeerIp: String? = null
+
+    val unicastPeerConnected = MutableStateFlow(false)
+
+    val sessionEncryptedLive = MutableStateFlow(false)
 
     fun sessionUsesUsb(): Boolean = UsbLink.isUsbPeer(activePeerIp)
 
@@ -173,6 +185,7 @@ object NetworkManager {
     @Volatile private var dlnaManager: DlnaSessionManager? = null
     private val dlnaLifecycleMutex = kotlinx.coroutines.sync.Mutex()
     private const val DLNA_STOP_TIMEOUT_MS = 4000L
+    private const val MULTICAST_SILENCE_TIMEOUT_MS = 6000L
 
     val dlnaTargets: kotlinx.coroutines.flow.StateFlow<List<DlnaTargetState>>
         get() = DlnaStatus.targets
@@ -239,6 +252,8 @@ object NetworkManager {
 
     const val WFAS_PROTOCOL_VERSION = 2
 
+    const val MULTICAST_GROUP = NetworkSettings.MULTICAST_GROUP_IP
+
     @Volatile var securityMode: String = "OFF"
     @Volatile var authKey: String = ""
     @Volatile var encryptionEnabled: Boolean = false
@@ -289,6 +304,35 @@ object NetworkManager {
     @Volatile var clientPresharedKey: String = ""
     @Volatile var micSendDir: WfasCrypto.Dir? = null
     var onAuthRequest: ((peer: String) -> Boolean)? = null
+
+    class McastSession {
+        @Volatile var dir: WfasCrypto.Dir? = null
+        @Volatile var beacon: ByteArray? = null
+        @Volatile var epoch: Long = 0L
+        @Volatile var key: String = ""
+        @Volatile var beaconUrgent: Boolean = false
+    }
+
+    data class McastSnapshot(val epoch: Long, val key: String, val encrypted: Boolean)
+
+    val mcastSession = MutableStateFlow<McastSnapshot?>(null)
+    @Volatile private var mcastRekey: (suspend (String) -> Unit)? = null
+
+    val pendingEpochMismatch = MutableStateFlow(false)
+    fun clearEpochMismatch() { pendingEpochMismatch.value = false }
+
+    @Volatile var clientKeyFromInvite: Boolean = false
+
+    val pendingInviteRejected = MutableStateFlow(false)
+    fun clearInviteRejected() { pendingInviteRejected.value = false }
+
+    @Volatile var expectedMcastEpoch: Long? = null
+
+    suspend fun rekeyMulticast(newKey: String): Boolean {
+        val fn = mcastRekey ?: return false
+        fn(newKey)
+        return true
+    }
 
     @Volatile var keyPromptEnabled: Boolean = false
     val pendingKeyRequest = MutableStateFlow<Boolean?>(null)
@@ -342,11 +386,16 @@ object NetworkManager {
         message.split(";").firstOrNull { it.startsWith("v=") }
             ?.removePrefix("v=")?.trim()?.toIntOrNull() ?: 0
 
-    private fun signalProtocolMismatch(remoteVersion: Int) {
+    private fun signalProtocolMismatch(remoteVersion: Int, remoteRole: PeerRole) {
         if (protocolMismatch.value == null) {
-            protocolMismatch.value = ProtocolMismatch(WFAS_PROTOCOL_VERSION, remoteVersion)
+            protocolMismatch.value =
+                ProtocolMismatch(WFAS_PROTOCOL_VERSION, remoteVersion, remoteRole)
         }
     }
+
+    private const val LEGACY_HELLO_PROBE_DELAY_MS = 2500L
+
+    private val versionedHelloPeers = java.util.Collections.synchronizedSet(HashSet<String>())
 
     fun clearProtocolMismatch() { protocolMismatch.value = null }
 
@@ -896,8 +945,9 @@ object NetworkManager {
 
                 while (isActive) {
                     try {
-                        val encOn = encryptionEnabled && securityMode.equals("KEY", ignoreCase = true)
-                        val secStr = ";auth=$securityMode;enc=${if (encOn) 1 else 0}"
+                        val encOn = encryptionEnabled && SecurityMode.requiresKey(securityMode)
+                        val announcedAuth = SecurityMode.fromStringSafe(securityMode).name
+                        val secStr = ";auth=$announcedAuth;enc=${if (encOn) 1 else 0}"
                         val message = "$staticPrefix$secStr$micStr"
                         val messageBytes = message.toByteArray()
                         val packet = DatagramPacket(
@@ -1264,14 +1314,15 @@ object NetworkManager {
                     targetAddress: SocketAddress,
                     clientAlive: java.util.concurrent.atomic.AtomicBoolean? = null,
                     sendDir: WfasCrypto.Dir? = null,
-                    beacon: ByteArray? = null
+                    beacon: ByteArray? = null,
+                    mcast: McastSession? = null
                 ) {
                     val fSz = channels * 2
                     val safeMtuSize = 1400
                     val headerSize = 10
                     var maxBytesPerPacket = SettingsDataStore(context).settingsFlow.first().maxPayloadBytes.coerceIn(256, safeMtuSize - headerSize)
                     maxBytesPerPacket -= (maxBytesPerPacket % fSz)
-                    if (sendDir != null) {
+                    if (sendDir != null || mcast != null) {
                         maxBytesPerPacket -= WfasCrypto.AEAD_OVERHEAD
                         maxBytesPerPacket -= (maxBytesPerPacket % fSz)
                         if (maxBytesPerPacket < fSz) maxBytesPerPacket = fSz
@@ -1285,9 +1336,14 @@ object NetworkManager {
                     Log.d(TAG, "[UDP_SENDER] streamingLoop avviato verso $targetAddress maxBytesPerPacket=$maxBytesPerPacket")
 
                     while (isActive && clientAlive?.get() != false) {
-                        if (beacon != null && System.currentTimeMillis() - lastBeacon >= 400L) {
-                            runCatching { sendSocket?.send(Datagram(buildPacket { writeFully(beacon) }, targetAddress)) }
+                        val beaconNow = mcast?.beacon ?: beacon
+                        val beaconUrgent = mcast?.beaconUrgent == true
+                        if (beaconNow != null &&
+                            (beaconUrgent || System.currentTimeMillis() - lastBeacon >= 400L)
+                        ) {
+                            runCatching { sendSocket?.send(Datagram(buildPacket { writeFully(beaconNow) }, targetAddress)) }
                             lastBeacon = System.currentTimeMillis()
+                            if (beaconUrgent) mcast?.beaconUrgent = false
                         }
                         val (pcmData, pcmLen) = udpAudioQueue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
                         loopCount++
@@ -1295,9 +1351,10 @@ object NetworkManager {
                             var offset = 0
                             while (offset < pcmLen) {
                                 val chunkSize = minOf(maxBytesPerPacket, pcmLen - offset)
-                                val packet = if (sendDir != null) {
+                                val activeDir = mcast?.dir ?: sendDir
+                                val packet = if (activeDir != null) {
                                     val enc = WfasCrypto.encryptPacket(
-                                        sendDir, seqNumber, samplePosition, false,
+                                        activeDir, seqNumber, samplePosition, false,
                                         pcmData.copyOfRange(offset, offset + chunkSize)
                                     )
                                     buildPacket { writeFully(enc) }
@@ -1422,19 +1479,48 @@ object NetworkManager {
 
                     val mcSec = SettingsDataStore(context).settingsFlow.first()
                     configureSecurity(mcSec.securityMode, mcSec.authKey, mcSec.encryptionEnabled)
-                    var mcDir: WfasCrypto.Dir? = null
-                    var mcBeaconBytes: ByteArray? = null
-                    if (mcSec.encryptionEnabled && SecurityMode.fromStringSafe(mcSec.securityMode) == SecurityMode.KEY) {
-                        val salt = ByteArray(WfasCrypto.SALT_BYTES).also { java.security.SecureRandom().nextBytes(it) }
-                        mcDir = WfasCrypto.deriveMulticast(mcSec.authKey, salt)
-                        val epoch = SettingsDataStore(context).nextMcastEpoch()
-                        mcBeaconBytes = WfasCrypto.buildMcastBeacon(mcSec.authKey, epoch, System.currentTimeMillis() / 1000, salt)
+
+                    val session = McastSession()
+                    val store = SettingsDataStore(context)
+
+                    suspend fun applyGroupKey(key: String) {
+                        if (encryptionEnabled && SecurityMode.requiresKey(securityMode) && key.isBlank()) {
+                            connectionStatus.value = context.getString(R.string.status_key_required)
+                            throw IllegalStateException("encryption requested without a key")
+                        }
+                        if (!(encryptionEnabled && SecurityMode.requiresKey(securityMode))) {
+                            session.dir = null
+                            session.beacon = null
+                            session.key = key
+                            session.epoch = 0L
+                            mcastSession.value = McastSnapshot(0L, key, false)
+                            sessionEncryptedLive.value = false
+                            return
+                        }
+                        val salt = ByteArray(WfasCrypto.SALT_BYTES)
+                            .also { java.security.SecureRandom().nextBytes(it) }
+                        val epoch = store.nextMcastEpoch()
+                        val beaconBytes = WfasCrypto
+                            .buildMcastBeacon(key, epoch, System.currentTimeMillis() / 1000, salt)
                             .toByteArray(Charsets.US_ASCII)
+                        session.beacon = beaconBytes
+                        session.beaconUrgent = true
+                        session.dir = WfasCrypto.deriveMulticast(key, salt)
+                        session.epoch = epoch
+                        session.key = key
+                        mcastSession.value = McastSnapshot(epoch, key, true)
+                        sessionEncryptedLive.value = true
                     }
 
+                    applyGroupKey(mcSec.authKey)
+
+                    mcastRekey = { newKey -> applyGroupKey(newKey) }
+
                     try {
-                        streamingLoop(targetAddress, sendDir = mcDir, beacon = mcBeaconBytes)
+                        streamingLoop(targetAddress, mcast = session)
                     } finally {
+                        mcastRekey = null
+                        mcastSession.value = null
                         withContext(NonCancellable) {
                             try {
                                 repeat(3) {
@@ -1499,10 +1585,17 @@ object NetworkManager {
                         }
 
                         val clientVersion = parseProtocolVersion(message)
-                        if (clientVersion != WFAS_PROTOCOL_VERSION) {
+                        if (clientVersion == WFAS_PROTOCOL_VERSION) {
+                            versionedHelloPeers.add(peerHost ?: clientAddress.toString())
+                        } else {
                             Log.w(TAG, "[SERVER][UNICAST] client incompatibile v=$clientVersion (mio v=$WFAS_PROTOCOL_VERSION), rifiuto $clientAddress")
                             sendSocket.send(Datagram(buildPacket { writeText(incompatibleMessage()) }, clientAddress))
-                            signalProtocolMismatch(clientVersion)
+                            val probeFromModernPeer =
+                                clientVersion == 0 &&
+                                    versionedHelloPeers.contains(peerHost ?: clientAddress.toString())
+                            if (!probeFromModernPeer) {
+                                signalProtocolMismatch(clientVersion, PeerRole.RECEIVER)
+                            }
                             continue
                         }
 
@@ -1547,11 +1640,13 @@ object NetworkManager {
                         }
 
                         val encrypting = encryptionEnabled &&
-                            SecurityMode.fromStringSafe(securityMode) == SecurityMode.KEY
+                            SecurityMode.requiresKey(securityMode)
                         val sendDir: WfasCrypto.Dir? =
                             if (encrypting) WfasCrypto.deriveUnicast(authKey, pendCnonce, pendSnonce).second else null
 
                         activePeerIp = peerHostOf(clientAddress)
+                        unicastPeerConnected.value = true
+                        sessionEncryptedLive.value = sendDir != null
                         Log.d(TAG, "[SERVER][UNICAST] HELLO ricevuto da $clientAddress, invio HELLO_ACK")
                         connectionStatus.value = context.getString(R.string.status_client_connected, clientAddress)
 
@@ -1647,6 +1742,8 @@ object NetworkManager {
                         try {
                             streamingLoop(clientAddress, clientAlive, sendDir)
                         } finally {
+                            unicastPeerConnected.value = false
+                            sessionEncryptedLive.value = false
                             clientByeJob.cancel()
                             pingJob.cancel()
                             if (clientAlive.get()) {
@@ -1862,6 +1959,7 @@ object NetworkManager {
 
                         var helloWaitMs = 150L
                         var helloAttempts = 0
+                        var legacyProbeSent = false
                         val handshakeStartedAt = System.currentTimeMillis()
                         while (System.currentTimeMillis() < handshakeDeadline) {
                             val ackMsg = try {
@@ -1871,11 +1969,28 @@ object NetworkManager {
                                 helloWaitMs = (helloWaitMs * 2).coerceAtMost(2000L)
                                 socket.send(Datagram(buildPacket { writeText(helloMsg) }, remoteAddress))
                                 Log.d(TAG, "[CLIENT] nessuna risposta, reinvio #$helloAttempts, prossima attesa ${helloWaitMs}ms")
+                                if (!legacyProbeSent &&
+                                    System.currentTimeMillis() - handshakeStartedAt >= LEGACY_HELLO_PROBE_DELAY_MS
+                                ) {
+                                    legacyProbeSent = true
+                                    Log.d(TAG, "[CLIENT] nessuna risposta all'HELLO versionato, invio sonda legacy")
+                                    socket.send(
+                                        Datagram(
+                                            buildPacket { writeText(NetworkSettings.CLIENT_HELLO_MESSAGE) },
+                                            remoteAddress
+                                        )
+                                    )
+                                }
                                 continue
                             }
                             when {
                                 ackMsg.startsWith(NetworkSettings.INCOMPATIBLE_PREFIX) -> {
-                                    signalProtocolMismatch(parseProtocolVersion(ackMsg))
+                                    val rejectedBy = parseProtocolVersion(ackMsg)
+                                    if (rejectedBy == WFAS_PROTOCOL_VERSION) {
+                                        Log.d(TAG, "[CLIENT] rifiuto causato dalla sonda legacy, ignoro")
+                                        continue
+                                    }
+                                    signalProtocolMismatch(rejectedBy, PeerRole.SENDER)
                                     connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
                                     return@launch
                                 }
@@ -1887,6 +2002,12 @@ object NetworkManager {
                                     return@launch
                                 }
                                 ackMsg == NetworkSettings.UNAUTHORIZED_MESSAGE -> {
+                                    if (clientKeyFromInvite) {
+                                        pendingInviteRejected.value = true
+                                        connectionStatus.value = context.getString(R.string.status_unauthorized)
+                                        isStreamingCurrent.value = false
+                                        return@launch
+                                    }
                                     if (!promptKeyAndRestart(true)) {
                                         connectionStatus.value = context.getString(R.string.status_unauthorized)
                                         return@launch
@@ -1923,7 +2044,7 @@ object NetworkManager {
                                 ackMsg.startsWith(NetworkSettings.HELLO_ACK_PREFIX) -> {
                                     val serverVersion = parseProtocolVersion(ackMsg)
                                     if (serverVersion != WFAS_PROTOCOL_VERSION) {
-                                        signalProtocolMismatch(serverVersion)
+                                        signalProtocolMismatch(serverVersion, PeerRole.SENDER)
                                         connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
                                         return@launch
                                     }
@@ -1945,6 +2066,7 @@ object NetworkManager {
                             WfasCrypto.deriveUnicast(clientKey, cnonce, clientSnonce) else null
                         val recvDir: WfasCrypto.Dir? = sessionKeys?.second
                         micSendDir = if (sessionEncrypted) sessionKeys?.first else null
+                        sessionEncryptedLive.value = sessionEncrypted && recvDir != null
                         val recvWin = WfasCrypto.ReplayWindow()
                         var serverEncrypts = sessionEncrypted
 
@@ -1989,7 +2111,7 @@ object NetworkManager {
                                 versionChecked = true
                                 val packetVersion = bytes[2].toInt() and 0xFF
                                 if (packetVersion != WFAS_PROTOCOL_VERSION) {
-                                    signalProtocolMismatch(packetVersion)
+                                    signalProtocolMismatch(packetVersion, PeerRole.SENDER)
                                     connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
                                     streamingJob?.cancel()
                                     return
@@ -2230,16 +2352,42 @@ object NetworkManager {
                         var mcVersionChecked = false
                         var mcDir: WfasCrypto.Dir? = null
                         var mcWin = WfasCrypto.ReplayWindow()
-                        var mcKey = ""
+                        var mcKey = clientPresharedKey
                         var mcKeyAsked = false
-                        var mcLastEpoch = SettingsDataStore(context).getMcastClientEpoch(serverInfo.ip)
+                        val mcExpectedEpoch = expectedMcastEpoch
+                        val mcFromInvite = clientKeyFromInvite
+                        var mcLastEpoch = when {
+                            mcExpectedEpoch != null -> mcExpectedEpoch - 1
+                            mcFromInvite -> 0L
+                            else -> SettingsDataStore(context).getMcastClientEpoch(serverInfo.ip)
+                        }
+                        var mcEpochVerified = mcExpectedEpoch == null
+                        var mcEpochRejected = false
+                        var mcKeyRejected = false
+                        var mcBeaconSeenAt = 0L
+                        var mcMacFailStreak = 0
                         val beaconPrefixLen = WfasCrypto.MSG_MCAST_ENC.length
+                        var mcLastRxAt = System.currentTimeMillis()
+                        var mcAnyRx = false
 
                         while (isActive) {
                             try {
                                 packet.length = buffer.size
                                 multicastSocket.receive(packet)
+                                mcLastRxAt = System.currentTimeMillis()
+                                mcAnyRx = true
                             } catch (_: java.net.SocketTimeoutException) {
+                                val beaconExpected = mcDir != null || (mcKey.isNotEmpty() && !mcAnyRx)
+                                if (beaconExpected &&
+                                    System.currentTimeMillis() - mcLastRxAt >= MULTICAST_SILENCE_TIMEOUT_MS) {
+                                    connectionStatus.value =
+                                        context.getString(R.string.status_server_disconnected)
+                                    if (disconnectionSoundEnabled) {
+                                        playDisconnectionSound(context)
+                                        disconnectionSoundPlayed = true
+                                    }
+                                    break
+                                }
                                 continue
                             }
 
@@ -2251,6 +2399,7 @@ object NetworkManager {
                                 if (plen <= 0) return
                                 if (plen >= beaconPrefixLen &&
                                     String(src, 0, beaconPrefixLen, Charsets.US_ASCII) == WfasCrypto.MSG_MCAST_ENC) {
+                                    if (mcBeaconSeenAt == 0L) mcBeaconSeenAt = System.currentTimeMillis()
                                     if (mcKey.isEmpty() && !mcKeyAsked) {
                                         mcKeyAsked = true
                                         mcKey = requestKeyFromUi(false) ?: ""
@@ -2258,18 +2407,65 @@ object NetworkManager {
                                     }
                                     if (mcKey.isNotEmpty()) {
                                         val info = WfasCrypto.parseMcastBeacon(mcKey, String(src, 0, plen, Charsets.US_ASCII), -1L)
+                                        if (info != null && !mcEpochVerified) {
+                                            mcEpochVerified = true
+                                            if (mcExpectedEpoch != null && info.epoch != mcExpectedEpoch) {
+                                                pendingEpochMismatch.value = true
+                                            }
+                                        }
+                                        if (info == null) {
+                                            mcMacFailStreak++
+                                            if (mcDir != null && mcMacFailStreak >= 6) {
+                                                pendingEpochMismatch.value = true
+                                                connectionStatus.value =
+                                                    context.getString(R.string.status_group_rekeyed)
+                                                stopLoop = true
+                                                return
+                                            }
+                                            if (mcDir == null && mcMacFailStreak >= 6 && !mcKeyRejected) {
+                                                mcKeyRejected = true
+                                                connectionStatus.value =
+                                                    context.getString(R.string.key_dialog_wrong)
+                                                if (mcFromInvite) {
+                                                    pendingInviteRejected.value = true
+                                                } else {
+                                                    mcKey = ""
+                                                    mcKeyAsked = false
+                                                    mcMacFailStreak = 0
+                                                    mcKeyRejected = false
+                                                }
+                                            }
+                                        } else {
+                                            mcMacFailStreak = 0
+                                        }
                                         if (info != null && (info.epoch > mcLastEpoch || (mcDir == null && info.epoch == mcLastEpoch))) {
                                             mcDir = WfasCrypto.deriveMulticast(mcKey, info.salt)
+                                            sessionEncryptedLive.value = true
                                             mcWin = WfasCrypto.ReplayWindow()
                                             if (info.epoch > mcLastEpoch) {
                                                 mcLastEpoch = info.epoch
-                                                SettingsDataStore(context).setMcastClientEpoch(serverInfo.ip, info.epoch)
+                                                if (!mcFromInvite) {
+                                                    SettingsDataStore(context).setMcastClientEpoch(serverInfo.ip, info.epoch)
+                                                }
                                             }
+                                        } else if (info != null && mcDir == null && !mcEpochRejected) {
+                                            mcEpochRejected = true
+                                            pendingEpochMismatch.value = true
+                                            connectionStatus.value =
+                                                context.getString(R.string.status_group_rekeyed)
+                                        }
+                                        if (info == null && !mcEpochVerified && mcExpectedEpoch != null &&
+                                            System.currentTimeMillis() - mcBeaconSeenAt > 6000L
+                                        ) {
+                                            mcEpochVerified = true
+                                            pendingEpochMismatch.value = true
                                         }
                                     }
                                     return
                                 }
                                 if (plen == 3 && String(src, 0, 3, Charsets.UTF_8) == "BYE") {
+                                    connectionStatus.value =
+                                        context.getString(R.string.status_server_disconnected)
                                     if (disconnectionSoundEnabled) { playDisconnectionSound(context); disconnectionSoundPlayed = true }
                                     stopLoop = true
                                     return
@@ -2280,6 +2476,7 @@ object NetworkManager {
                             suspend fun playMc(audio: ByteArray) {
                                 val len = audio.size
                                 if (len >= MC_HEADER_SIZE && audio[0] == MC_MAGIC_0 && audio[1] == MC_MAGIC_1) {
+                                    if (len == MC_HEADER_SIZE) return
                                     LinkMetrics.onPacket(
                                         ((audio[4].toInt() and 0xFF) shl 8) or (audio[5].toInt() and 0xFF),
                                         ((audio[6].toLong() and 0xFF) shl 24) or
@@ -2291,7 +2488,7 @@ object NetworkManager {
                                         mcVersionChecked = true
                                         val packetVersion = audio[2].toInt() and 0xFF
                                         if (packetVersion != WFAS_PROTOCOL_VERSION) {
-                                            signalProtocolMismatch(packetVersion)
+                                            signalProtocolMismatch(packetVersion, PeerRole.SENDER)
                                             connectionStatus.value = context.getString(R.string.status_protocol_incompatible)
                                             mcAbort = true
                                             return
@@ -2385,6 +2582,8 @@ object NetworkManager {
 
     fun stopStreaming(context: Context) {
         activePeerIp = null
+        unicastPeerConnected.value = false
+        sessionEncryptedLive.value = false
         // Va letto prima dell'azzeramento: serve a sapere se eravamo noi il server.
         val wasServing = isServerStreaming
         isServerStreaming = false

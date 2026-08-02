@@ -24,9 +24,19 @@ Apache License 2.0  (https://www.apache.org/licenses/LICENSE-2.0)
     - DataStore Preferences
     - Glance (App Widget, Material 3)
     - Core SplashScreen
+    - Graphics Shapes (Material 3 Expressive shape morphing)
+    - CameraX (core, camera2, lifecycle, view) — QR scanner preview
   Kotlin standard library              (c) JetBrains s.r.o.
   kotlinx.coroutines (Android)         (c) JetBrains s.r.o.
   Ktor (client/server core + CIO, network)  (c) JetBrains s.r.o.
+  ZXing Core                           (c) ZXing authors
+      QR encoding for pairing invites.  https://github.com/zxing/zxing
+
+Google ML Kit Barcode Scanning
+  Used to read pairing QR codes from the camera. Distributed by Google LLC under
+  the ML Kit terms of service, not under an OSI licence:
+  https://developers.google.com/ml-kit/terms
+  The library is bundled on-device; no image ever leaves the phone.
 
 Bouncy Castle Licence (MIT-style)
   bcprov / bctls / bcpkix (jdk15on)

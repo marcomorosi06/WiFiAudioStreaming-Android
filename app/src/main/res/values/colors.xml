@@ -18,4 +18,7 @@
     <color name="splash_background_bottom">#FEF7FF</color>
     <color name="splash_accent">#6650A4</color>
     <color name="splash_icon_bg">#EADDFF</color>
+    <color name="notif_accent">#6750A4</color>
+    <color name="notif_volume_primary">#6750A4</color>
+    <color name="notif_volume_boost">#7D5260</color>
 </resources>

@@ -18,18 +18,12 @@
 package com.cuscus.wifiaudiostreaming
 
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.cuscus.wifiaudiostreaming.data.AutoConnectEntry
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +32,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -51,8 +48,6 @@ import java.net.SocketTimeoutException
 class AutoConnectService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val channelId = "auto_connect_channel"
-    private val notificationId = 301
     private var isConnecting = false
     private var listenJob: Job? = null
 
@@ -61,30 +56,40 @@ class AutoConnectService : Service() {
     @SuppressLint("MissingPermission")
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        NotificationCenter.ensureChannels(this)
 
-        val notification = buildNotification(getString(R.string.auto_connect_listening))
+        val notification = buildNotification(getString(R.string.auto_connect_listening), false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                notificationId,
+                NotificationCenter.ID_AUTO_CONNECT,
                 notification,
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
-            startForeground(notificationId, notification)
+            startForeground(NotificationCenter.ID_AUTO_CONNECT, notification)
         }
 
         serviceScope.launch {
-            NetworkManager.connectionStatus.collect { status ->
-                if (NetworkManager.isStreamingCurrent.value) {
-                    NotificationManagerCompat.from(this@AutoConnectService)
-                        .notify(notificationId, buildNotification(status))
-                } else {
-                    NotificationManagerCompat.from(this@AutoConnectService)
-                        .notify(notificationId, buildNotification(getString(R.string.auto_connect_listening)))
+            combine(
+                NetworkManager.connectionStatus,
+                NetworkManager.isStreamingCurrent
+            ) { status, streaming -> status to streaming }
+                .distinctUntilChanged()
+                .conflate()
+                .collect { (status, streaming) ->
+                    val text = if (streaming && status.isNotBlank()) {
+                        status
+                    } else {
+                        getString(R.string.auto_connect_listening)
+                    }
+                    NotificationCenter.post(
+                        this@AutoConnectService,
+                        NotificationCenter.ID_AUTO_CONNECT,
+                        buildNotification(text, streaming)
+                    )
+                    delay(UPDATE_THROTTLE_MS)
                 }
-            }
         }
     }
 
@@ -264,50 +269,17 @@ class AutoConnectService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         Log.d("AutoConnect", "Servizio distrutto.")
         serviceScope.cancel()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        NotificationCenter.cancel(this, NotificationCenter.ID_AUTO_CONNECT)
+        super.onDestroy()
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Auto Connect Service",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
-    }
+    private fun buildNotification(statusText: String, streaming: Boolean) =
+        NotificationCenter.autoConnectNotification(this, statusText, streaming)
 
-    private fun buildNotification(statusText: String): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, openAppIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val stopIntent = Intent(this, MainActivity::class.java).apply {
-            action = "com.cuscus.wifiaudiostreaming.STOP_STREAMING"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        val stopPendingIntent = PendingIntent.getActivity(
-            this, 1, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(statusText)
-            .setSmallIcon(R.drawable.ic_shortcut_server)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-
-        if (NetworkManager.isStreamingCurrent.value) {
-            builder.addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
-        }
-
-        return builder.build()
+    private companion object {
+        const val UPDATE_THROTTLE_MS = 500L
     }
 }

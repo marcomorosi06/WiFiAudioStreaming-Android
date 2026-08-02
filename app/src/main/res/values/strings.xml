@@ -321,6 +321,7 @@
     <string name="script_action_set">Change settings</string>
     <string name="close">Close</string>
     <string name="status_protocol_incompatible">Incompatible protocol version</string>
+    <string name="status_group_rekeyed">Group key changed by the sender</string>
     <string name="status_unauthorized">Connection refused by the server</string>
     <string name="status_awaiting_approval">Waiting for the other device to approve…</string>
     <string name="status_key_required">This server requires a key</string>
@@ -346,8 +347,12 @@
     <string name="key_dialog_wrong">Wrong key. Try again:</string>
     <string name="key_dialog_connect">Connect</string>
     <string name="key_dialog_cancel">Cancel</string>
-    <string name="protocol_incompatible_title">Update required</string>
+    <string name="protocol_incompatible_title">The other device needs an update</string>
+    <string name="protocol_incompatible_title_local">This device needs an update</string>
     <string name="protocol_incompatible_body">The two apps are running incompatible WFAS protocol versions (this device: v%1$d, other end: v%2$d). The connection was closed. Please update so both devices run the latest version.</string>
+    <string name="protocol_incompatible_body_sender">The device that is transmitting is running an older version of the app (WFAS protocol v%2$d, this device uses v%1$d), so the connection was closed. Update the app on the transmitting device.</string>
+    <string name="protocol_incompatible_body_receiver">The device that is receiving is running an older version of the app (WFAS protocol v%2$d, this device uses v%1$d), so the connection was closed. Update the app on the receiving device.</string>
+    <string name="protocol_incompatible_body_local">This device is running an older version of the app (WFAS protocol v%1$d, the other device uses v%2$d), so the connection was closed. Update the app on this device.</string>
     <string name="protocol_incompatible_update">Open downloads</string>
     <string name="protocol_incompatible_website">Download from the website</string>
     <string name="protocol_incompatible_github">Open on GitHub</string>
@@ -435,5 +440,103 @@
     <string name="dlna_card_format">Format</string>
     <string name="dlna_card_no_targets">No renderer selected. Pick one in Settings.</string>
     <string name="dlna_card_connections">%1$d active connection(s)</string>
+
+    <string name="server_key_required_title">Key missing</string>
+    <string name="server_key_required_desc">In Key mode the key cannot be empty. Enter one under Security, or switch to QR Code to have it generated for you.</string>
+
+    <string name="sec_mode_qr">QR Code</string>
+    <string name="sec_mode_qr_info_title">Key generated automatically</string>
+    <string name="sec_mode_qr_info_body">Automatically generates a random key for each invite — more secure than a manually chosen password. No password to remember or say out loud.</string>
+
+    <string name="qr_invite_button">Invite</string>
+    <string name="qr_invite_button_multicast">Invite device</string>
+    <string name="qr_invite_content_description">Generate an invite code</string>
+    <string name="qr_invite_title">Scan to connect</string>
+    <string name="qr_invite_subtitle_unicast">Scan this code from the receiving device. It is valid for one pairing only.</string>
+    <string name="qr_invite_subtitle_multicast">Scan this code from the receiving device to join the group.</string>
+    <string name="qr_invite_countdown">Expires in %1$s</string>
+    <string name="qr_invite_expired_pill">Expired</string>
+    <string name="qr_invite_tap_plain">Trouble scanning? Tap the code for the plain black and white version.</string>
+    <string name="qr_invite_tap_expressive">Tap the code to go back to the colourful version.</string>
+    <string name="qr_invite_key_label">Key (manual entry)</string>
+    <string name="qr_invite_key_reveal">Show key</string>
+    <string name="qr_invite_key_hide">Hide key</string>
+    <string name="qr_invite_encryption_note">Audio encryption was turned on: a multicast group has no handshake, so without it the key would protect nothing.</string>
+    <string name="qr_invite_no_ip">No network address yet. Connect to a Wi-Fi network and try again.</string>
+    <string name="qr_invite_copy">Copy</string>
+    <string name="qr_invite_copied">Key copied</string>
+    <string name="qr_invite_close">Close</string>
+    <string name="qr_invite_endpoint">%1$s · port %2$d</string>
+    <string name="qr_regenerate_button">Regenerate key</string>
+
+    <string name="qr_scan_button">Scan QR</string>
+    <string name="qr_scan_title">Scan the invite code</string>
+    <string name="qr_scan_hint">Point the camera at the QR code shown by the other device.</string>
+    <string name="qr_scan_torch">Torch</string>
+    <string name="qr_scan_close">Close scanner</string>
+    <string name="qr_scan_permission_denied">Camera permission denied</string>
+    <string name="qr_scan_not_wfas">Ehm… you want me to scan that? That\'s not a WFAS QR code!</string>
+    <string name="qr_scan_expired_hint">That invite has expired. Ask for a fresh one.</string>
+    <string name="qr_scan_found">Invite found</string>
+
+    <string name="qr_pairing_expired_title">QR code expired</string>
+    <string name="qr_pairing_expired_body">This code is no longer valid for security reasons. Generate a new invite to continue.</string>
+    <string name="qr_pairing_expired_primary">Generate new code</string>
+    <string name="qr_pairing_expired_secondary">Close</string>
+
+    <string name="qr_pairing_invalid_title">Code not recognized</string>
+    <string name="qr_pairing_invalid_body">The scanned code isn\'t a valid WFAS invite. Make sure you\'re scanning the code generated by the other device.</string>
+    <string name="qr_pairing_invalid_retry">Try again</string>
+    <string name="qr_pairing_invalid_cancel">Cancel</string>
+
+    <string name="qr_pairing_superseded_title">Invite no longer valid</string>
+    <string name="qr_pairing_superseded_body">The other device turned this invite down. It was probably replaced by a newer one, or the group key was regenerated. Ask for a fresh code.</string>
+    <string name="qr_pairing_superseded_button">Scan a new code</string>
+    <string name="qr_pairing_superseded_dismiss">Close</string>
+
+    <string name="qr_pairing_self_title">This is your own code</string>
+    <string name="qr_pairing_self_body">This invite was generated by this same device, so there is nothing to connect to. Scan it from the device that should receive the audio.</string>
+    <string name="qr_pairing_self_button">Got it</string>
+
+    <string name="qr_pairing_epoch_mismatch_title">This group has changed</string>
+    <string name="qr_pairing_epoch_mismatch_body">This multicast group\'s key was updated after the code was generated. Ask the broadcasting device for a new invite.</string>
+    <string name="qr_pairing_epoch_mismatch_button">Got it</string>
+
+    <string name="qr_pairing_no_camera_title">Camera unavailable</string>
+    <string name="qr_pairing_no_camera_body">No webcam was detected. You can still enter the address and key manually.</string>
+    <string name="qr_pairing_no_camera_manual">Enter manually</string>
+    <string name="qr_pairing_no_camera_close">Close</string>
+
+    <string name="qr_pairing_regenerate_confirm_title">Regenerate the group key?</string>
+    <string name="qr_pairing_regenerate_confirm_body">All connected devices will have to pair again. Use this option if you think an unauthorized device knows the current key.</string>
+    <string name="qr_pairing_regenerate_confirm_cancel">Cancel</string>
+    <string name="qr_pairing_regenerate_confirm_confirm">Regenerate</string>
+
+    <string name="qr_pairing_deeplink_confirm_title">Connect to %1$s?</string>
+    <string name="qr_pairing_deeplink_confirm_body_unicast">A WFAS invite was detected for streaming from that device. Do you want to connect now?</string>
+    <string name="qr_pairing_deeplink_confirm_body_multicast">A WFAS invite was detected for multicast reception. Do you want to connect now?</string>
+    <string name="qr_pairing_deeplink_confirm_stops_server">This device is transmitting right now. Connecting will stop that transmission.</string>
+    <string name="qr_pairing_deeplink_confirm_ignore">Ignore</string>
+    <string name="qr_pairing_deeplink_confirm_connect">Connect</string>
+
+    <string name="notif_channel_server_name">Audio transmission</string>
+    <string name="notif_channel_server_desc">Live status of the stream you are sending, with volume controls.</string>
+    <string name="notif_channel_client_name">Audio reception</string>
+    <string name="notif_channel_client_desc">Live status of the stream you are receiving.</string>
+    <string name="notif_channel_auto_connect_name">Automatic connection</string>
+    <string name="notif_channel_auto_connect_desc">Background search for your starred servers.</string>
+    <string name="notif_server_title">Transmitting audio</string>
+    <string name="notif_client_title">Receiving audio</string>
+    <string name="notif_auto_connect_title">Automatic connection</string>
+    <string name="notif_starting">Starting…</string>
+    <string name="notif_connecting">Connecting…</string>
+    <string name="notif_volume">Volume %1$d%%</string>
+    <string name="notif_volume_muted">Muted</string>
+    <string name="notif_action_stop">Stop</string>
+    <string name="notif_action_volume_up">Louder</string>
+    <string name="notif_action_volume_down">Quieter</string>
+    <string name="notif_chip_muted">Mute</string>
+    <string name="notif_chip_live">Live</string>
+    <string name="notif_chip_scanning">Scan</string>
 
 </resources>

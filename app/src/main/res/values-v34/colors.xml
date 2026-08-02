@@ -5,4 +5,7 @@
     <color name="splash_icon_bg">@android:color/system_primary_container_light</color>
     <color name="splash_background_top">@android:color/system_surface_container_light</color>
     <color name="splash_background_bottom">@android:color/system_background_light</color>
+    <color name="notif_accent">@android:color/system_primary_light</color>
+    <color name="notif_volume_primary">@android:color/system_primary_light</color>
+    <color name="notif_volume_boost">@android:color/system_tertiary_light</color>
 </resources>

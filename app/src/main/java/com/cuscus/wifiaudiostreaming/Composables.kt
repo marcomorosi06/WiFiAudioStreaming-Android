@@ -30,8 +30,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.Image
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -267,7 +271,10 @@ fun WiFiAudioStreamingApp(
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
-                    securityMode = appSettings.securityMode,
+                    securityMode = SecurityMode.uiMode(
+                        appSettings.securityMode,
+                        appSettings.qrPairingEnabled
+                    ),
                     authKey = appSettings.authKey,
                     onSecurityChange = onSecurityChange,
                     encryptionEnabled = appSettings.encryptionEnabled,
@@ -2190,6 +2197,18 @@ fun ExpressiveAudioSourceSelector(
                     leadingIcon = { Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     modifier = Modifier.weight(1f)
                 )
+                FilterChip(
+                    selected = secMode == "QR",
+                    onClick = { onSecurityChange("QR", authKey) },
+                    label = { Text(stringResource(R.string.sec_mode_qr), maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Outlined.QrCode2, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (secMode == "QR") {
+                Spacer(modifier = Modifier.height(12.dp))
+                QrSecurityInfoCard(accent = MaterialTheme.colorScheme.primary)
             }
 
             if (secMode == "KEY") {
@@ -2254,9 +2273,9 @@ fun ExpressiveAudioSourceSelector(
                         )
                     }
                     Switch(
-                        checked = encryptionEnabled && secMode == "KEY",
+                        checked = encryptionEnabled && (secMode == "KEY" || secMode == "QR"),
                         onCheckedChange = onEncryptionChange,
-                        enabled = secMode == "KEY"
+                        enabled = secMode == "KEY" || secMode == "QR"
                     )
                 }
             }
@@ -3016,17 +3035,15 @@ fun DeviceBadges(
         if (viaUsb) add(
             DeviceBadgeSpec(Icons.Filled.Usb, stringResource(R.string.usb_device_transport), true, MaterialShapes.Sunny)
         )
-        when {
-            encrypted -> add(
-                DeviceBadgeSpec(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true, MaterialShapes.Gem)
-            )
-            mode == "KEY" -> add(
-                DeviceBadgeSpec(Icons.Outlined.Key, stringResource(R.string.sec_key), true, MaterialShapes.Pentagon)
-            )
-            mode == "ASK" -> add(
-                DeviceBadgeSpec(Icons.Outlined.Security, stringResource(R.string.sec_ask), true, MaterialShapes.Sunny)
-            )
-        }
+        if (mode == "KEY") add(
+            DeviceBadgeSpec(Icons.Outlined.Key, stringResource(R.string.sec_key), true, MaterialShapes.Pentagon)
+        )
+        if (mode == "ASK") add(
+            DeviceBadgeSpec(Icons.Outlined.Security, stringResource(R.string.sec_ask), true, MaterialShapes.Sunny)
+        )
+        if (encrypted) add(
+            DeviceBadgeSpec(Icons.Filled.Lock, stringResource(R.string.sec_encrypted), true, MaterialShapes.Gem)
+        )
         if (serverSendsMic) add(
             DeviceBadgeSpec(Icons.Filled.Mic, stringResource(R.string.mic_sends), false, MaterialShapes.Cookie7Sided)
         )
@@ -4589,38 +4606,44 @@ fun ExpressiveVolumeSlider(
         label = "VolumeBadgeColor"
     )
 
+    val volumeMorph = remember { Morph(MaterialShapes.Circle, MaterialShapes.Cookie9Sided) }
+    val volumeShape by animateFloatAsState(
+        targetValue = if (isDragging) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "VolumeIconShape"
+    )
+
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(34.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = badgeColor.copy(alpha = 0.15f)
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(MorphOutlineShape(volumeMorph, volumeShape))
+                        .background(badgeColor.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .size(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = volumeIcon,
-                            contentDescription = null,
-                            tint = badgeColor,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = volumeIcon,
+                        contentDescription = null,
+                        tint = badgeColor,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.transmission_volume, percentage),
@@ -4649,9 +4672,11 @@ fun ExpressiveVolumeSlider(
                 }
             }
 
-            Slider(
-                value = volume,
-                onValueChange = { valValue ->
+            ExpressiveVolumeTrack(
+                volume = volume,
+                badgeColor = badgeColor,
+                dragging = isDragging,
+                onSeek = { valValue ->
                     if (!isDragging) {
                         isDragging = true
                         haptics.gestureStart()
@@ -4667,17 +4692,10 @@ fun ExpressiveVolumeSlider(
                     }
                     onVolumeChange(valValue)
                 },
-                onValueChangeFinished = {
+                onSeekFinished = {
                     isDragging = false
                     haptics.gestureEnd()
-                },
-                valueRange = 0f..2f,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    thumbColor = badgeColor,
-                    activeTrackColor = badgeColor,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
+                }
             )
 
             if (showPresets) {
@@ -4696,9 +4714,17 @@ fun ExpressiveVolumeSlider(
                             targetValue = if (isSelected) badgeColor else MaterialTheme.colorScheme.onSurfaceVariant,
                             label = "PresetColor"
                         )
+                        val presetCorner by animateDpAsState(
+                            targetValue = if (isSelected) 26.dp else 14.dp,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "PresetCorner"
+                        )
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) badgeColor.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(presetCorner),
+                            color = if (isSelected) badgeColor.copy(alpha = 0.20f) else MaterialTheme.colorScheme.surfaceContainerHigh,
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
@@ -4708,16 +4734,98 @@ fun ExpressiveVolumeSlider(
                         ) {
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
                                 color = presetColor,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 12.dp)
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveVolumeTrack(
+    volume: Float,
+    badgeColor: Color,
+    dragging: Boolean,
+    onSeek: (Float) -> Unit,
+    onSeekFinished: () -> Unit
+) {
+    val inactive = MaterialTheme.colorScheme.surfaceContainerHighest
+    var widthPx by remember { mutableStateOf(1f) }
+
+    val trackHeight by animateDpAsState(
+        targetValue = if (dragging) 52.dp else 44.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "VolTrackHeight"
+    )
+
+    fun seekTo(x: Float) = onSeek((x / widthPx).coerceIn(0f, 1f) * 2f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(trackHeight)
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(Unit) {
+                detectTapGestures { seekTo(it.x); onSeekFinished() }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { onSeekFinished() },
+                    onDragCancel = { onSeekFinished() }
+                ) { change, _ -> seekTo(change.position.x) }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val h = size.height
+            val r = h / 2f
+            val gap = h * 0.14f
+            val fill = (volume / 2f).coerceIn(0f, 1f) * size.width
+            val handleW = h * 0.20f
+
+            drawRoundRect(
+                color = inactive,
+                topLeft = Offset(0f, 0f),
+                size = Size(size.width, h),
+                cornerRadius = CornerRadius(r, r)
+            )
+
+            val activeEnd = (fill - handleW / 2f - gap).coerceAtLeast(0f)
+            if (activeEnd > 0f) {
+                drawRoundRect(
+                    color = badgeColor,
+                    topLeft = Offset(0f, 0f),
+                    size = Size(activeEnd, h),
+                    cornerRadius = CornerRadius(r, r)
+                )
+            }
+
+            val stdX = size.width / 2f
+            if (fill < stdX - handleW) {
+                drawRoundRect(
+                    color = badgeColor.copy(alpha = 0.45f),
+                    topLeft = Offset(stdX - h * 0.045f, h * 0.30f),
+                    size = Size(h * 0.09f, h * 0.40f),
+                    cornerRadius = CornerRadius(h * 0.05f, h * 0.05f)
+                )
+            }
+
+            val handleX = fill.coerceIn(handleW / 2f + gap, size.width - handleW / 2f - gap)
+            drawRoundRect(
+                color = badgeColor,
+                topLeft = Offset(handleX - handleW / 2f, h * 0.10f),
+                size = Size(handleW, h * 0.80f),
+                cornerRadius = CornerRadius(handleW / 2f, handleW / 2f)
+            )
         }
     }
 }
@@ -4763,9 +4871,8 @@ fun ExpressiveIpCopyButton(
     )
 
     Surface(
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(34.dp),
         color = containerColor,
-        border = BorderStroke(1.5.dp, accent.copy(alpha = if (copied) 0.8f else 0.3f)),
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -4790,11 +4897,11 @@ fun ExpressiveIpCopyButton(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(46.dp)
                     .clip(MorphOutlineShape(morph, shapeProgress.value))
                     .background(contentColor.copy(alpha = if (copied) 0.25f else 0.16f)),
                 contentAlignment = Alignment.Center
@@ -4827,7 +4934,7 @@ fun ExpressiveIpCopyButton(
             Spacer(Modifier.width(10.dp))
 
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = contentColor.copy(alpha = if (copied) 0.25f else 0.12f)
             ) {
                 AnimatedContent(

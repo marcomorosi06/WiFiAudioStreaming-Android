@@ -78,6 +78,8 @@ data class AppSettings(
     val securityMode: String = "OFF",
     val authKey: String = "",
     val encryptionEnabled: Boolean = false,
+    val qrPairingEnabled: Boolean = false,
+    val manualAuthKey: String = "",
     val hapticsEnabled: Boolean = true,
     val blackoutOutlinedUi: Boolean = false,
     val developerMode: Boolean = false,
@@ -102,6 +104,8 @@ class SettingsDataStore(context: Context) {
         val SECURITY_MODE = stringPreferencesKey("security_mode")
         val AUTH_KEY = stringPreferencesKey("auth_key")
         val ENCRYPTION_ENABLED = booleanPreferencesKey("encryption_enabled")
+        val QR_PAIRING_ENABLED = booleanPreferencesKey("qr_pairing_enabled")
+        val MANUAL_AUTH_KEY = stringPreferencesKey("manual_auth_key")
         val STREAMING_PORT = intPreferencesKey("streaming_port")
         val SEND_CLIENT_MICROPHONE = booleanPreferencesKey("send_client_microphone")
         val MIC_PORT = intPreferencesKey("mic_port")
@@ -185,6 +189,8 @@ class SettingsDataStore(context: Context) {
             securityMode = preferences[PreferencesKeys.SECURITY_MODE] ?: "OFF",
             authKey = preferences[PreferencesKeys.AUTH_KEY] ?: "",
             encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: false,
+            qrPairingEnabled = preferences[PreferencesKeys.QR_PAIRING_ENABLED] ?: false,
+            manualAuthKey = preferences[PreferencesKeys.MANUAL_AUTH_KEY] ?: "",
             usbModeEnabled = preferences[PreferencesKeys.USB_MODE_ENABLED] ?: false,
             usbLatencyMs = preferences[PreferencesKeys.USB_LATENCY_MS] ?: UsbLink.DEFAULT_USB_LATENCY_MS,
             wfasMode = preferences[PreferencesKeys.WFAS_MODE] ?: WfasPolicy.MODE_OFF_ON_USB
@@ -261,6 +267,18 @@ class SettingsDataStore(context: Context) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.SECURITY_MODE] = mode
             preferences[PreferencesKeys.AUTH_KEY] = key
+        }
+    }
+
+    suspend fun saveQrPairing(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.QR_PAIRING_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveManualAuthKey(key: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MANUAL_AUTH_KEY] = key
         }
     }
 

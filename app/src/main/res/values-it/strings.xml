@@ -321,6 +321,7 @@
     <string name="script_action_set">Cambia impostazioni</string>
     <string name="close">Chiudi</string>
     <string name="status_protocol_incompatible">Versione del protocollo incompatibile</string>
+    <string name="status_group_rekeyed">Chiave del gruppo cambiata dal trasmettitore</string>
     <string name="status_unauthorized">Connessione rifiutata dal server</string>
     <string name="status_awaiting_approval">In attesa di approvazione dall\'altro dispositivo…</string>
     <string name="status_key_required">Questo server richiede una chiave</string>
@@ -346,8 +347,12 @@
     <string name="key_dialog_wrong">Chiave errata. Riprova:</string>
     <string name="key_dialog_connect">Connetti</string>
     <string name="key_dialog_cancel">Annulla</string>
-    <string name="protocol_incompatible_title">Aggiornamento necessario</string>
+    <string name="protocol_incompatible_title">L\'altro dispositivo va aggiornato</string>
+    <string name="protocol_incompatible_title_local">Questo dispositivo va aggiornato</string>
     <string name="protocol_incompatible_body">Le due app usano versioni incompatibili del protocollo WFAS (questo dispositivo: v%1$d, altro dispositivo: v%2$d). La connessione è stata chiusa. Aggiorna entrambi i dispositivi all\'ultima versione.</string>
+    <string name="protocol_incompatible_body_sender">Il dispositivo che trasmette usa una versione precedente dell\'app (protocollo WFAS v%2$d, questo dispositivo usa la v%1$d), quindi la connessione è stata chiusa. Aggiorna l\'app sul dispositivo che trasmette.</string>
+    <string name="protocol_incompatible_body_receiver">Il dispositivo che riceve usa una versione precedente dell\'app (protocollo WFAS v%2$d, questo dispositivo usa la v%1$d), quindi la connessione è stata chiusa. Aggiorna l\'app sul dispositivo che riceve.</string>
+    <string name="protocol_incompatible_body_local">Questo dispositivo usa una versione precedente dell\'app (protocollo WFAS v%1$d, l\'altro dispositivo usa la v%2$d), quindi la connessione è stata chiusa. Aggiorna l\'app su questo dispositivo.</string>
     <string name="protocol_incompatible_update">Apri i download</string>
     <string name="protocol_incompatible_website">Scarica dal sito web</string>
     <string name="protocol_incompatible_github">Apri su GitHub</string>
@@ -435,5 +440,103 @@
     <string name="dlna_card_format">Formato</string>
     <string name="dlna_card_no_targets">Nessun renderer selezionato. Scegline uno nelle impostazioni.</string>
     <string name="dlna_card_connections">%1$d connessioni attive</string>
+
+    <string name="server_key_required_title">Chiave mancante</string>
+    <string name="server_key_required_desc">In modalità Key la chiave non può essere vuota. Inseriscine una in Sicurezza, oppure passa a QR Code per farla generare.</string>
+
+    <string name="sec_mode_qr">QR Code</string>
+    <string name="sec_mode_qr_info_title">Chiave generata automaticamente</string>
+    <string name="sec_mode_qr_info_body">Genera automaticamente una chiave casuale a ogni invito, più sicura di una password scelta manualmente. Nessuna password da ricordare o comunicare a voce.</string>
+
+    <string name="qr_invite_button">Invita</string>
+    <string name="qr_invite_button_multicast">Invita dispositivo</string>
+    <string name="qr_invite_content_description">Genera un codice di invito</string>
+    <string name="qr_invite_title">Inquadra per connetterti</string>
+    <string name="qr_invite_subtitle_unicast">Scansiona questo codice dal dispositivo ricevente. Vale per un solo abbinamento.</string>
+    <string name="qr_invite_subtitle_multicast">Scansiona questo codice dal dispositivo ricevente per entrare nel gruppo.</string>
+    <string name="qr_invite_countdown">Scade tra %1$s</string>
+    <string name="qr_invite_expired_pill">Scaduto</string>
+    <string name="qr_invite_tap_plain">Fatica a leggerlo? Tocca il codice per la versione in bianco e nero.</string>
+    <string name="qr_invite_tap_expressive">Tocca il codice per tornare alla versione colorata.</string>
+    <string name="qr_invite_key_label">Chiave (inserimento manuale)</string>
+    <string name="qr_invite_key_reveal">Mostra chiave</string>
+    <string name="qr_invite_key_hide">Nascondi chiave</string>
+    <string name="qr_invite_encryption_note">La cifratura dell\'audio è stata attivata: un gruppo multicast non ha handshake, quindi senza cifratura la chiave non proteggerebbe nulla.</string>
+    <string name="qr_invite_no_ip">Nessun indirizzo di rete. Collegati a una rete Wi-Fi e riprova.</string>
+    <string name="qr_invite_copy">Copia</string>
+    <string name="qr_invite_copied">Chiave copiata</string>
+    <string name="qr_invite_close">Chiudi</string>
+    <string name="qr_invite_endpoint">%1$s · porta %2$d</string>
+    <string name="qr_regenerate_button">Rigenera chiave</string>
+
+    <string name="qr_scan_button">Scansiona QR</string>
+    <string name="qr_scan_title">Inquadra il codice invito</string>
+    <string name="qr_scan_hint">Punta la fotocamera verso il codice QR mostrato dall\'altro dispositivo.</string>
+    <string name="qr_scan_torch">Torcia</string>
+    <string name="qr_scan_close">Chiudi scanner</string>
+    <string name="qr_scan_permission_denied">Permesso fotocamera negato</string>
+    <string name="qr_scan_not_wfas">Ehm… vuoi che scansioni quello? Non è un QR code WFAS!</string>
+    <string name="qr_scan_expired_hint">Quell\'invito è scaduto. Fattene dare uno nuovo.</string>
+    <string name="qr_scan_found">Invito trovato</string>
+
+    <string name="qr_pairing_expired_title">Codice QR scaduto</string>
+    <string name="qr_pairing_expired_body">Questo codice non è più valido per motivi di sicurezza. Genera un nuovo invito per continuare.</string>
+    <string name="qr_pairing_expired_primary">Genera nuovo codice</string>
+    <string name="qr_pairing_expired_secondary">Chiudi</string>
+
+    <string name="qr_pairing_invalid_title">Codice non riconosciuto</string>
+    <string name="qr_pairing_invalid_body">Il codice scansionato non è un invito WFAS valido. Verifica di inquadrare il codice corretto, generato dall\'altro dispositivo.</string>
+    <string name="qr_pairing_invalid_retry">Riprova</string>
+    <string name="qr_pairing_invalid_cancel">Annulla</string>
+
+    <string name="qr_pairing_superseded_title">Invito non più valido</string>
+    <string name="qr_pairing_superseded_body">L\'altro dispositivo ha rifiutato questo invito. Probabilmente è stato sostituito da uno più recente, oppure la chiave del gruppo è stata rigenerata. Fatti dare un codice nuovo.</string>
+    <string name="qr_pairing_superseded_button">Scansiona un nuovo codice</string>
+    <string name="qr_pairing_superseded_dismiss">Chiudi</string>
+
+    <string name="qr_pairing_self_title">Questo è il tuo stesso codice</string>
+    <string name="qr_pairing_self_body">Questo invito è stato generato da questo stesso dispositivo, quindi non c\'è niente a cui connettersi. Scansionalo dal dispositivo che deve ricevere l\'audio.</string>
+    <string name="qr_pairing_self_button">Ho capito</string>
+
+    <string name="qr_pairing_epoch_mismatch_title">Il gruppo è cambiato</string>
+    <string name="qr_pairing_epoch_mismatch_body">La chiave di questo gruppo multicast è stata aggiornata dopo la generazione del codice. Chiedi un nuovo invito al dispositivo che trasmette.</string>
+    <string name="qr_pairing_epoch_mismatch_button">Ho capito</string>
+
+    <string name="qr_pairing_no_camera_title">Fotocamera non disponibile</string>
+    <string name="qr_pairing_no_camera_body">Non è stata rilevata nessuna fotocamera. Puoi comunque inserire l\'indirizzo e la chiave manualmente.</string>
+    <string name="qr_pairing_no_camera_manual">Inserisci manualmente</string>
+    <string name="qr_pairing_no_camera_close">Chiudi</string>
+
+    <string name="qr_pairing_regenerate_confirm_title">Rigenerare la chiave del gruppo?</string>
+    <string name="qr_pairing_regenerate_confirm_body">Tutti i dispositivi connessi dovranno effettuare di nuovo il pairing. Usa questa opzione se pensi che un dispositivo non autorizzato conosca la chiave attuale.</string>
+    <string name="qr_pairing_regenerate_confirm_cancel">Annulla</string>
+    <string name="qr_pairing_regenerate_confirm_confirm">Rigenera</string>
+
+    <string name="qr_pairing_deeplink_confirm_title">Connettersi a %1$s?</string>
+    <string name="qr_pairing_deeplink_confirm_body_unicast">È stato rilevato un invito WFAS per lo streaming da quel dispositivo. Vuoi connetterti ora?</string>
+    <string name="qr_pairing_deeplink_confirm_body_multicast">È stato rilevato un invito WFAS per la ricezione multicast. Vuoi connetterti ora?</string>
+    <string name="qr_pairing_deeplink_confirm_stops_server">Questo dispositivo sta trasmettendo. Connettendoti fermerai la trasmissione in corso.</string>
+    <string name="qr_pairing_deeplink_confirm_ignore">Ignora</string>
+    <string name="qr_pairing_deeplink_confirm_connect">Connetti</string>
+
+    <string name="notif_channel_server_name">Trasmissione audio</string>
+    <string name="notif_channel_server_desc">Stato in tempo reale dello stream che stai inviando, con i controlli del volume.</string>
+    <string name="notif_channel_client_name">Ricezione audio</string>
+    <string name="notif_channel_client_desc">Stato in tempo reale dello stream che stai ricevendo.</string>
+    <string name="notif_channel_auto_connect_name">Connessione automatica</string>
+    <string name="notif_channel_auto_connect_desc">Ricerca in background dei tuoi server preferiti.</string>
+    <string name="notif_server_title">Trasmissione audio</string>
+    <string name="notif_client_title">Ricezione audio</string>
+    <string name="notif_auto_connect_title">Connessione automatica</string>
+    <string name="notif_starting">Avvio…</string>
+    <string name="notif_connecting">Connessione…</string>
+    <string name="notif_volume">Volume %1$d%%</string>
+    <string name="notif_volume_muted">Muto</string>
+    <string name="notif_action_stop">Ferma</string>
+    <string name="notif_action_volume_up">Alza</string>
+    <string name="notif_action_volume_down">Abbassa</string>
+    <string name="notif_chip_muted">Muto</string>
+    <string name="notif_chip_live">Live</string>
+    <string name="notif_chip_scanning">Scan</string>
 
 </resources>

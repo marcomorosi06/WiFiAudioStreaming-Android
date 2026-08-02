@@ -3,10 +3,6 @@ package com.cuscus.wifiaudiostreaming
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -18,14 +14,17 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.annotation.RequiresPermission
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.cuscus.wifiaudiostreaming.NetworkManager.updateWidgetState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AudioCaptureService : Service() {
 
@@ -33,6 +32,8 @@ class AudioCaptureService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private val shuttingDown = AtomicBoolean(false)
+    private val observingState = AtomicBoolean(false)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -103,8 +104,24 @@ class AudioCaptureService : Service() {
                 }
             }
             ACTION_STOP -> stopCapture()
+            ACTION_YIELD -> yieldToClient()
         }
         return START_STICKY
+    }
+
+    private fun yieldToClient() {
+        if (!shuttingDown.compareAndSet(false, true)) return
+
+        mediaProjection?.stop()
+        mediaProjection = null
+
+        releaseLocks()
+        CoroutineScope(Dispatchers.IO).launch {
+            updateWidgetState(this@AudioCaptureService, false, true)
+        }
+
+        dismissNotification()
+        stopSelf()
     }
 
     @SuppressLint("WakelockTimeout")
@@ -135,101 +152,88 @@ class AudioCaptureService : Service() {
     }
 
     private fun stopCapture() {
+        if (!shuttingDown.compareAndSet(false, true)) return
+
         NetworkManager.stopStreaming(this)
         mediaProjection?.stop()
         mediaProjection = null
 
         releaseLocks()
-
         CoroutineScope(Dispatchers.IO).launch {
             updateWidgetState(this@AudioCaptureService, false, true)
         }
 
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        dismissNotification()
         stopSelf()
+    }
+
+    private fun dismissNotification() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        NotificationCenter.cancel(this, NotificationCenter.ID_SERVER)
     }
 
     @SuppressLint("MissingPermission")
     private fun startForegroundWithNotification() {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Audio Streaming",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            manager.createNotificationChannel(channel)
-        }
+        NotificationCenter.ensureChannels(this)
 
-        val initialNotification = buildNotification("Avvio del servizio...")
+        val initial = buildNotification(getString(R.string.notif_starting))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                SERVICE_ID,
-                initialNotification,
+                NotificationCenter.ID_SERVER,
+                initial,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
             )
         } else {
-            startForeground(SERVICE_ID, initialNotification)
+            startForeground(NotificationCenter.ID_SERVER, initial)
         }
+
+        if (!observingState.compareAndSet(false, true)) return
 
         serviceScope.launch {
-            NetworkManager.connectionStatus.collect { status ->
-                val updatedNotification = buildNotification(status)
-                NotificationManagerCompat.from(this@AudioCaptureService)
-                    .notify(SERVICE_ID, updatedNotification)
-            }
+            combine(
+                NetworkManager.connectionStatus,
+                NetworkManager.serverVolume
+            ) { status, volume -> status to volume }
+                .distinctUntilChanged()
+                .conflate()
+                .collect { (status, volume) ->
+                    if (shuttingDown.get()) return@collect
+                    NotificationCenter.post(
+                        this@AudioCaptureService,
+                        NotificationCenter.ID_SERVER,
+                        NotificationCenter.serverNotification(
+                            this@AudioCaptureService,
+                            status.ifBlank { getString(R.string.notif_starting) },
+                            volume
+                        )
+                    )
+                    delay(UPDATE_THROTTLE_MS)
+                }
         }
     }
 
-    private fun buildNotification(statusText: String): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        val openAppPendingIntent = PendingIntent.getActivity(
-            this, 0, openAppIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    private fun buildNotification(statusText: String) =
+        NotificationCenter.serverNotification(
+            this,
+            statusText,
+            NetworkManager.serverVolume.value
         )
-
-        val stopIntent = Intent(this, StreamingActionReceiver::class.java).apply {
-            action = "com.cuscus.wifiaudiostreaming.ACTION_STOP_STREAMING"
-        }
-        val stopPendingIntent = PendingIntent.getBroadcast(
-            this, 1, stopIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Server Audio")
-            .setContentText(statusText)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentIntent(openAppPendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setOngoing(true)
-
-        if (Build.VERSION.SDK_INT >= 36) {
-            builder.extras.putBoolean("android.app.extra.REQUEST_PROMOTED_ONGOING", true)
-        }
-
-        return builder.build()
-    }
 
     companion object {
         const val ACTION_START = "com.cuscus.wifiaudiostreamer.ACTION_START"
         const val ACTION_STOP = "com.cuscus.wifiaudiostreamer.ACTION_STOP"
+        const val ACTION_YIELD = "com.cuscus.wifiaudiostreamer.ACTION_YIELD"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_DATA = "data"
         const val EXTRA_STREAM_INTERNAL = "stream_internal"
         const val EXTRA_STREAM_MIC = "stream_mic"
         const val EXTRA_IS_MULTICAST = "is_multicast"
-        private const val SERVICE_ID = 101
-        private const val CHANNEL_ID = "audio_stream_channel_v2"
+        private const val UPDATE_THROTTLE_MS = 350L
     }
 
     override fun onDestroy() {
         stopCapture()
         serviceScope.cancel()
-        serviceScope.launch { updateWidgetState(this@AudioCaptureService, false, true) }
         super.onDestroy()
     }
 }

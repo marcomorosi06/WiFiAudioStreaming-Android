@@ -46,6 +46,7 @@ android {
 
 dependencies {
 
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -87,4 +88,11 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     implementation("androidx.graphics:graphics-shapes:1.0.1")
+
+    implementation(libs.zxing.core)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
 }

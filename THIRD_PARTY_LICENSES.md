@@ -27,6 +27,10 @@ We are grateful to all of these projects.
 | Kotlin standard library | (Kotlin plugin) | Apache License 2.0 | JetBrains s.r.o. |
 | kotlinx.coroutines (Android) | 1.8.0 | Apache License 2.0 | JetBrains s.r.o. |
 | Ktor (client-core, client-cio, server-core, server-cio, network) | 2.3.11 | Apache License 2.0 | JetBrains s.r.o. |
+| ZXing Core | 3.5.3 | Apache License 2.0 | ZXing authors |
+| AndroidX CameraX (core, camera2, lifecycle, view) | 1.4.2 | Apache License 2.0 | The Android Open Source Project |
+| AndroidX Graphics Shapes | 1.0.1 | Apache License 2.0 | The Android Open Source Project |
+| Google ML Kit Barcode Scanning | 17.3.0 | [ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) (proprietary, redistributable) | Google LLC |
 | Bouncy Castle (`bcprov`, `bctls`, `bcpkix` jdk15on) | 1.70 | Bouncy Castle Licence (MIT-style) | The Legion of the Bouncy Castle Inc. |
 | JUnit 4 *(test only, not shipped)* | — | Eclipse Public License 1.0 | JUnit contributors |
 | AndroidX Test, Espresso *(test only, not shipped)* | — | Apache License 2.0 | The Android Open Source Project |
@@ -42,11 +46,26 @@ The following components are licensed under the Apache License, Version 2.0
 (<https://www.apache.org/licenses/LICENSE-2.0>):
 
 * AndroidX libraries and Jetpack Compose — © The Android Open Source Project / Google LLC
+* AndroidX CameraX and Graphics Shapes — © The Android Open Source Project
 * Kotlin standard library and kotlinx.coroutines — © JetBrains s.r.o.
 * Ktor — © JetBrains s.r.o.
+* ZXing Core — © ZXing authors (<https://github.com/zxing/zxing>)
 
 A full copy of the Apache License 2.0 is available at the URL above. `NOTICE`
 files shipped by these projects are preserved in their respective artifacts.
+
+---
+
+## Google ML Kit
+
+`com.google.mlkit:barcode-scanning` is © Google LLC and is **not** distributed
+under an OSI-approved open-source licence. It is redistributable inside an
+application under the ML Kit terms of service:
+
+<https://developers.google.com/ml-kit/terms>
+
+It is used only to decode pairing QR codes from the camera feed. The model runs
+on the device: no frame, image or decoded value is sent anywhere.
 
 ---
 

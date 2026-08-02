@@ -12,6 +12,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,7 +56,10 @@ import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Podcasts
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material.icons.outlined.WifiTethering
@@ -119,6 +124,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import kotlin.math.min
+
+object HeroOrbAnchor {
+    val bounds = androidx.compose.runtime.mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+    val handoffActive = androidx.compose.runtime.mutableStateOf(false)
+}
 
 internal class MorphOutlineShape(
     private val morph: Morph,
@@ -195,7 +205,9 @@ fun ExpressiveHomeScreen(
     usbLinkState: UsbLink.State = UsbLink.State(),
     onUsbModeChange: (Boolean) -> Unit = {},
     onOpenUsbTetherSettings: () -> Unit = {},
-    onActivateWfas: () -> Unit = {}
+    onActivateWfas: () -> Unit = {},
+    onScanQr: () -> Unit = {},
+    onGenerateInvite: (Boolean) -> Unit = {}
 ) {
     val sourceReady = appSettings.streamInternal || appSettings.streamMic
     val phase = when {
@@ -245,6 +257,10 @@ fun ExpressiveHomeScreen(
                 connectionStatus = connectionStatus,
                 localIp = localIp,
                 hasMicPermission = hasMicPermission,
+                usbConnected = usbLinkState.isReady && NetworkManager.sessionUsesUsb(),
+                keyMissing = SecurityMode.requiresKey(appSettings.securityMode) &&
+                        !appSettings.qrPairingEnabled &&
+                        appSettings.authKey.isBlank(),
                 canStartServer = WfasPolicy.canStartServerWith(
                     appSettings.wfasMode,
                     usbLinkState.isReady,
@@ -287,11 +303,18 @@ fun ExpressiveHomeScreen(
                     localIp = localIp,
                     accent = accent,
                     sendClientMicrophone = appSettings.sendClientMicrophone,
-                    usbConnected = usbLinkState.isReady && NetworkManager.sessionUsesUsb(),
                     developerMode = appSettings.developerMode,
                     noiseReductionEnabled = appSettings.noiseReductionEnabled,
                     noiseReductionStrength = appSettings.noiseReductionStrength,
-                    onNoiseReductionChange = onNoiseReductionChange
+                    onNoiseReductionChange = onNoiseReductionChange,
+                    isMulticast = isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled,
+                    qrPairingEnabled = appSettings.qrPairingEnabled &&
+                            SecurityMode.requiresKey(appSettings.securityMode),
+                    onGenerateInvite = {
+                        onGenerateInvite(
+                            isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled
+                        )
+                    }
                 )
             }
 
@@ -307,7 +330,10 @@ fun ExpressiveHomeScreen(
                         isMulticast = isMulticastMode,
                         rtpEnabled = appSettings.rtpEnabled,
                         httpEnabled = appSettings.httpEnabled,
-                        securityMode = appSettings.securityMode,
+                        securityMode = SecurityMode.uiMode(
+                            appSettings.securityMode,
+                            appSettings.qrPairingEnabled
+                        ),
                         authKey = appSettings.authKey,
                         encryptionEnabled = appSettings.encryptionEnabled,
                         accent = accent,
@@ -394,6 +420,24 @@ fun ExpressiveHomeScreen(
                     Column {
                         SectionHeader(stringResource(R.string.manual_ip_hint), accent)
                         var manualIp by remember { mutableStateOf("") }
+                        OutlinedButton(
+                            onClick = onScanQr,
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.QrCodeScanner,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = stringResource(R.string.qr_scan_button),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -490,6 +534,8 @@ private fun StateHero(
     localIp: String,
     hasMicPermission: Boolean,
     canStartServer: Boolean = true,
+    keyMissing: Boolean = false,
+    usbConnected: Boolean = false,
     onActivateWfas: () -> Unit = {},
     onStartServer: () -> Unit,
     onStopServer: () -> Unit
@@ -631,6 +677,17 @@ private fun StateHero(
             .padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val sessionEncrypted by NetworkManager.sessionEncryptedLive.collectAsState()
+
+        val handoffReveal by animateFloatAsState(
+            targetValue = if (HeroOrbAnchor.handoffActive.value) 0f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            ),
+            label = "HeroIconReveal"
+        )
+
         Box(
             modifier = Modifier.heightIn(min = 232.dp),
             contentAlignment = Alignment.Center
@@ -643,23 +700,26 @@ private fun StateHero(
                             val halo = 1.18f + (breathe - 1f) * 2.2f + boost * 0.22f
                             scaleX = halo
                             scaleY = halo
-                            alpha = 0.16f + boost * 0.34f
+                            alpha = if (HeroOrbAnchor.handoffActive.value) 0f
+                            else 0.16f + boost * 0.34f
                             rotationZ = -(spin + extraSpin) * 0.6f
                         }
-                        .skinnedSurface(accent, MorphOutlineShape(morph, morphProgress))
+                        .skinnedFill(accent, MorphOutlineShape(morph, morphProgress))
                 )
             }
 
             Box(
                 modifier = Modifier
                     .size(orbSize)
+                    .onGloballyPositioned { HeroOrbAnchor.bounds.value = it.boundsInRoot() }
                     .graphicsLayer {
                         rotationZ = (if (live) spin else 0f) + tapSpin.value + extraSpin
                         val s = (if (live) breathe else 1f) * tapScale.value * (1f + boost * 0.08f)
                         scaleX = s
                         scaleY = s
+                        alpha = if (HeroOrbAnchor.handoffActive.value) 0f else 1f
                     }
-                    .skinnedSurface(
+                    .skinnedFill(
                         Brush.linearGradient(
                             colors = listOf(
                                 accent.copy(alpha = if (live) 0.95f else 0.30f),
@@ -686,6 +746,20 @@ private fun StateHero(
                     }
             )
 
+            androidx.compose.animation.AnimatedVisibility(
+                visible = sessionEncrypted && !HeroOrbAnchor.handoffActive.value,
+                enter = scaleIn(
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                    initialScale = 0.4f
+                ) + fadeIn(tween(280, delayMillis = 120)),
+                exit = scaleOut(tween(140), targetScale = 0.6f) + fadeOut(tween(90)),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = orbSize * 0.30f, y = orbSize * 0.34f)
+            ) {
+                EncryptedBadge()
+            }
+
             AnimatedContent(
                 targetState = phase,
                 transitionSpec = {
@@ -695,8 +769,9 @@ private fun StateHero(
                 },
                 label = "HeroIcon",
                 modifier = Modifier.graphicsLayer {
-                    scaleX = tapScale.value
-                    scaleY = tapScale.value
+                    scaleX = tapScale.value * handoffReveal
+                    scaleY = tapScale.value * handoffReveal
+                    alpha = handoffReveal
                 }
             ) { p ->
                 Icon(
@@ -822,17 +897,74 @@ private fun StateHero(
             )
         }
 
+        if (live) {
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = stringResource(
+                    if (usbConnected) R.string.link_connected_usb
+                    else R.string.link_connected_wireless
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.sp,
+                fontWeight = FontWeight.Black,
+                color = if (usbConnected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+
         if (isServer || live) {
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(if (live) 12.dp else 28.dp))
             HeroActionButton(
                 live = live,
-                enabled = live || (phase == HeroPhase.Ready && canStartServer),
+                enabled = live || (phase == HeroPhase.Ready && canStartServer && !keyMissing),
                 accent = accent,
                 onClick = {
                     if (live) haptics.reject() else haptics.confirm()
                     if (live) onStopServer() else onStartServer()
                 }
             )
+
+            AnimatedVisibility(
+                visible = isServer && !live && canStartServer && keyMissing,
+                enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+                exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+            ) {
+                Column {
+                    Spacer(Modifier.height(14.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Key,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.server_key_required_title),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.server_key_required_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             AnimatedVisibility(
                 visible = isServer && !live && !canStartServer,
@@ -1003,11 +1135,13 @@ private fun LiveControls(
     localIp: String,
     accent: Color,
     sendClientMicrophone: Boolean,
-    usbConnected: Boolean = false,
     developerMode: Boolean = false,
     noiseReductionEnabled: Boolean = false,
     noiseReductionStrength: Int = 50,
-    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> }
+    onNoiseReductionChange: (Boolean, Int) -> Unit = { _, _ -> },
+    isMulticast: Boolean = false,
+    qrPairingEnabled: Boolean = false,
+    onGenerateInvite: () -> Unit = {}
 ) {
     val clipboard = LocalClipboardManager.current
     val haptics = rememberAppHaptics()
@@ -1017,22 +1151,26 @@ private fun LiveControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = stringResource(
-                if (usbConnected) R.string.link_connected_usb
-                else R.string.link_connected_wireless
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            letterSpacing = 1.sp,
-            fontWeight = FontWeight.Black,
-            color = if (usbConnected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
         if (isServer && localIp.isNotEmpty() && localIp != "0.0.0.0") {
             ExpressiveIpCopyButton(
                 localIp = localIp,
                 accent = accent
+            )
+        }
+
+        val peerConnected by NetworkManager.unicastPeerConnected.collectAsState()
+
+        AnimatedVisibility(
+            visible = isServer && qrPairingEnabled && (isMulticast || !peerConnected),
+            enter = expandVertically(
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            ) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            QrInviteAction(
+                isMulticast = isMulticast,
+                accent = accent,
+                onClick = onGenerateInvite
             )
         }
 

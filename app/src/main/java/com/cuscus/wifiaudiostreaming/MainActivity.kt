@@ -159,6 +159,27 @@ class MainActivity : ComponentActivity() {
             onMicPermissionGranted = null
         }
 
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                viewModel.openScanner()
+            } else {
+                Toast.makeText(this, R.string.qr_scan_permission_denied, Toast.LENGTH_LONG).show()
+            }
+        }
+
+    private fun requestQrScan() {
+        if (!QrCameraSupport.hasCamera(this)) {
+            viewModel.showNoCamera()
+            return
+        }
+        if (QrCameraSupport.hasPermission(this)) {
+            viewModel.openScanner()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
@@ -205,6 +226,7 @@ class MainActivity : ComponentActivity() {
         NetworkManager.startNetworkWatch(applicationContext)
 
         pendingCommand.value = ScriptCommand.fromIntent(intent)
+        consumePairingIntent(intent)
 
         setContent {
             WiFiAudioStreamingTheme {
@@ -340,6 +362,15 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingCommand.value = ScriptCommand.fromIntent(intent)
+        consumePairingIntent(intent)
+    }
+
+    private fun consumePairingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (viewModel.submitDeepLink(data.toString())) {
+            intent.data = null
+            intent.action = null
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -653,8 +684,12 @@ class MainActivity : ComponentActivity() {
             usbLinkState = usbLinkState,
             onUsbModeChange = viewModel::setUsbMode,
             onOpenUsbTetherSettings = viewModel::openUsbTetherSettings,
-            onActivateWfas = { viewModel.setWfasMode(WfasPolicy.MODE_OFF_ON_USB) }
+            onActivateWfas = { viewModel.setWfasMode(WfasPolicy.MODE_OFF_ON_USB) },
+            onScanQr = { requestQrScan() },
+            onGenerateInvite = { multicast -> viewModel.generateInvite(localIp, multicast) }
         )
+
+        QrPairingHost(localIp = localIp)
 
         ExpressiveSettingsScreen(
             isVisible = showSettingsScreen.value,
@@ -741,6 +776,116 @@ class MainActivity : ComponentActivity() {
         BlackoutOverlay(outlinedUi = currentSettings.blackoutOutlinedUi)
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
+    @Composable
+    private fun QrPairingHost(localIp: String) {
+        val invite by viewModel.qrInvite.collectAsStateWithLifecycle()
+        val pendingPairing by viewModel.pendingPairing.collectAsStateWithLifecycle()
+        val pairingError by viewModel.pairingError.collectAsStateWithLifecycle()
+        val epochMismatch by viewModel.epochMismatch.collectAsStateWithLifecycle()
+        val scannerVisible by viewModel.scannerVisible.collectAsStateWithLifecycle()
+        val noCameraVisible by viewModel.noCameraVisible.collectAsStateWithLifecycle()
+        val unicastPeerConnected by NetworkManager.unicastPeerConnected.collectAsStateWithLifecycle()
+        val haptics = rememberAppHaptics()
+
+        LaunchedEffect(unicastPeerConnected, invite?.multicast) {
+            if (unicastPeerConnected && invite?.multicast == false) {
+                haptics.confirm()
+                viewModel.dismissQrInvite()
+            }
+        }
+
+        BackHandler(enabled = scannerVisible) {
+            viewModel.closeScanner()
+        }
+
+        var handoffActive by remember { mutableStateOf(false) }
+
+        if (scannerVisible) {
+            QrScannerScreen(
+                onScanned = { raw ->
+                    handoffActive = true
+                    startClientChecked { viewModel.submitScannedCode(raw) }
+                },
+                onClose = { viewModel.closeScanner() }
+            )
+        }
+
+        if (handoffActive && !scannerVisible) {
+            QrScanHandoff(onFinished = { handoffActive = false })
+        }
+
+        invite?.let { current ->
+            QrInviteSheet(
+                invite = current,
+                onRegenerate = { viewModel.generateInvite(localIp, current.multicast) },
+                onRegenerateGroupKey = if (current.multicast) {
+                    { viewModel.regenerateGroupKey(localIp) }
+                } else {
+                    null
+                },
+                onDismiss = { viewModel.dismissQrInvite() }
+            )
+        }
+
+        pendingPairing?.let { payload ->
+            QrDeepLinkConfirmDialog(
+                payload = payload,
+                serverRunning = viewModel.serverRunning,
+                onConnect = {
+                    startClientChecked { viewModel.confirmPendingPairing() }
+                },
+                onDismiss = { viewModel.dismissPendingPairing() }
+            )
+        }
+
+        when (pairingError) {
+            MainViewModel.PairingError.INVALID -> QrInvalidDialog(
+                onRetry = {
+                    viewModel.clearPairingError()
+                    requestQrScan()
+                },
+                onDismiss = { viewModel.clearPairingError() }
+            )
+
+            MainViewModel.PairingError.EXPIRED -> QrExpiredDialog(
+                onRegenerate = {
+                    viewModel.clearPairingError()
+                    requestQrScan()
+                },
+                onDismiss = { viewModel.clearPairingError() }
+            )
+
+            MainViewModel.PairingError.SELF -> QrSelfPairingDialog(
+                onDismiss = { viewModel.clearPairingError() }
+            )
+
+            null -> Unit
+        }
+
+        if (epochMismatch) {
+            QrEpochMismatchDialog(onDismiss = { viewModel.clearEpochMismatch() })
+        }
+
+        val inviteRejected by viewModel.inviteRejected.collectAsStateWithLifecycle()
+        if (inviteRejected) {
+            QrInviteRejectedDialog(
+                onRescan = {
+                    viewModel.clearInviteRejected()
+                    requestQrScan()
+                },
+                onDismiss = { viewModel.clearInviteRejected() }
+            )
+        }
+
+        if (noCameraVisible) {
+            QrNoCameraDialog(
+                onManual = { viewModel.dismissNoCamera() },
+                onDismiss = { viewModel.dismissNoCamera() }
+            )
+        }
+    }
+
     private fun hasRecordAudioPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
@@ -795,17 +940,15 @@ class MainActivity : ComponentActivity() {
 fun ClientDiscoveryHandler() {
     val viewModel: MainViewModel = viewModel()
     val isServer by viewModel.isServer.collectAsStateWithLifecycle()
+    val isStreaming by viewModel.isStreaming.collectAsStateWithLifecycle()
     val networkRevision by NetworkManager.networkRevision.collectAsStateWithLifecycle()
 
-    LaunchedEffect(isServer, networkRevision) {
-        if (!isServer) {
-            if (!NetworkManager.autoConnectOwnsListening) {
-                viewModel.restartListening()
-            }
-        } else {
-            if (!NetworkManager.autoConnectOwnsListening) {
-                NetworkManager.stopListeningForDevices()
-            }
+    LaunchedEffect(isServer, networkRevision, isStreaming) {
+        if (NetworkManager.autoConnectOwnsListening) return@LaunchedEffect
+        if (isServer) {
+            NetworkManager.stopListeningForDevices()
+        } else if (!isStreaming) {
+            viewModel.restartListening()
         }
     }
 }
@@ -818,15 +961,20 @@ fun ProtocolMismatchDialog(
     onGithub: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val bodyRes = when {
+        mismatch.localIsOutdated -> R.string.protocol_incompatible_body_local
+        mismatch.remoteRole == PeerRole.SENDER -> R.string.protocol_incompatible_body_sender
+        else -> R.string.protocol_incompatible_body_receiver
+    }
+
     ExpressiveVersionDialog(
         icon = Icons.Outlined.SyncProblem,
         accent = MaterialTheme.colorScheme.error,
-        title = stringResource(R.string.protocol_incompatible_title),
-        body = stringResource(
-            R.string.protocol_incompatible_body,
-            mismatch.localVersion,
-            mismatch.remoteVersion
+        title = stringResource(
+            if (mismatch.localIsOutdated) R.string.protocol_incompatible_title_local
+            else R.string.protocol_incompatible_title
         ),
+        body = stringResource(bodyRes, mismatch.localVersion, mismatch.remoteVersion),
         fromVersion = "v${mismatch.localVersion}",
         toVersion = "v${mismatch.remoteVersion}",
         confirmLabel = stringResource(R.string.protocol_incompatible_website),

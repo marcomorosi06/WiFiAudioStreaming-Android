@@ -77,7 +77,7 @@ import androidx.graphics.shapes.Morph
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DialogShapeBadge(
+internal fun DialogShapeBadge(
     icon: ImageVector,
     accent: Color,
     alert: Boolean
@@ -124,7 +124,7 @@ private fun DialogShapeBadge(
 }
 
 @Composable
-private fun ExpressiveDialogButton(
+internal fun ExpressiveDialogButton(
     label: String,
     icon: ImageVector?,
     container: Color,
