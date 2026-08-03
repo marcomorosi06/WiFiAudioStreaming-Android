@@ -258,7 +258,7 @@ class SnapcastStreamServer(
                 instance = json.intAt("Instance") ?: 1
             )
             log("[Snapcast] client connected: $id (${host.name})")
-            sendServerSettings()
+            sendServerSettings(frame.header.id)
             sendCodecHeader()
         }
 
@@ -285,7 +285,7 @@ class SnapcastStreamServer(
             state.setClientVolume(id, percent, muted)
         }
 
-        fun sendServerSettings() {
+        fun sendServerSettings(refersTo: Int = 0) {
             val id = clientId ?: return
             val client = state.clientSnapshot(id) ?: return
             val (volume, muted) = state.effectiveVolume(id)
@@ -299,7 +299,7 @@ class SnapcastStreamServer(
                 SnapcastWire.frame(
                     SnapcastMessageType.SERVER_SETTINGS,
                     nextId(),
-                    0,
+                    refersTo,
                     clock.now(),
                     SnapcastTv(0, 0),
                     payload
