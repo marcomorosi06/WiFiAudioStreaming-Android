@@ -1,18 +1,17 @@
 <div align="center">
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true" alt="WiFi Audio Streaming Icon" width="120" />
   <h1>WiFi Audio Streaming (Android)</h1>
+
+  <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases">  
+    <img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" height="80">  
+  </a>  
+  <a href="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/releases">  
+    <img src="https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/-/raw/master/images/get-it-on-gitlab-badge.png" alt="Get it on GitLab" height="80">  
+  </a>  
+  <a href="https://apt.izzysoft.de/packages/com.cuscus.wifiaudiostreaming">  
+    <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroidGitLab" height="80">  
+  </a>  
 </div>
-<a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/releases">  
-<img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" height="80">  
-</a>  
-
-<a href="https://gitlab.com/marcomorosi.dev/wifiaudiostreaming-android/-/releases">  
-<img src="https://gitlab.com/marcomorosi.dev/WiFiAudioStreaming-Desktop/-/raw/master/images/get-it-on-gitlab-badge.png" alt="Get it on GitLab" height="80">  
-</a>  
-
-<a href="https://apt.izzysoft.de/packages/com.cuscus.wifiaudiostreaming">  
-<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroidGitLab" height="80">  
-</a>  
 
 Turn your Android device into a **versatile wireless audio transmitter, receiver, or web server**.  
 This application allows you to send your phone's audio to any device on the local network (PC, browser, media player), or listen to audio from another device, all without root.  
