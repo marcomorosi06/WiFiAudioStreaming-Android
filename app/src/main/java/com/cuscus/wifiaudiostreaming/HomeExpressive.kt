@@ -266,7 +266,8 @@ fun ExpressiveHomeScreen(
                     usbLinkState.isReady,
                     appSettings.rtpEnabled,
                     appSettings.httpEnabled,
-                    appSettings.dlnaEnabled
+                    appSettings.dlnaEnabled,
+                    appSettings.snapcastEnabled
                 ),
                 onActivateWfas = onActivateWfas,
                 onStartServer = onStartServer,
@@ -307,12 +308,12 @@ fun ExpressiveHomeScreen(
                     noiseReductionEnabled = appSettings.noiseReductionEnabled,
                     noiseReductionStrength = appSettings.noiseReductionStrength,
                     onNoiseReductionChange = onNoiseReductionChange,
-                    isMulticast = isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled,
+                    isMulticast = isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled || appSettings.dlnaEnabled || appSettings.snapcastEnabled,
                     qrPairingEnabled = appSettings.qrPairingEnabled &&
                             SecurityMode.requiresKey(appSettings.securityMode),
                     onGenerateInvite = {
                         onGenerateInvite(
-                            isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled
+                            isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled || appSettings.dlnaEnabled || appSettings.snapcastEnabled
                         )
                     }
                 )
@@ -330,6 +331,8 @@ fun ExpressiveHomeScreen(
                         isMulticast = isMulticastMode,
                         rtpEnabled = appSettings.rtpEnabled,
                         httpEnabled = appSettings.httpEnabled,
+                        dlnaEnabled = appSettings.dlnaEnabled,
+                        snapcastEnabled = appSettings.snapcastEnabled,
                         securityMode = SecurityMode.uiMode(
                             appSettings.securityMode,
                             appSettings.qrPairingEnabled
@@ -393,6 +396,17 @@ fun ExpressiveHomeScreen(
                         formatPreference = DlnaFormatPreference.fromId(appSettings.dlnaFormat),
                         hasSelection = appSettings.dlnaDevices.isNotEmpty()
                     )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.snapcastEnabled,
+                enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(280, delayMillis = 60)),
+                exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
+            ) {
+                Column {
+                    Spacer(Modifier.height(20.dp))
+                    ExpressiveSnapcastBanner(ip = localIp)
                 }
             }
 

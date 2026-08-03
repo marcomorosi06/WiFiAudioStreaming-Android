@@ -18,12 +18,19 @@
 package com.cuscus.wifiaudiostreaming
 
 object ProtocolStatus {
-    fun names(wfas: Boolean, rtp: Boolean, http: Boolean, dlna: Boolean): List<String> {
-        val out = ArrayList<String>(4)
+    fun names(
+        wfas: Boolean,
+        rtp: Boolean,
+        http: Boolean,
+        dlna: Boolean,
+        snapcast: Boolean = false
+    ): List<String> {
+        val out = ArrayList<String>(5)
         if (wfas) out.add("WFAS")
         if (rtp) out.add("RTP")
         if (http) out.add("HTTP")
         if (dlna) out.add("DLNA")
+        if (snapcast) out.add("Snapcast")
         return out
     }
 
@@ -38,6 +45,7 @@ object ProtocolStatus {
         rtp: Boolean,
         http: Boolean,
         dlna: Boolean,
-        conjunction: String
-    ): String = join(names(wfas, rtp, http, dlna), conjunction)
+        conjunction: String,
+        snapcast: Boolean = false
+    ): String = join(names(wfas, rtp, http, dlna, snapcast), conjunction)
 }

@@ -596,6 +596,8 @@ fun ExpressiveSourceSection(
     isMulticast: Boolean,
     rtpEnabled: Boolean,
     httpEnabled: Boolean,
+    dlnaEnabled: Boolean = false,
+    snapcastEnabled: Boolean = false,
     securityMode: String,
     authKey: String,
     encryptionEnabled: Boolean,
@@ -609,7 +611,14 @@ fun ExpressiveSourceSection(
     val secMode = securityMode.uppercase()
     // RTP e HTTP trasmettono entrambi a tutti gli ascoltatori: con uno dei due
     // attivo il multicast e' imposto e il toggle va bloccato.
-    val multicastLocked = rtpEnabled || httpEnabled
+    val lockingProtocols = ProtocolStatus.names(
+        wfas = false,
+        rtp = rtpEnabled,
+        http = httpEnabled,
+        dlna = dlnaEnabled,
+        snapcast = snapcastEnabled
+    )
+    val multicastLocked = lockingProtocols.isNotEmpty()
     val multicastActive = isMulticast || multicastLocked
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -694,11 +703,11 @@ fun ExpressiveSourceSection(
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = stringResource(
-                                    when {
-                                        rtpEnabled && httpEnabled -> R.string.multicast_locked_by_both
-                                        rtpEnabled -> R.string.multicast_locked_by_rtp
-                                        else -> R.string.multicast_locked_by_http
-                                    }
+                                    R.string.multicast_locked_by,
+                                    ProtocolStatus.join(
+                                        lockingProtocols,
+                                        stringResource(R.string.list_and)
+                                    )
                                 ),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,

@@ -104,8 +104,10 @@ object ScriptExecutor {
     fun resolveServerParams(settings: AppSettings, command: ScriptCommand): ResolvedServerParams {
         val rtpEnabled = command.bool(ScriptParams.RTP) ?: settings.rtpEnabled
         val httpEnabled = command.bool(ScriptParams.HTTP) ?: settings.httpEnabled
-        val multicast = command.bool(ScriptParams.MULTICAST)
-            ?: (settings.lastMulticastMode || rtpEnabled || httpEnabled)
+        val snapcastEnabled = command.bool(ScriptParams.SNAPCAST) ?: settings.snapcastEnabled
+        val forcedMulticast = rtpEnabled || httpEnabled || settings.dlnaEnabled || snapcastEnabled
+        val multicast = forcedMulticast ||
+            (command.bool(ScriptParams.MULTICAST) ?: settings.lastMulticastMode)
         return ResolvedServerParams(
             streamInternal = command.bool(ScriptParams.INTERNAL) ?: settings.streamInternal,
             streamMic = command.bool(ScriptParams.MIC) ?: settings.streamMic,
@@ -123,6 +125,15 @@ object ScriptExecutor {
             dlnaPort = settings.dlnaPort,
             dlnaFormat = settings.dlnaFormat,
             dlnaDevices = settings.dlnaDevices,
+            snapcastEnabled = snapcastEnabled,
+            snapcastPort = command.int(ScriptParams.SNAPCASTPORT) ?: settings.snapcastPort,
+            snapcastControlPort = command.int(ScriptParams.SNAPCASTCTRLPORT) ?: settings.snapcastControlPort,
+            snapcastCodec = com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.normalize(
+                command.str(ScriptParams.SNAPCASTCODEC) ?: settings.snapcastCodec
+            ),
+            snapcastChunkMs = settings.snapcastChunkMs,
+            snapcastBufferMs = settings.snapcastBufferMs,
+            snapcastStreamName = settings.snapcastStreamName,
             usbMode = command.bool(ScriptParams.USB) ?: settings.usbModeEnabled,
             usbLatencyMs = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
         )
@@ -148,6 +159,13 @@ object ScriptExecutor {
             putExtra("dlna_port", params.dlnaPort)
             putExtra("dlna_format", params.dlnaFormat)
             putExtra("dlna_devices", params.dlnaDevices.toTypedArray())
+            putExtra("snapcast_enabled", params.snapcastEnabled)
+            putExtra("snapcast_port", params.snapcastPort)
+            putExtra("snapcast_control_port", params.snapcastControlPort)
+            putExtra("snapcast_codec", params.snapcastCodec)
+            putExtra("snapcast_chunk_ms", params.snapcastChunkMs)
+            putExtra("snapcast_buffer_ms", params.snapcastBufferMs)
+            putExtra("snapcast_stream_name", params.snapcastStreamName)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)

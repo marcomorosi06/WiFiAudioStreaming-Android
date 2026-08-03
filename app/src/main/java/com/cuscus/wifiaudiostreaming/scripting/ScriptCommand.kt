@@ -66,6 +66,10 @@ object ScriptParams {
     const val AUTHKEY = "authkey"
     const val USB = "usb"
     const val USBLATENCY = "usblatency"
+    const val SNAPCAST = "snapcast"
+    const val SNAPCASTPORT = "snapcastport"
+    const val SNAPCASTCTRLPORT = "snapcastctrlport"
+    const val SNAPCASTCODEC = "snapcastcodec"
     const val WFASMODE = "wfasmode"
 
     val ALL = listOf(
@@ -165,6 +169,13 @@ data class ResolvedServerParams(
     val dlnaPort: Int = 8081,
     val dlnaFormat: String = "auto",
     val dlnaDevices: List<String> = emptyList(),
+    val snapcastEnabled: Boolean = false,
+    val snapcastPort: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_PORT,
+    val snapcastControlPort: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CONTROL_PORT,
+    val snapcastCodec: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.PCM,
+    val snapcastChunkMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CHUNK_MS,
+    val snapcastBufferMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS,
+    val snapcastStreamName: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME,
     val usbMode: Boolean = false,
     val usbLatencyMs: Int = 20
 )

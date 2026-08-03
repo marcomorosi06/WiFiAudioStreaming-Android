@@ -67,6 +67,30 @@ class AudioCaptureService : Service() {
                     ),
                     title = getString(R.string.app_name)
                 )
+                val snapcastConfig = com.cuscus.wifiaudiostreaming.snapcast.SnapcastServerConfig(
+                    enabled = intent.getBooleanExtra("snapcast_enabled", false),
+                    streamPort = intent.getIntExtra(
+                        "snapcast_port",
+                        com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_PORT
+                    ),
+                    controlPort = intent.getIntExtra(
+                        "snapcast_control_port",
+                        com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CONTROL_PORT
+                    ),
+                    codec = com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.normalize(
+                        intent.getStringExtra("snapcast_codec")
+                    ),
+                    chunkMs = intent.getIntExtra(
+                        "snapcast_chunk_ms",
+                        com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CHUNK_MS
+                    ),
+                    bufferMs = intent.getIntExtra(
+                        "snapcast_buffer_ms",
+                        com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS
+                    ),
+                    streamName = intent.getStringExtra("snapcast_stream_name")
+                        ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME
+                )
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
 
@@ -99,6 +123,7 @@ class AudioCaptureService : Service() {
                         httpEnabled = httpEnabled,
                         httpPort = httpPort,
                         dlnaConfig = dlnaConfig,
+                        snapcastConfig = snapcastConfig,
                         onClientDisconnected = { stopCapture() }
                     )
                 }

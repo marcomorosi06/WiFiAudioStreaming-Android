@@ -65,6 +65,13 @@ data class AppSettings(
     val dlnaPort: Int = 8081,
     val dlnaFormat: String = "auto",
     val dlnaDevices: List<String> = emptyList(),
+    val snapcastEnabled: Boolean = false,
+    val snapcastPort: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_PORT,
+    val snapcastControlPort: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CONTROL_PORT,
+    val snapcastCodec: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.PCM,
+    val snapcastChunkMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CHUNK_MS,
+    val snapcastBufferMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS,
+    val snapcastStreamName: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME,
     val lastMulticastMode: Boolean = false,
     val clientTileIp: String = "",
     val autoConnectEnabled: Boolean = false,
@@ -121,6 +128,13 @@ class SettingsDataStore(context: Context) {
         val DLNA_PORT = intPreferencesKey("dlna_port")
         val DLNA_FORMAT = stringPreferencesKey("dlna_format")
         val DLNA_DEVICES = stringPreferencesKey("dlna_devices")
+        val SNAPCAST_ENABLED = booleanPreferencesKey("snapcast_enabled")
+        val SNAPCAST_PORT = intPreferencesKey("snapcast_port")
+        val SNAPCAST_CONTROL_PORT = intPreferencesKey("snapcast_control_port")
+        val SNAPCAST_CODEC = stringPreferencesKey("snapcast_codec")
+        val SNAPCAST_CHUNK_MS = intPreferencesKey("snapcast_chunk_ms")
+        val SNAPCAST_BUFFER_MS = intPreferencesKey("snapcast_buffer_ms")
+        val SNAPCAST_STREAM_NAME = stringPreferencesKey("snapcast_stream_name")
         val CLIENT_TILE_IP = stringPreferencesKey("client_tile_ip")
         val AUTO_CONNECT_ENABLED = booleanPreferencesKey("auto_connect_enabled")
         val AUTO_CONNECT_LIST = stringPreferencesKey("auto_connect_list")
@@ -172,6 +186,20 @@ class SettingsDataStore(context: Context) {
             dlnaDevices = (preferences[PreferencesKeys.DLNA_DEVICES] ?: "")
                 .split('\n').map { it.trim() }.filter { it.isNotEmpty() },
             httpSafariMode = preferences[PreferencesKeys.HTTP_SAFARI_MODE] ?: false,
+            snapcastEnabled = preferences[PreferencesKeys.SNAPCAST_ENABLED] ?: false,
+            snapcastPort = preferences[PreferencesKeys.SNAPCAST_PORT]
+                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_PORT,
+            snapcastControlPort = preferences[PreferencesKeys.SNAPCAST_CONTROL_PORT]
+                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CONTROL_PORT,
+            snapcastCodec = com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.normalize(
+                preferences[PreferencesKeys.SNAPCAST_CODEC]
+            ),
+            snapcastChunkMs = preferences[PreferencesKeys.SNAPCAST_CHUNK_MS]
+                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.CHUNK_MS,
+            snapcastBufferMs = preferences[PreferencesKeys.SNAPCAST_BUFFER_MS]
+                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS,
+            snapcastStreamName = preferences[PreferencesKeys.SNAPCAST_STREAM_NAME]
+                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME,
             clientTileIp = preferences[PreferencesKeys.CLIENT_TILE_IP] ?: "",
             autoConnectEnabled = preferences[PreferencesKeys.AUTO_CONNECT_ENABLED] ?: false,
             autoConnectList = preferences[PreferencesKeys.AUTO_CONNECT_LIST] ?: "",
@@ -392,6 +420,31 @@ class SettingsDataStore(context: Context) {
             preferences[PreferencesKeys.RTP_ENABLED] = rtpEnabled
             preferences[PreferencesKeys.RTP_PORT] = rtpPort
             preferences[PreferencesKeys.HTTP_ENABLED] = httpEnabled
+        }
+    }
+
+    suspend fun saveSnapcastEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SNAPCAST_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveSnapcastSettings(
+        port: Int,
+        controlPort: Int,
+        codec: String,
+        chunkMs: Int,
+        bufferMs: Int,
+        streamName: String
+    ) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SNAPCAST_PORT] = port
+            preferences[PreferencesKeys.SNAPCAST_CONTROL_PORT] = controlPort
+            preferences[PreferencesKeys.SNAPCAST_CODEC] =
+                com.cuscus.wifiaudiostreaming.snapcast.SnapcastCodecs.normalize(codec)
+            preferences[PreferencesKeys.SNAPCAST_CHUNK_MS] = chunkMs
+            preferences[PreferencesKeys.SNAPCAST_BUFFER_MS] = bufferMs
+            preferences[PreferencesKeys.SNAPCAST_STREAM_NAME] = streamName
         }
     }
 

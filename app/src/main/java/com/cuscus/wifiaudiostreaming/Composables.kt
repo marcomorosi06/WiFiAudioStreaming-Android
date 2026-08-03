@@ -268,6 +268,8 @@ fun WiFiAudioStreamingApp(
                     streamMic = appSettings.streamMic,
                     isMulticast = isMulticastMode,
                     rtpEnabled = appSettings.rtpEnabled,
+                    forceMulticast = appSettings.httpEnabled || appSettings.dlnaEnabled ||
+                        appSettings.snapcastEnabled,
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
@@ -330,6 +332,14 @@ fun WiFiAudioStreamingApp(
                     formatPreference = DlnaFormatPreference.fromId(appSettings.dlnaFormat),
                     hasSelection = appSettings.dlnaDevices.isNotEmpty()
                 )
+            }
+
+            AnimatedVisibility(
+                visible = isServer && isStreaming && appSettings.snapcastEnabled,
+                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+            ) {
+                ExpressiveSnapcastBanner(ip = localIp)
             }
 
             AnimatedVisibility(
@@ -904,7 +914,8 @@ fun SettingsScreenContent(
                             usbLinkState.isReady,
                             appSettings.rtpEnabled,
                             appSettings.httpEnabled,
-                            appSettings.dlnaEnabled
+                            appSettings.dlnaEnabled,
+                            appSettings.snapcastEnabled
                         )
                     ) {
                         SettingsInfoItem(
@@ -974,6 +985,8 @@ fun SettingsScreenContent(
                     }
 
                     DlnaSettingsSection(appSettings = appSettings)
+
+                    SnapcastSettingsSection(appSettings = appSettings)
                 }
             }
 
@@ -2068,7 +2081,8 @@ fun ExpressiveAudioSourceSelector(
     streamInternal: Boolean,
     streamMic: Boolean,
     isMulticast: Boolean,
-    rtpEnabled: Boolean, // <-- NUOVO PARAMETRO AGGIUNTO
+    rtpEnabled: Boolean,
+    forceMulticast: Boolean = false,
     onStreamInternalChange: (Boolean) -> Unit,
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
@@ -2146,8 +2160,8 @@ fun ExpressiveAudioSourceSelector(
 
             // QUI APPLICHIAMO IL BLOCCO:
             ExpressiveStreamingModeToggle(
-                checked = isMulticast || rtpEnabled, // Forza il multicast se RTP è on
-                enabled = !rtpEnabled,               // Blocca lo switch se RTP è on
+                checked = isMulticast || rtpEnabled || forceMulticast,
+                enabled = !rtpEnabled && !forceMulticast,
                 onCheckedChange = onMulticastChange
             )
 

@@ -387,7 +387,7 @@
     <string name="multicast_locked_by_rtp">RTP requires it</string>
     <string name="multicast_locked_by_http">HTTP requires it</string>
     <string name="multicast_locked_by_both">RTP and HTTP require it</string>
-    <string name="multicast_locked_hint">Both stream to every listener at once, so single-client mode is not possible. Turn RTP and HTTP off in Settings to unlock this.</string>
+    <string name="multicast_locked_hint">These protocols stream to every listener at once, so single-client mode is not possible. Turn them off in Settings to unlock this.</string>
     <string name="status_unsupported_format">Cannot play this stream: the server sends %1$s, which this device does not support.</string>
     <string name="settings_group_developer">Developer</string>
     <string name="settings_item_developer_title">Developer features</string>
@@ -542,4 +542,50 @@
     <string name="notif_chip_live">Live</string>
     <string name="notif_chip_scanning">Scan</string>
 
+
+    <string name="settings_item_snapcast_title">Snapcast server (multiroom)</string>
+    <string name="settings_item_snapcast_desc">Serve synchronised audio to any snapclient: Raspberry Pi, ESP32, Home Assistant, the Snapcast apps</string>
+    <string name="settings_item_snapcast_port_title">Snapcast stream port</string>
+    <string name="settings_item_snapcast_port_desc">TCP port clients connect to for audio (default 1704)</string>
+    <string name="settings_item_snapcast_control_port_title">Snapcast control port</string>
+    <string name="settings_item_snapcast_control_port_desc">JSON-RPC port used to manage groups and volume (default 1705)</string>
+    <string name="settings_item_snapcast_codec_title">Snapcast codec</string>
+    <string name="settings_item_snapcast_codec_desc">How the audio is encoded before it leaves this device</string>
+    <string name="settings_item_snapcast_chunk_title">Chunk size</string>
+    <string name="settings_item_snapcast_chunk_desc">How much audio travels in each packet</string>
+    <string name="settings_item_snapcast_buffer_title">Client buffer</string>
+    <string name="settings_item_snapcast_buffer_desc">How far ahead clients schedule playback, in milliseconds</string>
+    <string name="settings_item_snapcast_name_title">Stream name</string>
+    <string name="settings_item_snapcast_name_desc">Identifier shown to clients and control apps</string>
+    <string name="snapcast_codec_pcm_desc">Uncompressed, about 1.5 Mbps per client, no encoding delay</string>
+    <string name="snapcast_codec_flac_desc">Lossless, roughly half the bandwidth, adds a little delay</string>
+    <string name="snapcast_codec_opus_desc">Lossy, lowest bandwidth, needs 48000 Hz stereo</string>
+    <string name="snapcast_opus_requirement_title">Opus needs 48000 Hz stereo</string>
+    <string name="snapcast_opus_requirement">With the current audio settings the server will fall back to PCM.</string>
+    <string name="snapcast_chunk_selected">%1$d ms per chunk</string>
+    <string name="snapcast_hint_title">Discovery</string>
+    <string name="snapcast_hint">Start the server to advertise the stream over mDNS. Clients find it automatically.</string>
+    <string name="snapcast_codec_fallback_title">Codec unavailable</string>
+    <string name="snapcast_codec_fallback">%1$s is not available on this device, streaming as %2$s instead</string>
+    <string name="snapcast_live_summary">Serving %1$s (%2$s) to %3$d client(s), %4$d control connection(s)</string>
+    <string name="snapcast_client_detail">%1$s - volume %2$d%%, latency %3$d ms</string>
+    <string name="snapcast_client_online">online</string>
+    <string name="snapcast_client_offline">offline</string>
+
+    <string name="snapcast_card_title">Snapcast multiroom</string>
+    <string name="snapcast_card_connections">%1$d client(s) playing in sync</string>
+    <string name="snapcast_card_endpoint">Stream</string>
+    <string name="snapcast_card_codec">Codec</string>
+    <string name="snapcast_card_control">Control</string>
+    <string name="snapcast_card_no_clients">No client connected yet. Point a snapclient at this device or let it find the stream over mDNS.</string>
+
+    <string name="snapcast_card_discovery">Discovery</string>
+    <string name="snapcast_discovery_on">advertised over mDNS</string>
+    <string name="snapcast_discovery_off">not advertised - connect manually</string>
+    <string name="snapcast_port_blocked">port %1$d not available</string>
+    <string name="snapcast_bind_error">Could not open a port: %1$s. Another Snapcast server may already be running, or the firewall is blocking it.</string>
+    <string name="snapcast_how_to_connect">How to connect</string>
+    <string name="snapcast_how_to_connect_auto">Clients on this network find the stream on their own. If one does not, point it at the address below.</string>
+    <string name="snapcast_how_to_connect_manual">Automatic discovery is off, so clients must be pointed at this address explicitly.</string>
+    <string name="multicast_locked_by">Required by %1$s</string>
 </resources>

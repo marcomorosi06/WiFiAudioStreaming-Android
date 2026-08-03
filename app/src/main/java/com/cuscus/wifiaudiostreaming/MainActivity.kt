@@ -133,6 +133,13 @@ class MainActivity : ComponentActivity() {
                         putExtra("dlna_port", it.dlnaPort)
                         putExtra("dlna_format", it.dlnaFormat)
                         putExtra("dlna_devices", it.dlnaDevices.toTypedArray())
+                        putExtra("snapcast_enabled", it.snapcastEnabled)
+                        putExtra("snapcast_port", it.snapcastPort)
+                        putExtra("snapcast_control_port", it.snapcastControlPort)
+                        putExtra("snapcast_codec", it.snapcastCodec)
+                        putExtra("snapcast_chunk_ms", it.snapcastChunkMs)
+                        putExtra("snapcast_buffer_ms", it.snapcastBufferMs)
+                        putExtra("snapcast_stream_name", it.snapcastStreamName)
                     }
                 }
                 startForegroundService(intent)
@@ -923,7 +930,12 @@ class MainActivity : ComponentActivity() {
         val settings = viewModel.appSettings.value ?: return
         val command = ScriptCommand(
             ScriptActionType.START_SERVER,
-            mapOf("multicast" to (viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled).toString())
+            mapOf(
+                "multicast" to (
+                    viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled ||
+                        settings.dlnaEnabled || settings.snapcastEnabled
+                    ).toString()
+            )
         )
         requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
     }

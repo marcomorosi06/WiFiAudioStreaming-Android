@@ -387,7 +387,7 @@
     <string name="multicast_locked_by_rtp">Lo richiede RTP</string>
     <string name="multicast_locked_by_http">Lo richiede HTTP</string>
     <string name="multicast_locked_by_both">Lo richiedono RTP e HTTP</string>
-    <string name="multicast_locked_hint">Trasmettono entrambi a tutti gli ascoltatori insieme, quindi la modalità a client singolo non è possibile. Disattiva RTP e HTTP nelle impostazioni per sbloccarla.</string>
+    <string name="multicast_locked_hint">Questi protocolli trasmettono a tutti gli ascoltatori insieme, quindi la modalità a client singolo non è possibile. Disattivali nelle impostazioni per sbloccarla.</string>
     <string name="status_unsupported_format">Impossibile riprodurre questo flusso: il server invia %1$s, non supportato da questo dispositivo.</string>
     <string name="settings_group_developer">Sviluppatore</string>
     <string name="settings_item_developer_title">Funzioni sviluppatore</string>
@@ -542,4 +542,50 @@
     <string name="notif_chip_live">Live</string>
     <string name="notif_chip_scanning">Scan</string>
 
+
+    <string name="settings_item_snapcast_title">Server Snapcast (multiroom)</string>
+    <string name="settings_item_snapcast_desc">Serve audio sincronizzato a qualsiasi snapclient: Raspberry Pi, ESP32, Home Assistant, le app Snapcast</string>
+    <string name="settings_item_snapcast_port_title">Porta stream Snapcast</string>
+    <string name="settings_item_snapcast_port_desc">Porta TCP a cui si collegano i client per l\'audio (default 1704)</string>
+    <string name="settings_item_snapcast_control_port_title">Porta controllo Snapcast</string>
+    <string name="settings_item_snapcast_control_port_desc">Porta JSON-RPC per gestire gruppi e volumi (default 1705)</string>
+    <string name="settings_item_snapcast_codec_title">Codec Snapcast</string>
+    <string name="settings_item_snapcast_codec_desc">Come viene codificato l\'audio prima di uscire da questo dispositivo</string>
+    <string name="settings_item_snapcast_chunk_title">Dimensione chunk</string>
+    <string name="settings_item_snapcast_chunk_desc">Quanto audio viaggia in ogni pacchetto</string>
+    <string name="settings_item_snapcast_buffer_title">Buffer dei client</string>
+    <string name="settings_item_snapcast_buffer_desc">Quanto in anticipo i client pianificano la riproduzione, in millisecondi</string>
+    <string name="settings_item_snapcast_name_title">Nome dello stream</string>
+    <string name="settings_item_snapcast_name_desc">Identificatore mostrato ai client e alle app di controllo</string>
+    <string name="snapcast_codec_pcm_desc">Non compresso, circa 1,5 Mbps per client, nessun ritardo di codifica</string>
+    <string name="snapcast_codec_flac_desc">Lossless, circa metà della banda, aggiunge un po\' di ritardo</string>
+    <string name="snapcast_codec_opus_desc">Lossy, banda minima, richiede 48000 Hz stereo</string>
+    <string name="snapcast_opus_requirement_title">Opus richiede 48000 Hz stereo</string>
+    <string name="snapcast_opus_requirement">Con le impostazioni audio attuali il server userà PCM.</string>
+    <string name="snapcast_chunk_selected">%1$d ms per chunk</string>
+    <string name="snapcast_hint_title">Rilevamento</string>
+    <string name="snapcast_hint">Avvia il server per annunciare lo stream via mDNS. I client lo trovano da soli.</string>
+    <string name="snapcast_codec_fallback_title">Codec non disponibile</string>
+    <string name="snapcast_codec_fallback">%1$s non è disponibile su questo dispositivo, streaming in %2$s</string>
+    <string name="snapcast_live_summary">In streaming %1$s (%2$s) verso %3$d client, %4$d connessioni di controllo</string>
+    <string name="snapcast_client_detail">%1$s - volume %2$d%%, latenza %3$d ms</string>
+    <string name="snapcast_client_online">online</string>
+    <string name="snapcast_client_offline">offline</string>
+
+    <string name="snapcast_card_title">Snapcast multiroom</string>
+    <string name="snapcast_card_connections">%1$d client in riproduzione sincronizzata</string>
+    <string name="snapcast_card_endpoint">Stream</string>
+    <string name="snapcast_card_codec">Codec</string>
+    <string name="snapcast_card_control">Controllo</string>
+    <string name="snapcast_card_no_clients">Nessun client collegato. Punta uno snapclient a questo dispositivo o lascia che trovi lo stream via mDNS.</string>
+
+    <string name="snapcast_card_discovery">Rilevamento</string>
+    <string name="snapcast_discovery_on">annunciato via mDNS</string>
+    <string name="snapcast_discovery_off">non annunciato - collega a mano</string>
+    <string name="snapcast_port_blocked">porta %1$d non disponibile</string>
+    <string name="snapcast_bind_error">Impossibile aprire una porta: %1$s. Potrebbe esserci un altro server Snapcast attivo, oppure il firewall la sta bloccando.</string>
+    <string name="snapcast_how_to_connect">Come collegarsi</string>
+    <string name="snapcast_how_to_connect_auto">I client sulla rete trovano lo stream da soli. Se uno non ci riesce, puntalo all\'indirizzo qui sotto.</string>
+    <string name="snapcast_how_to_connect_manual">Il rilevamento automatico non è attivo, quindi i client vanno puntati esplicitamente a questo indirizzo.</string>
+    <string name="multicast_locked_by">Richiesto da %1$s</string>
 </resources>

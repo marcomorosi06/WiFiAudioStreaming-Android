@@ -183,6 +183,8 @@ object NetworkManager {
 
     @Volatile private var httpPcmQueue: java.util.concurrent.ArrayBlockingQueue<ByteArray>? = null
     @Volatile private var dlnaManager: DlnaSessionManager? = null
+    @Volatile private var snapcastManager: com.cuscus.wifiaudiostreaming.snapcast.SnapcastSessionManager? = null
+    private val snapcastLifecycleMutex = kotlinx.coroutines.sync.Mutex()
     private val dlnaLifecycleMutex = kotlinx.coroutines.sync.Mutex()
     private const val DLNA_STOP_TIMEOUT_MS = 4000L
     private const val MULTICAST_SILENCE_TIMEOUT_MS = 6000L
@@ -191,6 +193,50 @@ object NetworkManager {
         get() = DlnaStatus.targets
 
     fun dlnaClientCount(): Int = dlnaManager?.activeClientCount() ?: 0
+
+    val snapcastSession: kotlinx.coroutines.flow.StateFlow<com.cuscus.wifiaudiostreaming.snapcast.SnapcastSessionState>
+        get() = com.cuscus.wifiaudiostreaming.snapcast.SnapcastStatus.session
+
+    fun snapcastClientCount(): Int = snapcastManager?.activeClientCount() ?: 0
+
+    private suspend fun stopSnapcastSession() {
+        snapcastLifecycleMutex.withLock { stopSnapcastSessionLocked() }
+    }
+
+    private fun stopSnapcastSessionLocked() {
+        val manager = snapcastManager
+        snapcastManager = null
+        if (manager != null) runCatching { manager.stop() }
+    }
+
+    private suspend fun restartSnapcastSession(
+        context: Context,
+        config: com.cuscus.wifiaudiostreaming.snapcast.SnapcastServerConfig,
+        sampleRate: Int,
+        channels: Int,
+        networkInterfaceName: String
+    ) {
+        snapcastLifecycleMutex.withLock {
+            stopSnapcastSessionLocked()
+            if (!config.enabled) return@withLock
+            DlnaMulticastLock.install(context)
+            val manager = com.cuscus.wifiaudiostreaming.snapcast.SnapcastSessionManager(
+                context = context.applicationContext,
+                scope = scope,
+                config = config,
+                sampleRate = sampleRate,
+                channels = channels,
+                bitDepth = 16,
+                hostName = android.os.Build.MODEL ?: "Android",
+                serverVersion = UpdateChecker.currentVersion(context),
+                persistenceFile = java.io.File(context.filesDir, "snapcast-state.json"),
+                localAddressProvider = { getLocalIpAddress(context) },
+                preferredInterfaceProvider = { getWifiNetworkInterface(networkInterfaceName) }
+            )
+            snapcastManager = manager
+            manager.start()
+        }
+    }
 
     private suspend fun stopDlnaSession() {
         dlnaLifecycleMutex.withLock { stopDlnaSessionLocked() }
@@ -1148,6 +1194,7 @@ object NetworkManager {
         httpEnabled: Boolean = false,
         httpPort: Int = 8080,
         dlnaConfig: DlnaServerConfig? = null,
+        snapcastConfig: com.cuscus.wifiaudiostreaming.snapcast.SnapcastServerConfig? = null,
         onClientDisconnected: (() -> Unit)? = null
     ) {
         if (streamingJob?.isActive == true) return
@@ -1292,6 +1339,7 @@ object NetworkManager {
                         httpPcmQueue?.let { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         rtpPcmQueue?.let  { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         dlnaManager?.submitPcm(chunk)
+                        snapcastManager?.submitPcm(chunk)
                         var dropped = 0
                         while (udpAudioQueue.remainingCapacity() == 0) {
                             if (udpAudioQueue.poll() == null) break
@@ -1409,7 +1457,8 @@ object NetworkManager {
                         rtp = rtpEnabled,
                         http = httpEnabled,
                         dlna = dlnaConfig?.enabled == true,
-                        conjunction = context.getString(R.string.list_and)
+                        conjunction = context.getString(R.string.list_and),
+                        snapcast = snapcastConfig?.enabled == true
                     )
                     if (summary.isNotEmpty()) {
                         connectionStatus.value = context.getString(R.string.status_serving_protocols, summary)
@@ -1426,6 +1475,19 @@ object NetworkManager {
                             networkInterfaceName = networkInterfaceName
                         )
                     }.onFailure { Log.e(TAG, "[DLNA] avvio sessione fallito: ${it.message}", it) }
+                }
+
+                scope.launch {
+                    runCatching {
+                        restartSnapcastSession(
+                            context = context,
+                            config = snapcastConfig
+                                ?: com.cuscus.wifiaudiostreaming.snapcast.SnapcastServerConfig(),
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            networkInterfaceName = networkInterfaceName
+                        )
+                    }.onFailure { Log.e(TAG, "[Snapcast] avvio sessione fallito: ${it.message}", it) }
                 }
 
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -2587,6 +2649,7 @@ object NetworkManager {
         rtpJob?.cancel()
         httpJob?.cancel()
         scope.launch { stopDlnaSession() }
+        scope.launch { stopSnapcastSession() }
 
         try { activeInternalRecord?.release() } catch (_: Exception) {}
         activeInternalRecord = null
