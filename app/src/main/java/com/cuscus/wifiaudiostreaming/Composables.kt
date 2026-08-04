@@ -2274,6 +2274,11 @@ fun ExpressiveAudioSourceSelector(
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
+                    val keyBased = secMode == "KEY" || secMode == "QR"
+                    val encryptionLocked = SecurityMode.encryptionForced(
+                        secMode,
+                        isMulticast || rtpEnabled || forceMulticast
+                    )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.settings_item_encryption_title),
@@ -2281,15 +2286,18 @@ fun ExpressiveAudioSourceSelector(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = stringResource(R.string.settings_item_encryption_desc),
+                            text = stringResource(
+                                if (encryptionLocked) R.string.settings_item_encryption_locked_qr_multicast
+                                else R.string.settings_item_encryption_desc
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
-                        checked = encryptionEnabled && (secMode == "KEY" || secMode == "QR"),
+                        checked = (encryptionEnabled || encryptionLocked) && keyBased,
                         onCheckedChange = onEncryptionChange,
-                        enabled = secMode == "KEY" || secMode == "QR"
+                        enabled = keyBased && !encryptionLocked
                     )
                 }
             }

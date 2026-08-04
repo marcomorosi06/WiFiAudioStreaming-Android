@@ -791,17 +791,21 @@ fun ExpressiveSourceSection(
         Spacer(Modifier.height(10.dp))
 
         val keyBased = secMode == "KEY" || secMode == "QR"
+        val encryptionLocked = SecurityMode.encryptionForced(secMode, multicastActive)
 
         ExpressiveToggleTile(
             icon = if (keyBased) Icons.Outlined.EnhancedEncryption else Icons.Outlined.LockOpen,
             activeIcon = Icons.Filled.EnhancedEncryption,
             title = stringResource(R.string.settings_item_encryption_title),
             subtitle = stringResource(
-                if (keyBased) R.string.settings_item_encryption_desc
-                else R.string.settings_item_encryption_needs_key
+                when {
+                    encryptionLocked -> R.string.settings_item_encryption_locked_qr_multicast
+                    keyBased -> R.string.settings_item_encryption_desc
+                    else -> R.string.settings_item_encryption_needs_key
+                }
             ),
-            checked = encryptionEnabled && keyBased,
-            enabled = keyBased,
+            checked = (encryptionEnabled || encryptionLocked) && keyBased,
+            enabled = keyBased && !encryptionLocked,
             accent = accent,
             onCheckedChange = onEncryptionChange
         )

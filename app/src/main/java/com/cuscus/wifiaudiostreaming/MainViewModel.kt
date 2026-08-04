@@ -192,7 +192,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch {
+            combine(
+                settingsDataStore.settingsFlow,
+                _isMulticastMode
+            ) { settings, multicast -> settings to multicast }
+                .collect { (settings, multicast) ->
+                    if (!settings.encryptionEnabled &&
+                        isEncryptionForced(settings, multicast)
+                    ) {
+                        settingsDataStore.saveEncryption(true)
+                    }
+                }
+        }
     }
+
+    private fun effectiveMulticast(settings: AppSettings, multicast: Boolean): Boolean =
+        multicast || settings.rtpEnabled || settings.httpEnabled ||
+            settings.dlnaEnabled || settings.snapcastEnabled
+
+    private fun isEncryptionForced(
+        settings: AppSettings,
+        multicast: Boolean = _isMulticastMode.value
+    ): Boolean = SecurityMode.encryptionForcedStored(
+        settings.securityMode,
+        settings.qrPairingEnabled,
+        effectiveMulticast(settings, multicast)
+    )
 
     fun toggleMode(isServerMode: Boolean) {
         _isServer.value = isServerMode
@@ -279,6 +305,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEncryption(enabled: Boolean) {
         viewModelScope.launch {
+            val settings = settingsDataStore.settingsFlow.first()
+            if (!enabled && isEncryptionForced(settings)) return@launch
             settingsDataStore.saveEncryption(enabled)
         }
     }
@@ -672,7 +700,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!encryptionForcedByInvite) return
         encryptionForcedByInvite = false
         _qrInvite.value = null
-        viewModelScope.launch { settingsDataStore.saveEncryption(false) }
+        viewModelScope.launch {
+            val settings = settingsDataStore.settingsFlow.first()
+            if (isEncryptionForced(settings)) return@launch
+            settingsDataStore.saveEncryption(false)
+        }
     }
 
     fun updateStatus(message: String) {

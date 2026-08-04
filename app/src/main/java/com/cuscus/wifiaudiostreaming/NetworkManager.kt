@@ -1949,8 +1949,11 @@ object NetworkManager {
                         }
                         val effectiveLatencyMs = UsbLink.effectiveLatencyMs(advSettings.latencyMs)
                         val targetLatencyFrames = effectiveLatencyMs * sampleRate / 1000
-                        val marginFrames = sampleRate * 30 / 1000
-                        var playbackBufferSize = minBuffer.coerceAtLeast((targetLatencyFrames + marginFrames * 2) * frameSize)
+                        // Headroom: la coda di AudioTrack deve poter assorbire un burst senza
+                        // bloccare la write, altrimenti l'arretrato migra nel socket dove non e'
+                        // misurabile. Il livello reale lo tiene PlayoutGovernor scartando pacchetti.
+                        val headroomFrames = sampleRate * 200 / 1000
+                        var playbackBufferSize = minBuffer.coerceAtLeast((targetLatencyFrames + headroomFrames) * frameSize)
                         if (playbackBufferSize % frameSize != 0) {
                             playbackBufferSize += frameSize - (playbackBufferSize % frameSize)
                         }
@@ -1975,11 +1978,17 @@ object NetworkManager {
                             trackBuilder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
                         }
                         audioTrack = trackBuilder.build()
+                        val playout = PlayoutGovernor(
+                            audioTrack!!, sampleRate, frameSize, effectiveLatencyMs, TAG
+                        )
 
                         val prerollLen = (sampleRate * frameSize * 30 / 1000)
                             .coerceIn(0, playbackBufferSize - frameSize)
                             .let { it - (it % frameSize) }
-                        if (prerollLen > 0) audioTrack!!.write(ByteArray(prerollLen), 0, prerollLen, AudioTrack.WRITE_BLOCKING)
+                        if (prerollLen > 0) {
+                            audioTrack!!.write(ByteArray(prerollLen), 0, prerollLen, AudioTrack.WRITE_BLOCKING)
+                            playout.noteWritten(prerollLen)
+                        }
                         audioTrack!!.play()
                         LinkMetrics.start(
                             if (sessionUsesUsb()) "USB" else "WIFI",
@@ -2148,11 +2157,8 @@ object NetworkManager {
                             }
                         }
 
-                        var maxLagPackets = 3
                         var packetMs = 0
-                        val driftTargetBacklog = 2
-                        var driftAvgBacklog = driftTargetBacklog.toFloat()
-                        var driftCurrentRate = sampleRate
+                        var pendingSmooth = false
                         var silenceRunMs = 0
                         var silenceRunLogged = false
 
@@ -2201,7 +2207,7 @@ object NetworkManager {
                                 expectedSeq = seq
                             } else {
                                 val gap = (seq - expectedSeq) and 0xFFFF
-                                if (gap in 1..8) {
+                                if (gap in 1..8 && !playout.shouldDrop(lastGoodPcm?.size ?: 0)) {
                                     val ref = lastGoodPcm
                                     if (ref != null) {
                                         var step = 0
@@ -2217,6 +2223,7 @@ object NetworkManager {
                                                 out.putShort(s.toShort())
                                             }
                                             audioTrack.write(fade, 0, fade.size, AudioTrack.WRITE_BLOCKING)
+                                            playout.noteWritten(fade.size)
                                         }
                                     }
                                 }
@@ -2226,14 +2233,19 @@ object NetworkManager {
 
                             if (isSilence || data.size <= HEADER_SIZE) {
                                 val silenceLen = lastGoodPcm?.size ?: 3840
-                                val silenceBuffer = ByteArray(silenceLen)
                                 silenceRunMs += packetMs
                                 if (silenceRunMs > 10_000 && !silenceRunLogged) {
                                     silenceRunLogged = true
                                     Log.w(TAG, "[CLIENT] the server has been sending silence-flagged packets for over 10s: " +
                                             "the stream is alive but the capture side has nothing to send")
                                 }
-                                audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
+                                if (playout.shouldDrop(silenceLen)) {
+                                    pendingSmooth = true
+                                } else {
+                                    val silenceBuffer = ByteArray(silenceLen)
+                                    audioTrack.write(silenceBuffer, 0, silenceLen, AudioTrack.WRITE_BLOCKING)
+                                    playout.noteWritten(silenceLen)
+                                }
                             } else {
                                 silenceRunMs = 0
                                 silenceRunLogged = false
@@ -2241,8 +2253,18 @@ object NetworkManager {
                                 if (frameSize > 0 && sampleRate > 0) {
                                     packetMs = (pcmLen * 1000) / (sampleRate * frameSize)
                                 }
+                                if (playout.shouldDrop(pcmLen)) {
+                                    pendingSmooth = true
+                                    if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
+                                        lastGoodPcm = ByteArray(pcmLen)
+                                    }
+                                    data.copyInto(lastGoodPcm!!, 0, HEADER_SIZE, HEADER_SIZE + pcmLen)
+                                    return
+                                }
+                                val fadeIn = smooth || pendingSmooth
+                                pendingSmooth = false
                                 val ref = lastGoodPcm
-                                if (smooth && ref != null && ref.size >= 2 && pcmLen >= 2) {
+                                if (fadeIn && ref != null && ref.size >= 2 && pcmLen >= 2) {
                                     val outBuf = ByteArray(pcmLen)
                                     System.arraycopy(data, HEADER_SIZE, outBuf, 0, pcmLen)
                                     val fadeSamples = (minOf(ref.size, pcmLen) / 2).coerceAtMost(256)
@@ -2258,9 +2280,11 @@ object NetworkManager {
                                     }
                                     denoiseInPlace(outBuf, 0, pcmLen)
                                     audioTrack.write(outBuf, 0, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                    playout.noteWritten(pcmLen)
                                 } else {
                                     denoiseInPlace(data, HEADER_SIZE, pcmLen)
                                     audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                    playout.noteWritten(pcmLen)
                                 }
                                 if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
                                     lastGoodPcm = ByteArray(pcmLen)
@@ -2295,23 +2319,17 @@ object NetworkManager {
                                 if (byeReceived) { streamingJob?.cancel(); break }
                                 if (audio.isEmpty()) continue
 
-                                if (packetMs > 0) {
-                                    maxLagPackets = (effectiveLatencyMs / packetMs).coerceIn(3, 128)
-                                }
-                                val skip = (audio.size - maxLagPackets).coerceAtLeast(0)
-                                if (skip > 0) expectedSeq = -1
-                                for (i in skip until audio.size) {
+                                // Un burst grosso non significa latenza alta: quanto scartare
+                                // lo decide PlayoutGovernor sulla coda reale di AudioTrack.
+                                for (a in audio) {
                                     if (!isActive) break
-                                    playPacket(audio[i], smooth = (i == skip && skip > 0))
+                                    playPacket(a)
                                 }
-                                driftAvgBacklog = driftAvgBacklog * 0.98f + audio.size * 0.02f
-                                val err = driftAvgBacklog - driftTargetBacklog
-                                val factor = (1.0 + err * 0.0004).coerceIn(0.997, 1.003)
-                                val newRate = (sampleRate * factor).toInt()
-                                if (kotlin.math.abs(newRate - driftCurrentRate) >= 4) {
-                                    runCatching { audioTrack!!.setPlaybackRate(newRate) }
-                                    driftCurrentRate = newRate
+                                if (playout.hardResyncIfNeeded()) {
+                                    expectedSeq = -1
+                                    pendingSmooth = true
                                 }
+                                playout.retune()
                             }
                         } finally {
                             watchdogJob.cancel()
@@ -2340,6 +2358,7 @@ object NetworkManager {
                         val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                         multicastSocket = MulticastSocket(serverInfo.port).apply {
                             reuseAddress = true
+                            runCatching { receiveBufferSize = 128 * 1024 }
                             getWifiNetworkInterface(networkInterfaceName)?.let { networkInterface = it }
                             MulticastNet.joinAllGroups(this)
                         }
@@ -2362,9 +2381,11 @@ object NetworkManager {
                         val mcLatencyMs = UsbLink.effectiveLatencyMs(
                             SettingsDataStore(context).settingsFlow.first().latencyMs
                         )
-                        var playbackBufferSize = minBuffer.coerceAtLeast(mcLatencyMs * sampleRate / 1000 * (if (channelConfig == "STEREO") 4 else 2))
-
                         val frameSize = if (channelConfig == "STEREO") 4 else 2
+                        var playbackBufferSize = minBuffer.coerceAtLeast(
+                            (mcLatencyMs + 200) * sampleRate / 1000 * frameSize
+                        )
+
                         if (playbackBufferSize % frameSize != 0) {
                             playbackBufferSize += frameSize - (playbackBufferSize % frameSize)
                         }
@@ -2387,6 +2408,9 @@ object NetworkManager {
                             .setTransferMode(AudioTrack.MODE_STREAM)
                             .build()
 
+                        val mcPlayout = PlayoutGovernor(
+                            audioTrack, sampleRate, frameSize, mcLatencyMs, TAG
+                        )
                         audioTrack.play()
                         LinkMetrics.start(if (sessionUsesUsb()) "USB" else "WIFI", sampleRate)
                         connectionStatus.value = context.getString(R.string.status_streaming)
@@ -2551,20 +2575,26 @@ object NetworkManager {
                                         if (dir != null) {
                                             val r = WfasCrypto.decryptPacket(dir, mcWin, audio, len)
                                             if (r is WfasCrypto.Decrypted.Ok && r.pcm.isNotEmpty()) {
+                                                if (mcPlayout.shouldDrop(r.pcm.size)) return
                                                 denoiseInPlace(r.pcm, 0, r.pcm.size)
                                                 audioTrack.write(r.pcm, 0, r.pcm.size, AudioTrack.WRITE_BLOCKING)
+                                                mcPlayout.noteWritten(r.pcm.size)
                                             }
                                         }
                                     } else {
                                         val pcmLen = len - MC_HEADER_SIZE
                                         if (pcmLen > 0) {
+                                            if (mcPlayout.shouldDrop(pcmLen)) return
                                             denoiseInPlace(audio, MC_HEADER_SIZE, pcmLen)
                                             audioTrack.write(audio, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
+                                            mcPlayout.noteWritten(pcmLen)
                                         }
                                     }
                                 } else {
+                                    if (mcPlayout.shouldDrop(len)) return
                                     denoiseInPlace(audio, 0, len)
                                     audioTrack.write(audio, 0, len, AudioTrack.WRITE_BLOCKING)
+                                    mcPlayout.noteWritten(len)
                                 }
                             }
 
@@ -2573,10 +2603,12 @@ object NetworkManager {
                             if (stopLoop) break
                             if (audioPackets.isEmpty()) continue
 
+                            mcPlayout.hardResyncIfNeeded()
                             for (a in audioPackets) {
                                 if (!isActive) break
                                 playMc(a)
                             }
+                            mcPlayout.retune()
                             if (mcAbort) break
                         }
                     } finally {
