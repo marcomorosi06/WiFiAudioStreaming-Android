@@ -29,9 +29,9 @@ This application allows you to send your phone's audio to any device on the loca
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/2.png?raw=true" width="180">
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/3.png?raw=true" width="180">
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/4.png?raw=true" width="180">
-  <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/5.png?raw=true" width="180">
 </p>
 <p align="center">
+  <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/5.png?raw=true" width="180">
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/6.png?raw=true" width="180">
   <img src="https://github.com/marcomorosi06/WiFiAudioStreaming-Android/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/7.png?raw=true" width="180">
 </p>
