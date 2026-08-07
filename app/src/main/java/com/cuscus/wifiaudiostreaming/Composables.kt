@@ -502,6 +502,7 @@ fun ExpressiveSettingsScreen(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onBackgroundSpectrumChange: (Boolean, String, Boolean, Int) -> Unit = { _, _, _, _ -> },
     onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
     onDeveloperModeChange: (Boolean) -> Unit = {},
@@ -549,6 +550,7 @@ fun ExpressiveSettingsScreen(
             onConnectionSoundChange = onConnectionSoundChange,
             onDisconnectionSoundChange = onDisconnectionSoundChange,
             onHapticsChange = onHapticsChange,
+            onBackgroundSpectrumChange = onBackgroundSpectrumChange,
             onBlackoutOutlinedChange = onBlackoutOutlinedChange,
             onShowDonation = onShowDonation,
             onDeveloperModeChange = onDeveloperModeChange,
@@ -590,6 +592,7 @@ fun SettingsScreenContent(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onBackgroundSpectrumChange: (Boolean, String, Boolean, Int) -> Unit = { _, _, _, _ -> },
     onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
     onDeveloperModeChange: (Boolean) -> Unit = {},
@@ -1084,6 +1087,74 @@ fun SettingsScreenContent(
                         isChecked = appSettings.hapticsEnabled,
                         onCheckedChange = onHapticsChange
                     )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_background_spectrum_title),
+                        description = stringResource(R.string.settings_item_background_spectrum_desc),
+                        icon = Icons.Outlined.GraphicEq,
+                        isChecked = appSettings.backgroundSpectrumEnabled,
+                        onCheckedChange = { enabled ->
+                            onBackgroundSpectrumChange(enabled, appSettings.backgroundSpectrumStyle, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
+                        }
+                    )
+                    AnimatedVisibility(visible = appSettings.backgroundSpectrumEnabled) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsChoiceItem(
+                                title = stringResource(R.string.settings_item_spectrum_style_title),
+                                description = stringResource(R.string.settings_item_spectrum_style_desc),
+                                icon = Icons.Outlined.Equalizer,
+                                options = listOf(
+                                    ChoiceOption(
+                                        Icons.Outlined.Equalizer,
+                                        stringResource(R.string.spectrum_style_bars),
+                                        "BARS"
+                                    ),
+                                    ChoiceOption(
+                                        Icons.Outlined.GraphicEq,
+                                        stringResource(R.string.spectrum_style_wave),
+                                        "WAVE"
+                                    )
+                                ),
+                                selectedValue = appSettings.backgroundSpectrumStyle,
+                                selectedDescription = if (appSettings.backgroundSpectrumStyle == "WAVE")
+                                    stringResource(R.string.spectrum_style_wave_desc)
+                                else
+                                    stringResource(R.string.spectrum_style_bars_desc),
+                                onSelect = { style ->
+                                    onBackgroundSpectrumChange(true, style, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
+                                }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsSliderItem(
+                                title = stringResource(R.string.settings_item_spectrum_groove_title),
+                                description = stringResource(R.string.settings_item_spectrum_groove_desc),
+                                icon = Icons.Outlined.AutoAwesome,
+                                value = appSettings.backgroundSpectrumGroove.toFloat(),
+                                range = 0f..160f,
+                                steps = 159,
+                                valueSuffix = "",
+                                onValueChange = { groove ->
+                                    onBackgroundSpectrumChange(
+                                        true,
+                                        appSettings.backgroundSpectrumStyle,
+                                        appSettings.backgroundSpectrumBlackoutOnly,
+                                        groove.toInt()
+                                    )
+                                }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.settings_item_spectrum_blackout_only_title),
+                                description = stringResource(R.string.settings_item_spectrum_blackout_only_desc),
+                                icon = Icons.Outlined.VisibilityOff,
+                                isChecked = appSettings.backgroundSpectrumBlackoutOnly,
+                                onCheckedChange = { blackoutOnly ->
+                                    onBackgroundSpectrumChange(true, appSettings.backgroundSpectrumStyle, blackoutOnly, appSettings.backgroundSpectrumGroove)
+                                }
+                            )
+                        }
+                    }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_blackout_outlined_title),
@@ -2635,28 +2706,30 @@ fun ExpressiveStreamingControlCenter(
                             Text(stringResource(R.string.blackout_button))
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.Top,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        if (!LocalOutlinedSkin.current) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Info,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(R.string.playback_keep_open_hint),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Start
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.playback_keep_open_hint),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Start
+                                    )
+                                }
                             }
                         }
                     }

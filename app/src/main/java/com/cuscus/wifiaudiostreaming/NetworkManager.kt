@@ -1340,6 +1340,9 @@ object NetworkManager {
                         rtpPcmQueue?.let  { if (it.remainingCapacity() > 0) it.offer(chunk) }
                         dlnaManager?.submitPcm(chunk)
                         snapcastManager?.submitPcm(chunk)
+                        // Feed ambient spectrum visualizer (server side)
+                        com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                            .feedFrame(chunk, 0, aligned, channels, sampleRate)
                         var dropped = 0
                         while (udpAudioQueue.remainingCapacity() == 0) {
                             if (udpAudioQueue.poll() == null) break
@@ -1831,6 +1834,8 @@ object NetworkManager {
                 }
             } finally {
                 Log.d(TAG, "[SERVER] finally: cleanup, hasError=$hasError isServerStreaming=$isServerStreaming")
+                // Reset ambient visualizer so the background fades cleanly
+                com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer.reset()
                 // Se nel frattempo e' partito un altro stream questo job e' superato:
                 // azzerare lo stato globale spegnerebbe quello nuovo.
                 if (streamGeneration == generation) {
@@ -2281,10 +2286,16 @@ object NetworkManager {
                                     denoiseInPlace(outBuf, 0, pcmLen)
                                     audioTrack.write(outBuf, 0, pcmLen, AudioTrack.WRITE_BLOCKING)
                                     playout.noteWritten(pcmLen)
+                                    // Feed ambient spectrum visualizer (client side – crossfade branch)
+                                    com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                                        .feedFrame(outBuf, 0, pcmLen, frameSize / 2, sampleRate)
                                 } else {
                                     denoiseInPlace(data, HEADER_SIZE, pcmLen)
                                     audioTrack.write(data, HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
                                     playout.noteWritten(pcmLen)
+                                    // Feed ambient spectrum visualizer (client side – normal branch)
+                                    com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                                        .feedFrame(data, HEADER_SIZE, pcmLen, frameSize / 2, sampleRate)
                                 }
                                 if (lastGoodPcm == null || lastGoodPcm!!.size != pcmLen) {
                                     lastGoodPcm = ByteArray(pcmLen)
@@ -2338,6 +2349,8 @@ object NetworkManager {
                         LinkMetrics.stop()
                         audioTrack?.stop()
                         audioTrack?.release()
+                        // Reset ambient visualizer so the background fades cleanly
+                        com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer.reset()
                         if (connectedSuccessfully) {
                             withContext(NonCancellable) {
                                 try {
@@ -2579,6 +2592,9 @@ object NetworkManager {
                                                 denoiseInPlace(r.pcm, 0, r.pcm.size)
                                                 audioTrack.write(r.pcm, 0, r.pcm.size, AudioTrack.WRITE_BLOCKING)
                                                 mcPlayout.noteWritten(r.pcm.size)
+                                                // Feed ambient spectrum visualizer (multicast encrypted)
+                                                com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                                                    .feedFrame(r.pcm, 0, r.pcm.size, if (channelConfig == "STEREO") 2 else 1, sampleRate)
                                             }
                                         }
                                     } else {
@@ -2588,6 +2604,9 @@ object NetworkManager {
                                             denoiseInPlace(audio, MC_HEADER_SIZE, pcmLen)
                                             audioTrack.write(audio, MC_HEADER_SIZE, pcmLen, AudioTrack.WRITE_BLOCKING)
                                             mcPlayout.noteWritten(pcmLen)
+                                            // Feed ambient spectrum visualizer (multicast plain header)
+                                            com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                                                .feedFrame(audio, MC_HEADER_SIZE, pcmLen, if (channelConfig == "STEREO") 2 else 1, sampleRate)
                                         }
                                     }
                                 } else {
@@ -2595,6 +2614,9 @@ object NetworkManager {
                                     denoiseInPlace(audio, 0, len)
                                     audioTrack.write(audio, 0, len, AudioTrack.WRITE_BLOCKING)
                                     mcPlayout.noteWritten(len)
+                                    // Feed ambient spectrum visualizer (multicast raw)
+                                    com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
+                                        .feedFrame(audio, 0, len, if (channelConfig == "STEREO") 2 else 1, sampleRate)
                                 }
                             }
 
@@ -2615,6 +2637,8 @@ object NetworkManager {
                         LinkMetrics.stop()
                         audioTrack?.stop()
                         audioTrack?.release()
+                        // Reset ambient visualizer so the background fades cleanly
+                        com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer.reset()
                         try {
                             val groupAddress = InetAddress.getByName(NetworkSettings.MULTICAST_GROUP_IP)
                             multicastSocket?.let { MulticastNet.leaveAllGroups(it) }

@@ -274,6 +274,18 @@
     <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
 
     <string name="settings_group_personalization">Personalization</string>
+    <string name="settings_item_background_spectrum_title">Background Spectrogram</string>
+    <string name="settings_item_background_spectrum_desc">Show a visual audio spectrogram in the background during active streaming.</string>
+    <string name="settings_item_spectrum_style_title">Spectrogram Style</string>
+    <string name="settings_item_spectrum_style_desc">Choose between crisp bars or fluid waves.</string>
+    <string name="spectrum_style_bars">Bars &amp; Peaks</string>
+    <string name="spectrum_style_bars_desc">Vertical bars with falling peak caps and gravity physics.</string>
+    <string name="spectrum_style_wave">Fluid Waves</string>
+    <string name="spectrum_style_wave_desc">Fluid multi-band with 3 continuous curve waves (Bass, Mid, High).</string>
+    <string name="settings_item_spectrum_blackout_only_title">Show Only in Dark Screen</string>
+    <string name="settings_item_spectrum_blackout_only_desc">Only display the spectrogram when Dark Screen mode is active.</string>
+    <string name="settings_item_spectrum_groove_title">Groove Level</string>
+    <string name="settings_item_spectrum_groove_desc">Adaptive spectrum contrast and melody tracking (0 to 160).</string>
     <string name="settings_item_connection_sound_title">Connection Sound</string>
     <string name="settings_item_connection_sound_desc">Play a sound when the client connects to a server</string>
     <string name="settings_item_custom_sound_title">Custom Connection Sound</string>

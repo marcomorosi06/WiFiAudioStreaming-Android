@@ -611,6 +611,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsDataStore.saveHapticsEnabled(enabled) }
     }
 
+    fun setBackgroundSpectrumSettings(enabled: Boolean, style: String, blackoutOnly: Boolean = false, groove: Int = 0) {
+        viewModelScope.launch { settingsDataStore.saveBackgroundSpectrumSettings(enabled, style, blackoutOnly, groove) }
+    }
+
     fun setBlackoutOutlinedUi(enabled: Boolean) {
         viewModelScope.launch { settingsDataStore.saveBlackoutOutlinedUi(enabled) }
     }

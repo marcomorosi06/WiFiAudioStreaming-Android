@@ -94,7 +94,11 @@ data class AppSettings(
     val noiseReductionStrength: Int = 50,
     val usbModeEnabled: Boolean = false,
     val usbLatencyMs: Int = 20,
-    val wfasMode: String = WfasPolicy.MODE_OFF_ON_USB
+    val wfasMode: String = WfasPolicy.MODE_OFF_ON_USB,
+    val backgroundSpectrumEnabled: Boolean = false,
+    val backgroundSpectrumStyle: String = "BARS",
+    val backgroundSpectrumBlackoutOnly: Boolean = false,
+    val backgroundSpectrumGroove: Int = 0
 )
 
 class SettingsDataStore(context: Context) {
@@ -151,6 +155,10 @@ class SettingsDataStore(context: Context) {
         val USB_MODE_ENABLED = booleanPreferencesKey("usb_mode_enabled")
         val USB_LATENCY_MS = intPreferencesKey("usb_latency_ms")
         val WFAS_MODE = stringPreferencesKey("wfas_mode")
+        val BACKGROUND_SPECTRUM_ENABLED = booleanPreferencesKey("background_spectrum_enabled")
+        val BACKGROUND_SPECTRUM_STYLE = stringPreferencesKey("background_spectrum_style")
+        val BACKGROUND_SPECTRUM_BLACKOUT_ONLY = booleanPreferencesKey("background_spectrum_blackout_only")
+        val BACKGROUND_SPECTRUM_GROOVE = intPreferencesKey("background_spectrum_groove")
     }
 
     val scriptsFlow: Flow<List<AppScript>> = dataStore.data.map { preferences ->
@@ -221,8 +229,21 @@ class SettingsDataStore(context: Context) {
             manualAuthKey = preferences[PreferencesKeys.MANUAL_AUTH_KEY] ?: "",
             usbModeEnabled = preferences[PreferencesKeys.USB_MODE_ENABLED] ?: false,
             usbLatencyMs = preferences[PreferencesKeys.USB_LATENCY_MS] ?: UsbLink.DEFAULT_USB_LATENCY_MS,
-            wfasMode = preferences[PreferencesKeys.WFAS_MODE] ?: WfasPolicy.MODE_OFF_ON_USB
+            wfasMode = preferences[PreferencesKeys.WFAS_MODE] ?: WfasPolicy.MODE_OFF_ON_USB,
+            backgroundSpectrumEnabled = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_ENABLED] ?: false,
+            backgroundSpectrumStyle = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_STYLE] ?: "BARS",
+            backgroundSpectrumBlackoutOnly = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_BLACKOUT_ONLY] ?: false,
+            backgroundSpectrumGroove = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_GROOVE] ?: 0
         )
+    }
+
+    suspend fun saveBackgroundSpectrumSettings(enabled: Boolean, style: String, blackoutOnly: Boolean = false, groove: Int = 0) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BACKGROUND_SPECTRUM_ENABLED] = enabled
+            preferences[PreferencesKeys.BACKGROUND_SPECTRUM_STYLE] = style
+            preferences[PreferencesKeys.BACKGROUND_SPECTRUM_BLACKOUT_ONLY] = blackoutOnly
+            preferences[PreferencesKeys.BACKGROUND_SPECTRUM_GROOVE] = groove
+        }
     }
 
     suspend fun setLastSeenChangelogVersion(version: String) {

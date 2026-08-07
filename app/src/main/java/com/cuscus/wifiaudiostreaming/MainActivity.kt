@@ -740,6 +740,7 @@ class MainActivity : ComponentActivity() {
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
             onHapticsChange = viewModel::setHapticsEnabled,
+            onBackgroundSpectrumChange = viewModel::setBackgroundSpectrumSettings,
             onBlackoutOutlinedChange = viewModel::setBlackoutOutlinedUi,
             onDeveloperModeChange = viewModel::setDeveloperMode,
             onNoiseReductionChange = viewModel::setNoiseReduction,

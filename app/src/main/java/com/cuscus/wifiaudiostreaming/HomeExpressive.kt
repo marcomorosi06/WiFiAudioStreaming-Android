@@ -88,7 +88,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -98,6 +100,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -235,7 +238,26 @@ fun ExpressiveHomeScreen(
         label = "HomeCanvas"
     )
 
-    Scaffold(containerColor = canvasColor) { padding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(canvasColor)
+    ) {
+        val blackoutActive = BlackoutController.active.value
+        val spectrumEnabled = appSettings.backgroundSpectrumEnabled &&
+                (!appSettings.backgroundSpectrumBlackoutOnly || blackoutActive)
+
+        // ── Ambient spectrum background – Z layer right above canvasColor ─────
+        AmbientSpectrumBackground(
+            isStreaming = isStreaming,
+            enabled = spectrumEnabled,
+            style = appSettings.backgroundSpectrumStyle,
+            groove = appSettings.backgroundSpectrumGroove,
+            isOutlined = blackoutActive,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Scaffold(containerColor = Color.Transparent) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -496,7 +518,8 @@ fun ExpressiveHomeScreen(
 
             Spacer(Modifier.height(40.dp))
         }
-    }
+    } // end Scaffold
+    } // end ambient Box
 }
 
 @Composable
@@ -550,6 +573,7 @@ private fun StateHero(
     canStartServer: Boolean = true,
     keyMissing: Boolean = false,
     usbConnected: Boolean = false,
+    spectrumActive: Boolean = false,
     onActivateWfas: () -> Unit = {},
     onStartServer: () -> Unit,
     onStopServer: () -> Unit
@@ -926,7 +950,9 @@ private fun StateHero(
             )
         }
 
-        if (isServer || live) {
+        val outlinedSkin = LocalOutlinedSkin.current
+
+        if ((isServer || live) && !(live && outlinedSkin)) {
             Spacer(Modifier.height(if (live) 12.dp else 28.dp))
             HeroActionButton(
                 live = live,
@@ -1235,23 +1261,6 @@ private fun LiveControls(
                         .onGloballyPositioned {
                             BlackoutController.interactiveBounds.value = it.boundsInRoot()
                         }
-                        .then(
-                            if (outlinedSkin) Modifier.pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = {
-                                        val now = android.os.SystemClock.elapsedRealtime()
-                                        if (nrLastTap != 0L && now - nrLastTap <= 500L) {
-                                            nrLastTap = 0L
-                                            haptics.reject()
-                                            BlackoutController.signalWrongSpot()
-                                        } else {
-                                            nrLastTap = now
-                                            BlackoutController.poke()
-                                        }
-                                    }
-                                )
-                            } else Modifier
-                        )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1320,26 +1329,28 @@ private fun LiveControls(
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
-            ) {
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            if (!outlinedSkin) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.65f)
                 ) {
-                    Icon(
-                        Icons.Outlined.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.playback_keep_open_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.playback_keep_open_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

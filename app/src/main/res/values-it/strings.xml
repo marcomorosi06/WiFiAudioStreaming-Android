@@ -274,6 +274,18 @@
     <string name="auto_connect_switch_desc">L\'app rimarrà attiva in background per connettersi ai server con la stella.</string>
 
     <string name="settings_group_personalization">Personalizzazione</string>
+    <string name="settings_item_background_spectrum_title">Spettrogramma in sottofondo</string>
+    <string name="settings_item_background_spectrum_desc">Mostra uno spettrogramma audio visivo nello sfondo durante lo streaming attivo.</string>
+    <string name="settings_item_spectrum_style_title">Stile Spettrogramma</string>
+    <string name="settings_item_spectrum_style_desc">Scegli tra barre e picchi oppure onde fluide.</string>
+    <string name="spectrum_style_bars">Barre &amp; Picchi</string>
+    <string name="spectrum_style_bars_desc">Barre verticali con picchi a caduta di gravità.</string>
+    <string name="spectrum_style_wave">Onde Fluide</string>
+    <string name="spectrum_style_wave_desc">Onde fluide continue a 3 strati multibanda (Bassi, Medi, Alti).</string>
+    <string name="settings_item_spectrum_blackout_only_title">Mostra solo in Dark Screen</string>
+    <string name="settings_item_spectrum_blackout_only_desc">Mostra lo spettrogramma esclusivamente durante la modalità Dark Screen.</string>
+    <string name="settings_item_spectrum_groove_title">Livello Groove</string>
+    <string name="settings_item_spectrum_groove_desc">Contrasto adattivo e tracciamento dinamico della melodia (da 0 a 160).</string>
     <string name="settings_item_connection_sound_title">Suono di connessione</string>
     <string name="settings_item_connection_sound_desc">Riproduci un suono quando il client si connette a un server</string>
     <string name="settings_item_custom_sound_title">Suono di connessione personalizzato</string>
