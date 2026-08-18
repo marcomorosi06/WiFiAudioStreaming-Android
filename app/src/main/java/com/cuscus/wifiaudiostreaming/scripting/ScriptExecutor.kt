@@ -135,7 +135,8 @@ object ScriptExecutor {
             snapcastBufferMs = settings.snapcastBufferMs,
             snapcastStreamName = settings.snapcastStreamName,
             usbMode = command.bool(ScriptParams.USB) ?: settings.usbModeEnabled,
-            usbLatencyMs = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs
+            usbLatencyMs = command.int(ScriptParams.USBLATENCY) ?: settings.usbLatencyMs,
+            persist = command.bool(ScriptParams.PERSIST) ?: settings.serverPersist
         )
     }
 
@@ -166,6 +167,7 @@ object ScriptExecutor {
             putExtra("snapcast_chunk_ms", params.snapcastChunkMs)
             putExtra("snapcast_buffer_ms", params.snapcastBufferMs)
             putExtra("snapcast_stream_name", params.snapcastStreamName)
+            putExtra("server_persist", params.persist)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)

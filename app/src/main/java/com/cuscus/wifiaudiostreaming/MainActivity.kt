@@ -142,6 +142,7 @@ class MainActivity : ComponentActivity() {
                         putExtra("snapcast_chunk_ms", it.snapcastChunkMs)
                         putExtra("snapcast_buffer_ms", it.snapcastBufferMs)
                         putExtra("snapcast_stream_name", it.snapcastStreamName)
+                        putExtra("server_persist", it.persist)
                     }
                 }
                 startForegroundService(intent)
@@ -706,6 +707,7 @@ class MainActivity : ComponentActivity() {
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
+            onServerPersistChange = viewModel::setServerPersist,
             onStreamInternalChange = viewModel::setStreamInternal,
             onStreamMicChange = { enabled ->
                 if (enabled) {

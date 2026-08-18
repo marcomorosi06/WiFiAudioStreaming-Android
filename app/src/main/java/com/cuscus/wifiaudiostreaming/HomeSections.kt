@@ -37,6 +37,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speaker
@@ -603,6 +605,8 @@ fun ExpressiveSourceSection(
     encryptionEnabled: Boolean,
     accent: Color,
     onStreamInternalChange: (Boolean) -> Unit,
+    serverPersist: Boolean = false,
+    onServerPersistChange: (Boolean) -> Unit = {},
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
     onSecurityChange: (String, String) -> Unit,
@@ -663,6 +667,25 @@ fun ExpressiveSourceSection(
             accent = accent,
             onCheckedChange = onMulticastChange
         )
+
+        AnimatedVisibility(
+            visible = !multicastActive,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column {
+                Spacer(Modifier.height(10.dp))
+                ExpressiveToggleTile(
+                    icon = Icons.Outlined.Sync,
+                    activeIcon = Icons.Filled.Sync,
+                    title = stringResource(R.string.server_persist_title),
+                    subtitle = stringResource(R.string.server_persist_desc),
+                    checked = serverPersist,
+                    accent = accent,
+                    onCheckedChange = onServerPersistChange
+                )
+            }
+        }
 
         AnimatedVisibility(
             visible = multicastLocked,

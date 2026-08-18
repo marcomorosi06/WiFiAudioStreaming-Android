@@ -624,4 +624,6 @@
     <string name="snapcast_how_to_connect_auto">Clients on this network find the stream on their own. If one does not, point it at the address below.</string>
     <string name="snapcast_how_to_connect_manual">Automatic discovery is off, so clients must be pointed at this address explicitly.</string>
     <string name="multicast_locked_by">Required by %1$s</string>
+    <string name="server_persist_title">Keep Server Running After Disconnect</string>
+    <string name="server_persist_desc">In unicast, a client leaving ends the session, not the server: it keeps the port open and waits for the next client.</string>
 </resources>

@@ -262,6 +262,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setServerPersist(persist: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.saveServerPersist(persist)
+        }
+    }
+
     fun setStreamInternal(enabled: Boolean) {
         viewModelScope.launch {
             appSettings.value?.let {

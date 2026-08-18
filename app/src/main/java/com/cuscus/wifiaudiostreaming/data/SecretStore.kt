@@ -66,10 +66,33 @@ class SecretStore private constructor(private val prefs: SharedPreferences) {
         return token
     }
 
+    @Synchronized
+    fun storeServerKey(serverIp: String, key: String) {
+        prefs.edit().putString(KEY_SERVER_PREFIX + serverIp.trim().lowercase(), key).commit()
+    }
+
+    @Synchronized
+    fun loadServerKey(serverIp: String): String? {
+        return prefs.getString(KEY_SERVER_PREFIX + serverIp.trim().lowercase(), null)
+    }
+
+    @Synchronized
+    fun clearServerKey(serverIp: String) {
+        prefs.edit().remove(KEY_SERVER_PREFIX + serverIp.trim().lowercase()).commit()
+    }
+
+    @Synchronized
+    fun clearAllServerKeys() {
+        val editor = prefs.edit()
+        prefs.all.keys.filter { it.startsWith(KEY_SERVER_PREFIX) }.forEach { editor.remove(it) }
+        editor.commit()
+    }
+
     companion object {
         private const val FILE_NAME = "wfas_secrets"
         private const val MASTER_KEY_ALIAS = "wfas_secrets_master_key"
         private const val KEY_AUTOMATION_TOKEN = "automation_token"
+        private const val KEY_SERVER_PREFIX = "server_key_"
 
         @Volatile
         private var instance: SecretStore? = null

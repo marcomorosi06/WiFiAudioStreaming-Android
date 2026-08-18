@@ -71,6 +71,7 @@ object ScriptParams {
     const val SNAPCASTCTRLPORT = "snapcastctrlport"
     const val SNAPCASTCODEC = "snapcastcodec"
     const val WFASMODE = "wfasmode"
+    const val PERSIST = "persist"
 
     // Non e' un parametro di streaming ma la credenziale che autorizza i comandi
     // che arrivano da fuori dal processo: tenuto fuori da ALL apposta, cosi'
@@ -82,7 +83,7 @@ object ScriptParams {
         INTERNAL, MIC, SAMPLERATE, CHANNELS, BUFFER, PORT, MICPORT, MULTICAST,
         RTP, RTPPORT, HTTP, HTTPPORT, HTTPSAFARI, IFACE, IP, CLIENTMIC, CLIENTIP,
         AUTOCONNECT, CONNSOUND, DISCSOUND, MODE, AUTHMODE, AUTHKEY,
-        USB, USBLATENCY, WFASMODE
+        USB, USBLATENCY, WFASMODE, PERSIST
     )
 
     fun parseBool(value: String?): Boolean? {
@@ -200,5 +201,6 @@ data class ResolvedServerParams(
     val snapcastBufferMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS,
     val snapcastStreamName: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME,
     val usbMode: Boolean = false,
-    val usbLatencyMs: Int = 20
+    val usbLatencyMs: Int = 20,
+    val persist: Boolean = false
 )

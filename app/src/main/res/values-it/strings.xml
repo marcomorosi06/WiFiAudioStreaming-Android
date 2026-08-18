@@ -624,4 +624,6 @@
     <string name="snapcast_how_to_connect_auto">I client sulla rete trovano lo stream da soli. Se uno non ci riesce, puntalo all\'indirizzo qui sotto.</string>
     <string name="snapcast_how_to_connect_manual">Il rilevamento automatico non è attivo, quindi i client vanno puntati esplicitamente a questo indirizzo.</string>
     <string name="multicast_locked_by">Richiesto da %1$s</string>
+    <string name="server_persist_title">Tieni acceso il server dopo la disconnessione</string>
+    <string name="server_persist_desc">In unicast, se il client se ne va finisce la sessione, non il server: la porta resta aperta in attesa del prossimo client.</string>
 </resources>

@@ -184,6 +184,7 @@ fun ExpressiveHomeScreen(
     isMulticastMode: Boolean,
     localIp: String,
     onMulticastModeChange: (Boolean) -> Unit,
+    onServerPersistChange: (Boolean) -> Unit = {},
     onToggleMode: (Boolean) -> Unit,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
@@ -364,6 +365,8 @@ fun ExpressiveHomeScreen(
                         accent = accent,
                         onStreamInternalChange = onStreamInternalChange,
                         onStreamMicChange = onStreamMicChange,
+                        serverPersist = appSettings.serverPersist,
+                        onServerPersistChange = onServerPersistChange,
                         onMulticastChange = onMulticastModeChange,
                         onSecurityChange = onSecurityChange,
                         onEncryptionChange = onEncryptionChange

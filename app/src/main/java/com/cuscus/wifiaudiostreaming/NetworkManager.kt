@@ -1294,6 +1294,7 @@ object NetworkManager {
         httpPort: Int = 8080,
         dlnaConfig: DlnaServerConfig? = null,
         snapcastConfig: com.cuscus.wifiaudiostreaming.snapcast.SnapcastServerConfig? = null,
+        persist: Boolean = false,
         onClientDisconnected: (() -> Unit)? = null
     ) {
         if (streamingJob?.isActive == true) return
@@ -1966,9 +1967,16 @@ object NetworkManager {
                             }
                         }
                         if (clientDisconnectedUnexpectedly) {
-                            isStreamingCurrent.value = false
-                            scope.launch(Dispatchers.Main) { onClientDisconnected?.invoke() }
-                            break
+                            if (!persist) {
+                                isStreamingCurrent.value = false
+                                scope.launch(Dispatchers.Main) { onClientDisconnected?.invoke() }
+                                break
+                            } else {
+                                Log.d(TAG, "[SERVER][UNICAST] persist: session over, waiting for next client")
+                                connectionStatus.value = context.getString(R.string.status_waiting_for_client, streamingPort)
+                                pendCnonce = ""
+                                pendSnonce = ""
+                            }
                         }
                     }
                 }

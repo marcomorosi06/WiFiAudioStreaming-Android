@@ -74,6 +74,7 @@ data class AppSettings(
     val snapcastBufferMs: Int = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.BUFFER_MS,
     val snapcastStreamName: String = com.cuscus.wifiaudiostreaming.snapcast.SnapcastDefaults.STREAM_NAME,
     val lastMulticastMode: Boolean = false,
+    val serverPersist: Boolean = false,
     val clientTileIp: String = "",
     val autoConnectEnabled: Boolean = false,
     val autoConnectList: String = "",
@@ -126,6 +127,7 @@ class SettingsDataStore(context: Context) {
         val MIC_PORT = intPreferencesKey("mic_port")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val LAST_MULTICAST_MODE = booleanPreferencesKey("last_multicast_mode")
+        val SERVER_PERSIST = booleanPreferencesKey("server_persist")
         val NETWORK_INTERFACE = stringPreferencesKey("network_interface")
         val RTP_ENABLED = booleanPreferencesKey("rtp_enabled")
         val RTP_PORT = intPreferencesKey("rtp_port")
@@ -189,6 +191,7 @@ class SettingsDataStore(context: Context) {
             micPort = preferences[PreferencesKeys.MIC_PORT] ?: 9092,
             onboardingCompleted = preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false,
             lastMulticastMode = preferences[PreferencesKeys.LAST_MULTICAST_MODE] ?: false,
+            serverPersist = preferences[PreferencesKeys.SERVER_PERSIST] ?: false,
             networkInterface = preferences[PreferencesKeys.NETWORK_INTERFACE] ?: "Auto",
             rtpEnabled = preferences[PreferencesKeys.RTP_ENABLED] ?: false,
             rtpPort = preferences[PreferencesKeys.RTP_PORT] ?: 9094,
@@ -437,6 +440,13 @@ class SettingsDataStore(context: Context) {
     suspend fun saveMicPort(port: Int) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.MIC_PORT] = port
+        }
+    }
+
+    
+    suspend fun saveServerPersist(persist: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SERVER_PERSIST] = persist
         }
     }
 

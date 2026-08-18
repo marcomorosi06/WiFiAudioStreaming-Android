@@ -51,6 +51,7 @@ class AudioCaptureService : Service() {
                 val channelConfig = intent.getStringExtra("channel_config") ?: "STEREO"
                 val bufferSize = intent.getIntExtra("buffer_size", 6144)
                 val isMulticast = intent.getBooleanExtra(EXTRA_IS_MULTICAST, true)
+                val persist = intent.getBooleanExtra("server_persist", false)
 
                 val streamingPort = intent.getIntExtra("streaming_port", 9090)
                 val networkInterfaceName = intent.getStringExtra("network_interface") ?: "Auto"
@@ -124,6 +125,7 @@ class AudioCaptureService : Service() {
                         httpPort = httpPort,
                         dlnaConfig = dlnaConfig,
                         snapcastConfig = snapcastConfig,
+                        persist = persist,
                         onClientDisconnected = { stopCapture() }
                     )
                 }
