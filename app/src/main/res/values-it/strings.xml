@@ -635,4 +635,16 @@
     <string name="snapcast_how_to_connect_auto">I client sulla rete trovano lo stream da soli. Se uno non ci riesce, puntalo all\'indirizzo qui sotto.</string>
     <string name="snapcast_how_to_connect_manual">Il rilevamento automatico non è attivo, quindi i client vanno puntati esplicitamente a questo indirizzo.</string>
     <string name="multicast_locked_by">Richiesto da %1$s</string>
+    <string name="lang_auto">Automatico (Predefinito di sistema)</string>
+    <string name="lang_selector_title">Lingua</string>
+    <string name="lang_selector_desc">Seleziona la lingua di visualizzazione</string>
+    <string name="saved_servers_title">Server salvati</string>
+    <string name="saved_servers_desc">Gestisci i server e le credenziali cifrate memorizzate su questo dispositivo</string>
+    <string name="saved_servers_empty">Nessun server salvato al momento</string>
+    <string name="saved_servers_forget">Dimentica</string>
+    <string name="saved_servers_last_connected">Ultima connessione: %s</string>
+    <string name="remember_password_label">Ricorda password</string>
+    <string name="server_persist_title">Mantieni il server attivo dopo la disconnessione</string>
+    <string name="server_persist_desc">Quando il client si disconnette, non arrestare automaticamente il server (solo Unicast)</string>
+    <string name="recent_servers_label">Server recenti:</string>
 </resources>

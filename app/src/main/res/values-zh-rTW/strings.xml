@@ -1,5 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">WiFi Audio Streaming</string>
+    <string name="app_name">WiFi 音訊串流\n___XYZ_分割___\n已連接\n___XYZ_分割___\n連線錯誤\n___XYZ_分割___\n等待…\n___XYZ_分割___\n設定\n___XYZ_分割___\n返回\n___XYZ_分割___\n選擇模式\n___XYZ_分割___\n接收\n___XYZ_分割___\n聽音訊\n___XYZ_分割___\n傳送\n___XYZ_分割___\n串流音訊\n___XYZ_分割___\n選擇來源\n___XYZ_分割___\n內部音訊\n___XYZ_分割___\n系統和應用程式音頻\n___XYZ_分割___\n麥克風\n___XYZ_分割___\n你的聲音\n___XYZ_分割___\n串流媒體活躍...\n___XYZ_分割___\n停止串流\n___XYZ_分割___\n準備串流\n___XYZ_分割___\n選擇來源\n___XYZ_分割___\n伺服器已配置並準備就緒\n___XYZ_分割___\n啟動伺服器\n___XYZ_分割___\n正在等待伺服器...\n___XYZ_分割___\n從下面的清單中尋找設備\n___XYZ_分割___\n附近的設備</string>
     <string name="splash_tagline" translatable="false">AUDIO STREAMING OVER WIFI</string>
     <string name="connection_status_connected">Connected</string>
     <string name="connection_status_error">Connection error</string>
@@ -25,7 +26,7 @@
     <string name="waiting_for_server">Waiting for a server...</string>
     <string name="find_device_text">Find a device from the list below</string>
     <string name="nearby_devices_title">Nearby Devices</string>
-    <string name="refresh_button_description">Refresh</string>
+    <string name="refresh_button_description">重新整理\n___XYZ_分割___\n正在尋找...\n___XYZ_分割___\n確保設備位於同一網絡\n___XYZ_分割___\n連接\n___XYZ_分割___\n捕獲權限被拒絕。\n___XYZ_分割___\n麥克風權限被拒絕。\n___XYZ_分割___\n內部音訊需要 Android 10+。\n___XYZ_分割___\n音訊來源\n___XYZ_分割___\n內部音訊\n___XYZ_分割___\n串流裝置播放的音頻\n___XYZ_分割___\n串流時將此裝置靜音\n___XYZ_分割___\n在擷取音訊時將媒體音量靜音，這樣就不會聽到兩次。將其關閉以繼續在此設備上聽到它。伺服器停止時音量會恢復。\n___XYZ_分割___\n麥克風\n___XYZ_分割___\n串流麥克風捕獲的音頻\n___XYZ_分割___\n音訊品質\n___XYZ_分割___\n音訊\n___XYZ_分割___\n資訊\n___XYZ_分割___\n取樣率\n___XYZ_分割___\n更高的品質需要更多的頻寬\n___XYZ_分割___\n音訊頻道\n___XYZ_分割___\n立體聲提供更身臨其境的聲音\n___XYZ_分割___\n單聲道\n___XYZ_分割___\n立體聲\n___XYZ_分割___\n效能\n___XYZ_分割___\n緩衝區大小</string>
     <string name="searching_indicator_text">Searching…</string>
     <string name="searching_subtitle">Make sure devices are on the same network</string>
     <string name="connect_button_description">Connect</string>
@@ -50,7 +51,7 @@
     <string name="settings_option_stereo">Stereo</string>
     <string name="settings_group_performance">Performance</string>
     <string name="settings_item_buffer_size_title">Buffer Size</string>
-    <string name="settings_item_buffer_size_desc">A smaller buffer reduces latency but may cause dropouts</string>
+    <string name="settings_item_buffer_size_desc">較小的緩衝區可以減少延遲，但可能會導致損失\n___XYZ_分割___\n延遲\n___XYZ_分割___\n播放緩衝區深度。更高=更穩定，更多延遲。\n___XYZ_分割___\n進階\n___XYZ_分割___\n資料包大小\n___XYZ_分割___\n每個網路資料包的音訊位元組數（串流和麥克風）。較低 = 較小的資料包，例如對於微控制器。\n___XYZ_分割___\n傳輸方式\n___XYZ_分割___\n群播\n___XYZ_分割___\n對於多個客戶端，延遲較高\n___XYZ_分割___\n單一客戶端\n___XYZ_分割___\n直連，延遲更低\n___XYZ_分割___\n網路\n___XYZ_分割___\n串流媒體連接埠\n___XYZ_分割___\n單播/組播流的端口\n___XYZ_分割___\n實驗特點\n___XYZ_分割___\n啟用實驗性功能\n___XYZ_分割___\n警告：這些選項不穩定且可能不起作用。\n___XYZ_分割___\n警告\n___XYZ_分割___\n實驗性功能正在開發中，可能會導致崩潰或意外行為。使用風險自負。\n___XYZ_分割___\n無論如何啟用\n___XYZ_分割___\n取消\n___XYZ_分割___\n客戶選項\n___XYZ_分割___\n共用麥克風\n___XYZ_分割___\n透過桌面說話（Discord、Zoom、遊戲...）\n___XYZ_分割___\n主音訊連接埠</string>
     <string name="settings_item_latency_title">Latency</string>
     <string name="settings_item_latency_desc">Playback buffer depth. Higher = more stable, more delay.</string>
     <string name="settings_group_advanced">Advanced</string>
@@ -74,15 +75,13 @@
     <string name="client_options_title">Client Options</string>
     <string name="send_mic_to_server_title">Share Microphone</string>
     <string name="send_mic_to_server_subtitle">Speak through the desktop (Discord, Zoom, games...)</string>
-
     <string name="main_audio_port_title">Main Audio Port</string>
-    <string name="main_audio_port_desc">Port to receive audio from the server</string>
+    <string name="main_audio_port_desc">從伺服器接收音訊的連接埠\n___XYZ_分割___\n客戶端麥克風連接埠\n___XYZ_分割___\n將麥克風發送到伺服器的端口\n___XYZ_分割___\n連接埠號碼 (1024-65535)\n___XYZ_分割___\n公開選拔\n___XYZ_分割___\nXYZPH0XYZ B\n___XYZ_分割___\n群播\n___XYZ_分割___\n單播\n___XYZ_分割___\n加密的\n___XYZ_分割___\n需要鑰匙\n___XYZ_分割___\n核准\n___XYZ_分割___\n傳送麥克風\n___XYZ_分割___\n接受對講\n___XYZ_分割___\n享受 WiFi 音訊串流嗎？\n___XYZ_分割___\n這個應用程式是免費且無廣告的，由一個人在業餘時間製作。如果它對您有用，關於 Ko-fi 的小技巧可以幫助它保持活力。沒有壓力，一切都會順利進行。\n___XYZ_分割___\n支持 Ko-fi ☕\n___XYZ_分割___\n也許稍後\n___XYZ_分割___\n不顯示\n30天\n___XYZ_分割___\n空閒\n___XYZ_分割___\n錯誤：麥克風權限被拒絕。\n___XYZ_分割___\n麥克風發送錯誤：XYZPH0XYZ\n___XYZ_分割___\n伺服器不接受麥克風，麥克風未發送\n___XYZ_分割___\n正在連接埠 XYZPH0XYZ 上等待客戶端...\n___XYZ_分割___\n客戶端連線：XYZPH0XYZ。開始…\n___XYZ_分割___\n客戶端 XYZPH0XYZ 握手失敗</string>
     <string name="client_mic_port_title">Client Microphone Port</string>
     <string name="client_mic_port_desc">Port to send the microphone to the server</string>
     <string name="port_number_label">Port Number (1024-65535)</string>
     <string name="open_selection_desc">Open selection</string>
     <string name="buffer_size_value">%1$d B</string>
-
     <string name="mode_multicast">Multicast</string>
     <string name="mode_unicast">Unicast</string>
     <string name="sec_encrypted">Encrypted</string>
@@ -95,7 +94,6 @@
     <string name="donation_support">Support on Ko-fi ☕</string>
     <string name="donation_later">Maybe later</string>
     <string name="donation_dismiss_30">Don\'t show\nfor 30 days</string>
-
     <string name="status_idle">Idle</string>
     <string name="status_mic_permission_denied">Error: Microphone permission denied.</string>
     <string name="status_mic_send_error">Microphone sending error: %1$s</string>
@@ -103,7 +101,7 @@
     <string name="status_waiting_for_client">Waiting for client on port %1$d…</string>
     <string name="status_client_connected">Client connected: %1$s. Starting…</string>
     <string name="status_handshake_failed_from_client">Handshake failed from client %1$s</string>
-    <string name="status_server_error">Server error: %1$s</string>
+    <string name="status_server_error">伺服器錯誤：%1$s\n___XYZ_分割___\n網路無法存取－等待恢復\n___XYZ_分割___\n網路恢復，再次串流\n___XYZ_分割___\n伺服器停止了。\n___XYZ_分割___\n正在聯絡伺服器 %1$s...\n___XYZ_分割___\n等待確認（ACK）...\n___XYZ_分割___\n握手失敗：意外回應“%1$s”\n___XYZ_分割___\n串流媒體…\n___XYZ_分割___\n正在加入多播群組...\n___XYZ_分割___\n錯誤：連接埠已在使用中。請再試一次。\n___XYZ_分割___\n客戶端錯誤：%1$s\n___XYZ_分割___\n客戶停了下來。\n___XYZ_分割___\n歡迎來到\nWiFi 音訊串流！\n___XYZ_分割___\n將您的手機變成 PC 的 WiFi 揚聲器。首先，您需要桌面軟體。\n___XYZ_分割___\n下載桌面應用程式\n___XYZ_分割___\n訪問 %1$s\n___XYZ_分割___\n透過 WiFi 獲得水晶般清晰的音頻\n___XYZ_分割___\n使用 WiFi 網路傳輸或接收低延遲音訊。\n___XYZ_分割___\n無線音箱\n___XYZ_分割___\n在手機上收聽電腦的音訊。該應用程式會自動檢測您的 WiFi 網路上的伺服器。\n___XYZ_分割___\nWiFi音源\n___XYZ_分割___\n透過 WiFi 網路將音樂、遊戲或語音從手機傳輸到電腦。\n___XYZ_分割___\n控制您的網絡\n___XYZ_分割___\n優化設定以使流適應您的 WiFi 網路的強度。\n___XYZ_分割___\n跳過</string>
     <string name="status_link_lost_waiting">Network unreachable — waiting for it to come back</string>
     <string name="status_link_restored">Network back, streaming again</string>
     <string name="status_server_stopped">Server stopped.</string>
@@ -127,12 +125,10 @@
     <string name="onboarding_feature2_desc">Stream music, games, or your voice from your phone to your PC over the WiFi network.</string>
     <string name="onboarding_feature3_title">Control Over Your Network</string>
     <string name="onboarding_feature3_desc">Optimize settings to adapt the stream to the strength of your WiFi network.</string>
-
     <string name="skip">SKIP</string>
-    <string name="next">NEXT</string>
+    <string name="next">下一個\n___XYZ_分割___\n開始\n___XYZ_分割___\n關於和幫助\n___XYZ_分割___\n展會介紹\n___XYZ_分割___\n回顧最初的功能之旅\n___XYZ_分割___\n開發者\n___XYZ_分割___\n通知權限\n___XYZ_分割___\n為了確保即使應用程式在後台，串流媒體也能繼續運作，需要授予通知權限。\n___XYZ_分割___\n授予許可\n___XYZ_分割___\n後來\n___XYZ_分割___\n謝謝！通知現已啟動。\n___XYZ_分割___\n權限被拒絕。該應用程式可能無法在背景正常運作。\n___XYZ_分割___\n伺服器已斷開連接\n___XYZ_分割___\n手動IP\n___XYZ_分割___\n傳輸量：XYZPH0XYZ%%\n___XYZ_分割___\n伺服器IP：XYZPH0XYZ\n___XYZ_分割___\n網路介面\n___XYZ_分割___\n選擇用於遠端串流的 VPN 適配器（例如 tun0）\n___XYZ_分割___\nWFAS 可用性\n___XYZ_分割___\n決定此設備何時向其他設備提供 WFAS。\n___XYZ_分割___\n總是\n___XYZ_分割___\n不在 USB 上\n___XYZ_分割___\n從來沒有\n___XYZ_分割___\nWFAS 始終透過 Wi-Fi 和 USB 連接線提供。\n___XYZ_分割___\nWFAS 透過 Wi-Fi 提供，但一旦 USB 連結出現，就會停止。透過電纜它可以繼續工作。</string>
     <string name="start">START</string>
-
-    <string name="settings_group_about">About &amp; Help</string>
+    <string name="settings_group_about">About &amp;amp; Help</string>
     <string name="settings_item_show_intro_title">Show Introduction</string>
     <string name="settings_item_show_intro_desc">Review the initial feature tour</string>
     <string name="developer_name">Developed by</string>
@@ -155,7 +151,7 @@
     <string name="wfas_mode_off_short">Never</string>
     <string name="wfas_mode_always_desc">WFAS is always offered, over Wi-Fi and over the USB cable.</string>
     <string name="wfas_mode_off_on_usb_desc">WFAS is offered over Wi-Fi, but stops as soon as the USB link comes up. Over the cable it keeps working.</string>
-    <string name="wfas_mode_off_desc">WFAS is never offered over Wi-Fi. Only the USB cable and the other protocols remain.</string>
+    <string name="wfas_mode_off_desc">WFAS 絕不會透過 Wi-Fi 提供。僅保留 USB 連接線和其他協定。\n___XYZ_分割___\n始終開啟\n___XYZ_分割___\n連接 USB 時熄滅\n___XYZ_分割___\n關閉\n___XYZ_分割___\n啟動 WFAS 協議\n___XYZ_分割___\nUSB連接\n___XYZ_分割___\n透過 USB 連接\n___XYZ_分割___\n無線連線\n___XYZ_分割___\n無可用協議\n___XYZ_分割___\n關閉 WFAS 後，您至少需要啟用一種其他協定或有效的 USB 連接才能啟動串流。\n___XYZ_分割___\nUSB線\n___XYZ_分割___\n透過 USB 發送\n___XYZ_分割___\n透過電纜而不是 Wi-Fi 串流傳輸到計算機\n___XYZ_分割___\n透過 USB 接收\n___XYZ_分割___\n透過電纜而不是 Wi-Fi 收聽計算機\n___XYZ_分割___\n電纜鏈路激活\n___XYZ_分割___\n連接電纜並打開 USB 網路共享以開啟連結。\n___XYZ_分割___\nUSB\n___XYZ_分割___\nUSB連接\n___XYZ_分割___\nUSB模式\n___XYZ_分割___\n透過 USB 連接線而不是 Wi-Fi 進行串流傳輸。需要在此手機上啟用 USB 網路共用。\n___XYZ_分割___\nUSB緩衝器\n___XYZ_分割___\n當 USB 連結處於作用中狀態時，使用抖動緩衝器取代音訊緩衝器。更低意味著延遲更少，但丟失的風險更大。某些裝置會突發傳輸 USB 封包，因此需要比 Wi-Fi 更多的緩衝區，而不​​是更少。\n___XYZ_分割___\n透過 USB 連接\n___XYZ_分割___\n透過 XYZPH0XYZ (XYZPH1XYZ) 連接</string>
     <string name="wfas_mode_always">Always on</string>
     <string name="wfas_mode_off_on_usb">Off when USB is connected</string>
     <string name="wfas_mode_off">Off</string>
@@ -180,7 +176,7 @@
     <string name="settings_item_usb_latency_desc">Jitter buffer used instead of the audio one while the USB link is active. Lower means less latency but more risk of dropouts. Some devices deliver USB packets in bursts and need more buffer here than over Wi-Fi, not less.</string>
     <string name="usb_status_ready_short">Connected over USB</string>
     <string name="usb_status_ready">Connected via %1$s (%2$s)</string>
-    <string name="usb_status_cable_no_tether">Cable detected, USB tethering is off</string>
+    <string name="usb_status_cable_no_tether">偵測到電纜，USB 網路共享已關閉\n___XYZ_分割___\n未偵測到 USB 連接線\n___XYZ_分割___\n啟用 USB 網路分享\n___XYZ_分割___\n在電腦上，讓應用程式保持自動介面選擇：它會自行找到 USB 連結。\n___XYZ_分割___\n使用VPN？\n___XYZ_分割___\n設備發現無法透過 VPN 進行，組播封包無法透過隧道傳輸。如果您僅透過 VPN 連線（不在同一 Wi-Fi 上），請選擇單播模式並手動輸入伺服器 IP。多播需要相同的本地網路。\n___XYZ_分割___\n您的IP：XYZPH0XYZ\n___XYZ_分割___\n伺服器協定\n___XYZ_分割___\nWFAS（本地）\n___XYZ_分割___\n低延遲自訂協議，由行動和桌面應用程式使用。\n___XYZ_分割___\n斷開連接後保持伺服器運行\n___XYZ_分割___\n在單播中，客戶端離開會結束會話，而不是伺服器：它保持連接埠開啟並等待下一個。多播已經以這種方式工作。\n___XYZ_分割___\nRTP/PCM 流\n___XYZ_分割___\nVLC、Kodi 或 FFplay 的標準協定。\n___XYZ_分割___\nHTTP 網路流\n___XYZ_分割___\n直接串流到網頁瀏覽器。\n___XYZ_分割___\nHTTP 連接埠\n___XYZ_分割___\nWeb 介面的連接埠。\n___XYZ_分割___\n網路編解碼器（相容性）\n___XYZ_分割___\n選擇 Opus 以實現低延遲，或選擇 AAC 以實現 Safari/iOS。\n___XYZ_分割___\n作品（Chrome / 火狐）\n___XYZ_分割___\nAAC（Safari / iOS）\n___XYZ_分割___\nRTP連接埠\n___XYZ_分割___\nRTP 流的連接埠\n___XYZ_分割___\n啟用 RTP 流時會強制執行多播。</string>
     <string name="usb_status_no_cable">No USB cable detected</string>
     <string name="usb_action_open_tethering">Enable USB tethering</string>
     <string name="usb_hint_desktop">On the computer, keep the app on automatic interface selection: it will find the USB link on its own.</string>
@@ -205,7 +201,7 @@
     <string name="settings_item_rtp_port_title">RTP Port</string>
     <string name="settings_item_rtp_port_desc">Port for the RTP stream</string>
     <string name="rtp_forces_multicast">Multicast is enforced when RTP stream is enabled.</string>
-    <string name="copy_sdp">Copy SDP</string>
+    <string name="copy_sdp">複製SDP\n___XYZ_分割___\n保存SDP\n___XYZ_分割___\nSDP 已複製到剪貼簿\n___XYZ_分割___\n複製或儲存 SDP 檔案以使用 VLC 或 FFplay 收聽\n___XYZ_分割___\n給我買杯咖啡\n___XYZ_分割___\n如果你喜歡這個應用程序，請給我一杯咖啡！ ☕\n___XYZ_分割___\n安卓原始碼\n___XYZ_分割___\n桌面原始碼\n___XYZ_分割___\n在 GitHub 上查看\n___XYZ_分割___\n版本\n___XYZ_分割___\n許可證\n___XYZ_分割___\nEUPL v1.2 - © Marco Morosi\n___XYZ_分割___\n該項目根據歐盟公共許可證 v1.2 獲得許可。所有智慧財產權均屬於 Marco Morosi。該許可證授予您使用、研究、修改和重新分發該軟體的權利，即使是修改後的形式，前提是您保留相同的許可證。\n___XYZ_分割___\n閱讀完整的 EUPL v1.2 文本\n___XYZ_分割___\n在瀏覽器中開啟 eupl.eu\n___XYZ_分割___\n開源許可證\n___XYZ_分割___\n第三方軟體及其許可證\n___XYZ_分割___\n開源許可證\n___XYZ_分割___\n關閉\n___XYZ_分割___\n多種協定\n___XYZ_分割___\n發送相同音訊的五種方法。選擇適合您已有物品的產品。\n___XYZ_分割___\nWFAS（本地）\n___XYZ_分割___\n需要在兩台裝置上安裝 WiFi 音訊串流應用程式。它提供最佳的同步，非常適合遊戲和觀看影片。\n___XYZ_分割___\nRTP流\n___XYZ_分割___\n串流到 VLC、Kodi 或 FFplay 等外部媒體播放器。只需從應用程式保存 SDP 檔案並使用您最喜歡的播放器打開它。</string>
     <string name="save_sdp">Save SDP</string>
     <string name="sdp_copied">SDP copied to clipboard</string>
     <string name="rtp_description">Copy or save the SDP file to listen with VLC or FFplay</string>
@@ -226,19 +222,14 @@
     <string name="licenses_close">Close</string>
     <string name="onboarding_protocols_title">Multiple Protocols</string>
     <string name="onboarding_protocols_subtitle">Five ways to send the same audio. Pick the one that fits what you already own.</string>
-
     <string name="onboarding_proto1_title">WFAS (Native)</string>
     <string name="onboarding_proto1_desc">Requires the WiFi Audio Streaming app on both devices. It offers the best synchronization, ideal for gaming and watching videos.</string>
-
     <string name="onboarding_proto2_title">RTP Stream</string>
     <string name="onboarding_proto2_desc">Stream to external media players like VLC, Kodi, or FFplay. Just save the SDP file from the app and open it with your favorite player.</string>
-
-    <string name="onboarding_proto3_title">HTTP Web Stream</string>
+    <string name="onboarding_proto3_title">HTTP 網路流\n___XYZ_分割___\n直接從任何網頁瀏覽器（Chrome、Safari、智慧電視）收聽，無需安裝任何內容。只需鍵入伺服器的 IP 位址和連接埠。\n___XYZ_分割___\nDLNA\n___XYZ_分割___\n將音訊直接推送到網路上已有的 DLNA 渲染器 - 智慧電視、AV 接收器、網路揚聲器。無需在其上安裝任何內容：選擇設備即可開始播放。\n___XYZ_分割___\n快播\n___XYZ_分割___\n同步多房間音訊。網路上的任何 Snapclient（Raspberry Pi、ESP32、Home Assistant、Snapcast 應用程式）都會加入並與其他客戶端保持完美同步。\n___XYZ_分割___\n注意：Web 瀏覽器對 HTTP 流強制執行內部緩衝，這不可避免地會導致 1-3 秒的延遲。這是正常現象，無法繞過。\n___XYZ_分割___\n開始串流\n___XYZ_分割___\n重新整理\n___XYZ_分割___\n未找到伺服器\n___XYZ_分割___\n停止伺服器\n___XYZ_分割___\n斷開連接\n___XYZ_分割___\n串流媒體活躍\n___XYZ_分割___\n已連接\n___XYZ_分割___\n伺服器管理員\n___XYZ_分割___\n客戶經理\n___XYZ_分割___\nIP: XYZPH0XYZ\n___XYZ_分割___\n空閒\n___XYZ_分割___\n\n___XYZ_分割___\n伺服器管理員\n___XYZ_分割___\n客戶經理\n___XYZ_分割___\n快速設定圖塊\n___XYZ_分割___\n客戶端平鋪固定IP\n___XYZ_分割___\n例如，192.168.1.50\n___XYZ_分割___\n當您從通知列啟動接收器時，將自動使用此 IP 位址。</string>
     <string name="onboarding_proto3_desc">Listen directly from any web browser (Chrome, Safari, Smart TVs) without installing anything. Just type the server\'s IP address and port.</string>
-
     <string name="onboarding_proto4_title">DLNA</string>
     <string name="onboarding_proto4_desc">Push the audio straight to the DLNA renderers already on your network — Smart TVs, AV receivers, network speakers. Nothing to install on them: pick the device and it starts playing.</string>
-
     <string name="onboarding_proto5_title">Snapcast</string>
     <string name="onboarding_proto5_desc">Synchronised multiroom audio. Any snapclient on the network (Raspberry Pi, ESP32, Home Assistant, the Snapcast apps) joins in and stays perfectly in sync with the others.</string>
     <string name="http_latency_warning">Note: Web browsers enforce internal buffering for HTTP streams, which inevitably introduces a 1–3 second delay. This is normal and cannot be bypassed.</string>
@@ -260,7 +251,7 @@
     <string name="settings_tile_ip_label">Client Tile Fixed IP</string>
     <string name="settings_tile_ip_placeholder">e.g., 192.168.1.50</string>
     <string name="settings_tile_ip_description">This IP address will be used automatically when you start the receiver from the notification shade.</string>
-    <string name="shortcut_start_server_short">Start Server</string>
+    <string name="shortcut_start_server_short">啟動伺服器\n___XYZ_分割___\n啟動音訊伺服器\n___XYZ_分割___\n停止\n___XYZ_分割___\n停止串流\n___XYZ_分割___\n這裡隱藏著一些東西......\n___XYZ_分割___\n你越來越暖和了...\n___XYZ_分割___\n一個秘密正在等待著…\n___XYZ_分割___\n繼續走，不要停下來！\n___XYZ_分割___\n快到了...\n___XYZ_分割___\n最後一次觸摸...\n___XYZ_分割___\n正在偵聽優先權伺服器...\n___XYZ_分割___\n自動連接優先權\n___XYZ_分割___\nIP位址\n___XYZ_分割___\nWi-Fi 網路（選購）\n___XYZ_分割___\n鑰匙（可選）\n___XYZ_分割___\n密鑰已儲存 — 要替換的類型\n___XYZ_分割___\n刪除已儲存的密鑰\n___XYZ_分割___\n啟用\n___XYZ_分割___\n新增伺服器\n___XYZ_分割___\n向上移動\n___XYZ_分割___\n下移\n___XYZ_分割___\n刪除\n___XYZ_分割___\n訂購伺服器。該應用程式將嘗試從頂部開始連接。\n___XYZ_分割___\n使用目前的 Wi-Fi\n___XYZ_分割___\n連接到 Wi-Fi 網路並啟用“位置”以讀取 SSID。</string>
     <string name="shortcut_start_server_long">Start Audio Server</string>
     <string name="shortcut_stop_short">Stop</string>
     <string name="shortcut_stop_long">Stop Streaming</string>
@@ -285,16 +276,15 @@
     <string name="auto_connect_priority_desc">Order servers. The app will attempt to connect starting from the top.</string>
     <string name="auto_connect_use_current_wifi">Use current Wi-Fi</string>
     <string name="auto_connect_ssid_error">Connect to a Wi-Fi network and enable Location to read the SSID.</string>
-    <string name="auto_connect_wifi_hint">Read the network name and type it here</string>
+    <string name="auto_connect_wifi_hint">讀取網路名稱並在此輸入\n___XYZ_分割___\n在背景自動連接\n___XYZ_分割___\n讓應用程式在背景保持活動以自動連接到加星標的伺服器。\n___XYZ_分割___\n個人化\n___XYZ_分割___\n背景頻譜圖\n___XYZ_分割___\n在活動串流期間在背景顯示視覺音訊頻譜圖。\n___XYZ_分割___\n頻譜圖風格\n___XYZ_分割___\n在清脆的條形或流暢的波浪之間進行選擇。\n___XYZ_分割___\n酒吧和高峰\n___XYZ_分割___\n具有下降峰帽和重力物理的垂直條。\n___XYZ_分割___\n流體波\n___XYZ_分割___\n具有 3 個連續曲線波（低音、中音、高音）的流體多頻段。\n___XYZ_分割___\n僅在黑屏中顯示\n___XYZ_分割___\n僅當暗屏模式處於活動狀態時才顯示頻譜圖。\n___XYZ_分割___\n凹槽水平\n___XYZ_分割___\n自適應頻譜對比度和旋律追蹤（0 至 160）。\n___XYZ_分割___\n連結聲音\n___XYZ_分割___\n當客戶端連接到伺服器時播放聲音\n___XYZ_分割___\n自訂連線聲音\n___XYZ_分割___\n未選擇檔案（使用預設值）\n___XYZ_分割___\n選擇文件\n___XYZ_分割___\n斷開聲音\n___XYZ_分割___\n當客戶端與伺服器斷開連線時播放聲音\n___XYZ_分割___\n麥克風靜音\n___XYZ_分割___\n麥克風處於活動狀態</string>
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
-
     <string name="settings_group_personalization">Personalization</string>
     <string name="settings_item_background_spectrum_title">Background Spectrogram</string>
     <string name="settings_item_background_spectrum_desc">Show a visual audio spectrogram in the background during active streaming.</string>
     <string name="settings_item_spectrum_style_title">Spectrogram Style</string>
     <string name="settings_item_spectrum_style_desc">Choose between crisp bars or fluid waves.</string>
-    <string name="spectrum_style_bars">Bars &amp; Peaks</string>
+    <string name="spectrum_style_bars">Bars &amp;amp; Peaks</string>
     <string name="spectrum_style_bars_desc">Vertical bars with falling peak caps and gravity physics.</string>
     <string name="spectrum_style_wave">Fluid Waves</string>
     <string name="spectrum_style_wave_desc">Fluid multi-band with 3 continuous curve waves (Bass, Mid, High).</string>
@@ -311,16 +301,15 @@
     <string name="settings_item_disconnection_sound_desc">Play a sound when the client disconnects from a server</string>
     <string name="mic_muted">Microphone Muted</string>
     <string name="mic_active">Microphone Active</string>
-    <string name="mic_permission_required">Microphone permission is required.</string>
+    <string name="mic_permission_required">需要麥克風許可。\n___XYZ_分割___\n為什麼？\n___XYZ_分割___\n為什麼需要麥克風權限？\n___XYZ_分割___\n從 Android 10 開始，擷取內部音訊需要 MediaProjection API，即使您只想擷取系統音訊而不是麥克風，但該 API 也始終需要 RECORD_AUDIO 權限。這是作業系統強制執行的預防措施：音訊管道被初始化為單一單元，系統預先請求許可，而無需事先知道將使用哪個來源。此外，一些 OEM 實作（三星、小米等）比原生 Android 更嚴格地執行此要求，從而在所有情況下都強制執行該授權。\n___XYZ_分割___\n其他設備上沒有音訊？嘗試重新啟動此手機。\n___XYZ_分割___\n自動化和腳本編寫\n___XYZ_分割___\n自訂 URI 和意圖\n___XYZ_分割___\n產生 URI 和意圖以觸發來自 NFC 標籤、Tasker、MacroDroid 或快捷方式的操作\n___XYZ_分割___\n自動化和腳本編寫\n___XYZ_分割___\n產生 URI 以寫入 NFC 標籤或從任何自動化應用程式開啟。空字段保留應用程式預設值。儲存的腳本可以運行、複製或共用。\n___XYZ_分割___\n編輯\n___XYZ_分割___\n行動\n___XYZ_分割___\n腳本名稱（可選）\n___XYZ_分割___\n產生的 URI（NFC/深度連結）\n___XYZ_分割___\n廣播動作（Tasker / MacroDroid）\n___XYZ_分割___\n亞行命令\n___XYZ_分割___\n複製 URI\n___XYZ_分割___\n分享\n___XYZ_分割___\n複製廣播動作\n___XYZ_分割___\n複製ADB命令\n___XYZ_分割___\n外部命令\n___XYZ_分割___\n允許，需要令牌\n___XYZ_分割___\n被阻止\n___XYZ_分割___\n來自應用程式外部的命令（NFC 標籤、Tasker、MacroDroid、ADB）將一直被拒絕，直到您在此處將其開啟。啟動後，僅執行攜帶下列令牌的命令：此畫面上產生的 URI 和命令已包含該令牌。如果您不使用自動化，請關閉此選項。\n___XYZ_分割___\n顯示或隱藏令牌</string>
     <string name="mic_permission_why_button">Why?</string>
     <string name="mic_permission_explanation_title">Why is microphone permission needed?</string>
     <string name="mic_permission_explanation_body">Starting from Android 10, capturing internal audio requires the MediaProjection API, which always requires the RECORD_AUDIO permission, even if you only intend to capture system audio and not the microphone. This is a precautionary measure enforced by the OS: the audio pipeline is initialized as a single unit, and the system requests the permission upfront without knowing in advance which source will be used. Additionally, some OEM implementations (Samsung, Xiaomi, and others) enforce this requirement more strictly than stock Android, making the permission effectively mandatory in all cases.</string>
     <string name="server_audio_restart_hint">No audio on the other device? Try restarting this phone.</string>
-
-    <string name="settings_group_automation">Automation &amp; Scripting</string>
-    <string name="settings_item_scripting_title">Custom URIs &amp; intents</string>
+    <string name="settings_group_automation">Automation &amp;amp; Scripting</string>
+    <string name="settings_item_scripting_title">Custom URIs &amp;amp; intents</string>
     <string name="settings_item_scripting_desc">Generate URIs and intents to trigger actions from NFC tags, Tasker, MacroDroid or shortcuts</string>
-    <string name="scripting_title">Automation &amp; Scripting</string>
+    <string name="scripting_title">Automation &amp;amp; Scripting</string>
     <string name="scripting_help">Generate a URI to write to an NFC tag or open from any automation app. Empty fields keep the app defaults. Saved scripts can be run, copied or shared.</string>
     <string name="scripting_editor_title">Editor</string>
     <string name="scripting_action_label">Action</string>
@@ -337,7 +326,7 @@
     <string name="scripting_security_state_off">Blocked</string>
     <string name="scripting_security_explainer">Commands from outside the app (NFC tags, Tasker, MacroDroid, ADB) stay refused until you turn them on here. Once on, only commands carrying the token below run: the URIs and commands generated on this screen already include it. Leave this off if you do not use automations.</string>
     <string name="scripting_security_reveal">Show or hide the token</string>
-    <string name="scripting_security_copy_token">Copy token</string>
+    <string name="scripting_security_copy_token">複製令牌\n___XYZ_分割___\n產生新令牌\n___XYZ_分割___\n任何持有令牌的人都可以驅動該應用程式。重新產生它會使已設定的每個 URI、NFC 標籤和自動化失效。\n___XYZ_分割___\n儲存\n___XYZ_分割___\n更新\n___XYZ_分割___\n立即運行\n___XYZ_分割___\n取消編輯\n___XYZ_分割___\n儲存的腳本\n___XYZ_分割___\n尚未儲存腳本。\n___XYZ_分割___\nXYZPH0XYZ 參數\n___XYZ_分割___\n編輯\n___XYZ_分割___\n刪除\n___XYZ_分割___\n預設\n___XYZ_分割___\n開\n___XYZ_分割___\n關閉\n___XYZ_分割___\n啟動伺服器\n___XYZ_分割___\n連線客戶端\n___XYZ_分割___\n停止\n___XYZ_分割___\n切換\n___XYZ_分割___\n更改設定\n___XYZ_分割___\n關閉\n___XYZ_分割___\n協議版本不相容\n___XYZ_分割___\n伺服器未回應連線請求。如果您可以在清單中看到它但無法連接，則它可能正在運行舊版本的應用程式：在該裝置上更新它。\n___XYZ_分割___\n寄件者更改了群組密鑰\n___XYZ_分割___\n連線被伺服器拒絕</string>
     <string name="scripting_security_regenerate">Generate a new token</string>
     <string name="scripting_security_share_warning">Anyone holding the token can drive the app. Regenerating it invalidates every URI, NFC tag and automation already set up.</string>
     <string name="scripting_save">Save</string>
@@ -362,7 +351,7 @@
     <string name="status_server_silent_maybe_outdated">The server is not answering the connection request. If you can see it in the list but it will not connect, it is probably running an older version of the app: update it on that device.</string>
     <string name="status_group_rekeyed">Group key changed by the sender</string>
     <string name="status_unauthorized">Connection refused by the server</string>
-    <string name="status_awaiting_approval">Waiting for the other device to approve…</string>
+    <string name="status_awaiting_approval">等待其他設備批准...\n___XYZ_分割___\n該伺服器需要密鑰\n___XYZ_分割___\n安全性\n___XYZ_分割___\n需要授權（伺服器）\n___XYZ_分割___\n選擇當該設備是伺服器時誰可以連接\n___XYZ_分割___\n關閉\n___XYZ_分割___\n每次都詢問\n___XYZ_分割___\n預共享金鑰\n___XYZ_分割___\n關閉\n___XYZ_分割___\n詢問\n___XYZ_分割___\n鑰匙\n___XYZ_分割___\n鑰匙\n___XYZ_分割___\n弱鍵\n___XYZ_分割___\n公平密鑰\n___XYZ_分割___\n強鍵\n___XYZ_分割___\n兩個設備必須輸入相同的密鑰。它永遠不會透過網路發送。\n___XYZ_分割___\n加密音訊\n___XYZ_分割___\n使用 ChaCha20-Poly1305 端對端加密音訊。需要密鑰模式（預共享密鑰）。\n___XYZ_分割___\n允許連接嗎？\n___XYZ_分割___\nXYZPH0XYZ 想要連接到該裝置。\n___XYZ_分割___\n允許\n___XYZ_分割___\n否認\n___XYZ_分割___\n需要鑰匙\n___XYZ_分割___\n該伺服器需要密鑰。輸入它進行連接：\n___XYZ_分割___\n鑰匙錯誤。再試一次：</string>
     <string name="status_key_required">This server requires a key</string>
     <string name="settings_group_security">Security</string>
     <string name="settings_item_security_mode_title">Require authorization (server)</string>
@@ -387,7 +376,7 @@
     <string name="key_dialog_title">Key required</string>
     <string name="key_dialog_body">This server requires a key. Enter it to connect:</string>
     <string name="key_dialog_wrong">Wrong key. Try again:</string>
-    <string name="key_dialog_connect">Connect</string>
+    <string name="key_dialog_connect">連接\n___XYZ_分割___\n取消\n___XYZ_分割___\n其他設備沒有回應\n___XYZ_分割___\n「XYZPH0XYZ」從未應答連線要求。最可能的原因是它正在運行舊版本的應用程序，該應用程式無法與此版本通訊 - 更新該設備上的應用程式。否則，請檢查防火牆是否未封鎖該連接埠。\n___XYZ_分割___\n另一台設備需要更新\n___XYZ_分割___\n該設備需要更新\n___XYZ_分割___\n這兩個應用程式運行不相容的 WFAS 協定版本（本設備：vXYZPH0XYZ，另一端：vXYZPH1XYZ）。連線已關閉。請更新，以便兩台裝置都運行最新版本。\n___XYZ_分割___\n正在傳輸的裝置正在執行舊版的應用程式（WFAS 協定 vXYZPH0XYZ，此裝置使用 vXYZPH1XYZ），因此連線已關閉。更新傳輸裝置上的應用程式。\n___XYZ_分割___\n正在接收的裝置正在執行舊版的應用程式（WFAS 協定 vXYZPH0XYZ，此裝置使用 vXYZPH1XYZ），因此連線已關閉。更新接收裝置上的應用程式。\n___XYZ_分割___\n此裝置正在執行舊版的應用程式（WFAS 協定 vXYZPH0XYZ，其他裝置使用 vXYZPH1XYZ），因此連線已關閉。更新此裝置上的應用程式。\n___XYZ_分割___\n開啟下載\n___XYZ_分割___\n從網站下載\n___XYZ_分割___\n在 GitHub 上打開\n___XYZ_分割___\n黑螢幕\n___XYZ_分割___\n按兩下返回\n___XYZ_分割___\n不在那裡，夥計，在別的地方\n___XYZ_分割___\n為了獲得最佳質量，請保持此應用程式在螢幕上打開並且手機解鎖。離開應用程式或鎖定裝置可能會導致音訊失真。\n___XYZ_分割___\n觸覺回饋\n___XYZ_分割___\n點擊、切換和按鍵操作時振動\n___XYZ_分割___\n黑色螢幕輪廓\n___XYZ_分割___\n保持控制顯示為白色輪廓而不是全黑螢幕\n___XYZ_分割___\n顯示支援訊息\n___XYZ_分割___\n帶回您忽略的 Ko-fi 訊息\n___XYZ_分割___\nWFAS v2 協議\n___XYZ_分割___\n參考 GitHub 上的 C99 實現</string>
     <string name="key_dialog_cancel">Cancel</string>
     <string name="server_silent_title">The other device is not answering</string>
     <string name="server_silent_body">“%1$s” never answered the connection request. The most likely reason is that it is running an older version of the app, which cannot talk to this one — update the app on that device. Otherwise, check that a firewall is not blocking the port.</string>
@@ -412,7 +401,7 @@
     <string name="settings_item_show_donation_desc">Bring back the Ko-fi message you dismissed</string>
     <string name="source_code_protocol">WFAS v2 Protocol</string>
     <string name="source_code_protocol_desc">Reference C99 implementation on GitHub</string>
-    <string name="welcome_eyebrow">Audio streaming over WiFi</string>
+    <string name="welcome_eyebrow">透過 WiFi 傳輸音頻\n___XYZ_分割___\n你的電話，\n你的揚聲器。\n___XYZ_分割___\n將音訊從您的電腦傳送到此設備，反之亦然。低延遲，透過您自己的網絡，雲端中沒有任何內容。\n___XYZ_分割___\n取得桌面應用程式\n___XYZ_分割___\n您想要在配對的電腦上需要\n___XYZ_分割___\n自動更新檢查\n___XYZ_分割___\n每次啟動時，應用程式都會詢問 GitHub 是否存在更新版本。\n___XYZ_分割___\nGitHub 是微軟旗下的美國公司。每個請求都必須向他們透露您的 IP 位址以及請求時間。不會發送任何其他內容：沒有帳戶、沒有識別碼、沒有使用資料。關閉此功能，應用程式永遠不會自行連接網路 - 您仍然可以隨時從「設定」手動檢查。\n___XYZ_分割___\n開啟·每次啟動時進行檢查\n___XYZ_分割___\n關閉 · 該應用程式從不聯絡 GitHub\n___XYZ_分割___\n更多詳情\n___XYZ_分割___\n細節較少\n___XYZ_分割___\n群播鎖定\n___XYZ_分割___\nRTP需要它\n___XYZ_分割___\nHTTP 需要它\n___XYZ_分割___\nRTP 和 HTTP 需要它\n___XYZ_分割___\n這些協定同時流向每個偵聽器，因此單一客戶端模式是不可能的。在「設定」中將其關閉即可解鎖。\n___XYZ_分割___\n無法播放此串流：伺服器發送 XYZPH0XYZ，該裝置不支援。\n___XYZ_分割___\n開發商\n___XYZ_分割___\n開發者特色\n___XYZ_分割___\n顯示進階實驗選項\n___XYZ_分割___\n降噪\n___XYZ_分割___\n消除來自模擬來源的電源嗡嗡聲和嘶嘶聲\n___XYZ_分割___\n強度：XYZPH0XYZ%%\n___XYZ_分割___\n僅適用於雜訊的類比發送器，例如對線路輸出進行取樣的微控制器。在乾淨的數位音訊上，它只能添加偽影。如果發送器已經消除了其一側的噪音，請勿使用它。</string>
     <string name="welcome_headline">Your phone,\nyour speaker.</string>
     <string name="welcome_body">Send audio from your PC to this device, or the other way round. Low latency, over your own network, nothing in the cloud.</string>
     <string name="welcome_step_desktop_title">Get the desktop app</string>
@@ -437,7 +426,7 @@
     <string name="nr_desc">Cleans mains hum and hiss from analog sources</string>
     <string name="nr_strength">Strength: %1$d%%</string>
     <string name="nr_hint">Only for noisy analog senders, such as a microcontroller sampling a line-out. On clean digital audio it can only add artifacts. Do not use it if the sender already removes noise on its side.</string>
-    <string name="status_server_busy">That server is already streaming to another device.</string>
+    <string name="status_server_busy">該伺服器已經在串流到另一台裝置。\n___XYZ_分割___\n從網站下載\n___XYZ_分割___\n當安全模式設定為“密鑰”時可用\n___XYZ_分割___\n始終開啟：具有多重播送功能的 QR 模式需要加密\n___XYZ_分割___\n複製了！\n___XYZ_分割___\n已複製到剪貼簿！\n___XYZ_分割___\n點選複製IP\n___XYZ_分割___\n複製\n___XYZ_分割___\n已複製！\n___XYZ_分割___\n複製網址\n___XYZ_分割___\n瀏覽器\n___XYZ_分割___\n靜音\n___XYZ_分割___\n0%（靜音）\n___XYZ_分割___\n100%（標準）\n___XYZ_分割___\n200%（最大）\n___XYZ_分割___\nDLNA / UPnP 渲染器\n___XYZ_分割___\n將音訊推送到 AV 接收器、條形音箱和智慧電視 — 無需應用程式\n___XYZ_分割___\nDLNA 媒體端口\n___XYZ_分割___\n渲染器連接回的 TCP 連接埠\n___XYZ_分割___\n音訊格式\n___XYZ_分割___\n自動（協商）\n___XYZ_分割___\n詢問每個渲染器支援什麼並選擇最佳匹配。受到推崇的。\n___XYZ_分割___\n未壓縮的 16 位元 PCM，~1.4 Mbps。最低的延遲，最廣泛的兼容性。\n___XYZ_分割___\n流式 WAV 標頭內未壓縮的 PCM。對一些較舊的韌體有幫助。\n___XYZ_分割___\n壓縮後，約 320 kbps。不適用於 Android。</string>
     <string name="changelog_download_from_website">Download from the website</string>
     <string name="settings_item_encryption_needs_key">Available when the security mode is set to Key</string>
     <string name="settings_item_encryption_locked_qr_multicast">Always on: QR mode with multicast requires encryption</string>
@@ -452,7 +441,6 @@
     <string name="volume_preset_mute">0% (Mute)</string>
     <string name="volume_preset_std">100% (Std)</string>
     <string name="volume_preset_max">200% (Max)</string>
-
     <string name="settings_item_dlna_title">DLNA / UPnP renderers</string>
     <string name="settings_item_dlna_desc">Push audio to AV receivers, soundbars and smart TVs — no app needed</string>
     <string name="settings_item_dlna_port_title">DLNA media port</string>
@@ -463,7 +451,7 @@
     <string name="dlna_format_lpcm_desc">Uncompressed 16 bit PCM, ~1.4 Mbps. Lowest latency, widest compatibility.</string>
     <string name="dlna_format_wav_desc">Uncompressed PCM inside a streaming WAV header. Helps some older firmware.</string>
     <string name="dlna_format_mp3_desc">Compressed, ~320 kbps. Not available on Android.</string>
-    <string name="dlna_format_adts_desc">Compressed AAC. Efficient, but renderer support is the least consistent.</string>
+    <string name="dlna_format_adts_desc">壓縮的 AAC。高效，但渲染器支援最不穩定。\n___XYZ_分割___\n網路上的渲染器\n___XYZ_分割___\n重新掃描\n___XYZ_分割___\n正在搜尋渲染器...\n___XYZ_分割___\n未找到 DLNA 渲染器。確保裝置已開啟且位於相同網路上。\n___XYZ_分割___\n串流開始時，系統會記住並自動重新連接選定的渲染器。\n___XYZ_分割___\n離線\n___XYZ_分割___\n後備\n___XYZ_分割___\n演奏\n___XYZ_分割___\n正在連線…\n___XYZ_分割___\n正在重試...\n___XYZ_分割___\n握手失敗\n___XYZ_分割___\n複製診斷\n___XYZ_分割___\n清除選擇\n___XYZ_分割___\nDLNA 診斷已複製到剪貼簿\n___XYZ_分割___\n和\n___XYZ_分割___\n使用 XYZPH0XYZ 進行串流傳輸\n___XYZ_分割___\nDLNA輸出\n___XYZ_分割___\n媒體端點\n___XYZ_分割___\n格式\n___XYZ_分割___\n未選擇渲染器。在「設定」中選擇一項。\n___XYZ_分割___\nXYZPH0XYZ 活動連接\n___XYZ_分割___\n鑰匙遺失\n___XYZ_分割___\n在密鑰模式下密鑰不能為空。在「安全性」下輸入一個，或切換到二維碼，讓其為您產生。\n___XYZ_分割___\nQR 圖碼</string>
     <string name="dlna_devices_label">Renderers on the network</string>
     <string name="dlna_rescan">Rescan</string>
     <string name="dlna_scanning">Searching for renderers…</string>
@@ -485,14 +473,11 @@
     <string name="dlna_card_format">Format</string>
     <string name="dlna_card_no_targets">No renderer selected. Pick one in Settings.</string>
     <string name="dlna_card_connections">%1$d active connection(s)</string>
-
     <string name="server_key_required_title">Key missing</string>
     <string name="server_key_required_desc">In Key mode the key cannot be empty. Enter one under Security, or switch to QR Code to have it generated for you.</string>
-
     <string name="sec_mode_qr">QR Code</string>
-    <string name="sec_mode_qr_info_title">Key generated automatically</string>
+    <string name="sec_mode_qr_info_title">自動產生密鑰\n___XYZ_分割___\n為每個邀請自動產生一個隨機金鑰 - 比手動選擇的密碼更安全。無需記住或大聲說出密碼。\n___XYZ_分割___\n邀請\n___XYZ_分割___\n邀請設備\n___XYZ_分割___\n產生邀請碼\n___XYZ_分割___\n掃描連接\n___XYZ_分割___\n從接收設備掃描此代碼。僅對一對配對有效。\n___XYZ_分割___\n從接收裝置掃描此代碼即可加入群組。\n___XYZ_分割___\n於 XYZPH0XYZ 到期\n___XYZ_分割___\n已過期\n___XYZ_分割___\n掃描時遇到問題？點擊純黑白版本的程式碼。\n___XYZ_分割___\n點擊代碼可返回彩色版本。\n___XYZ_分割___\n密鑰（手動輸入）\n___XYZ_分割___\n顯示密鑰\n___XYZ_分割___\n隱藏鍵\n___XYZ_分割___\n音訊加密已開啟：多播群組沒有握手，因此如果沒有它，金鑰將無法保護任何內容。\n___XYZ_分割___\n還沒有網路位址。連接至 Wi-Fi 網路並重試。\n___XYZ_分割___\n複製\n___XYZ_分割___\n鑰匙已複製\n___XYZ_分割___\n關閉\n___XYZ_分割___\nXYZPH0XYZ · 連接埠 XYZPH1XYZ\n___XYZ_分割___\n重新產生金鑰\n___XYZ_分割___\n掃描二維碼\n___XYZ_分割___\n掃描邀請碼\n___XYZ_分割___\n將相機對準其他裝置顯示的二維碼。</string>
     <string name="sec_mode_qr_info_body">Automatically generates a random key for each invite — more secure than a manually chosen password. No password to remember or say out loud.</string>
-
     <string name="qr_invite_button">Invite</string>
     <string name="qr_invite_button_multicast">Invite device</string>
     <string name="qr_invite_content_description">Generate an invite code</string>
@@ -513,57 +498,47 @@
     <string name="qr_invite_close">Close</string>
     <string name="qr_invite_endpoint">%1$s · port %2$d</string>
     <string name="qr_regenerate_button">Regenerate key</string>
-
     <string name="qr_scan_button">Scan QR</string>
     <string name="qr_scan_title">Scan the invite code</string>
     <string name="qr_scan_hint">Point the camera at the QR code shown by the other device.</string>
-    <string name="qr_scan_torch">Torch</string>
+    <string name="qr_scan_torch">火炬\n___XYZ_分割___\n關閉掃描儀\n___XYZ_分割___\n相機權限被拒絕\n___XYZ_分割___\n嗯……你想讓我掃描一下嗎？這不是 WFAS 二維碼！\n___XYZ_分割___\n該邀請已過期。要求一份新鮮的。\n___XYZ_分割___\n已找到邀請\n___XYZ_分割___\nQR 圖碼已過期\n___XYZ_分割___\n出於安全原因，此程式碼不再有效。產生新邀請以繼續。\n___XYZ_分割___\n產生新程式碼\n___XYZ_分割___\n關閉\n___XYZ_分割___\n代碼無法識別\n___XYZ_分割___\n掃描的程式碼不是有效的 WFAS 邀請。確保您正在掃描其他裝置產生的程式碼。\n___XYZ_分割___\n再試一次\n___XYZ_分割___\n取消\n___XYZ_分割___\n邀請不再有效\n___XYZ_分割___\n另一台設備拒絕了此邀請。它可能已被更新的密鑰替換，或者群組密鑰已重新產生。要求一個新的代碼。\n___XYZ_分割___\n掃描新程式碼\n___XYZ_分割___\n關閉\n___XYZ_分割___\n這是你自己的程式碼\n___XYZ_分割___\n該邀請是由同一裝置產生的，因此沒有任何可連接的內容。從應接收音訊的裝置上掃描它。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n這個群已經變了\n___XYZ_分割___\n該多播組的金鑰在程式碼產生後被更新。向廣播設備請求新的邀請。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n相機不可用</string>
     <string name="qr_scan_close">Close scanner</string>
     <string name="qr_scan_permission_denied">Camera permission denied</string>
     <string name="qr_scan_not_wfas">Ehm… you want me to scan that? That\'s not a WFAS QR code!</string>
     <string name="qr_scan_expired_hint">That invite has expired. Ask for a fresh one.</string>
     <string name="qr_scan_found">Invite found</string>
-
     <string name="qr_pairing_expired_title">QR code expired</string>
     <string name="qr_pairing_expired_body">This code is no longer valid for security reasons. Generate a new invite to continue.</string>
     <string name="qr_pairing_expired_primary">Generate new code</string>
     <string name="qr_pairing_expired_secondary">Close</string>
-
     <string name="qr_pairing_invalid_title">Code not recognized</string>
     <string name="qr_pairing_invalid_body">The scanned code isn\'t a valid WFAS invite. Make sure you\'re scanning the code generated by the other device.</string>
     <string name="qr_pairing_invalid_retry">Try again</string>
     <string name="qr_pairing_invalid_cancel">Cancel</string>
-
     <string name="qr_pairing_superseded_title">Invite no longer valid</string>
     <string name="qr_pairing_superseded_body">The other device turned this invite down. It was probably replaced by a newer one, or the group key was regenerated. Ask for a fresh code.</string>
     <string name="qr_pairing_superseded_button">Scan a new code</string>
     <string name="qr_pairing_superseded_dismiss">Close</string>
-
     <string name="qr_pairing_self_title">This is your own code</string>
     <string name="qr_pairing_self_body">This invite was generated by this same device, so there is nothing to connect to. Scan it from the device that should receive the audio.</string>
     <string name="qr_pairing_self_button">Got it</string>
-
     <string name="qr_pairing_epoch_mismatch_title">This group has changed</string>
     <string name="qr_pairing_epoch_mismatch_body">This multicast group\'s key was updated after the code was generated. Ask the broadcasting device for a new invite.</string>
     <string name="qr_pairing_epoch_mismatch_button">Got it</string>
-
     <string name="qr_pairing_no_camera_title">Camera unavailable</string>
-    <string name="qr_pairing_no_camera_body">No webcam was detected. You can still enter the address and key manually.</string>
+    <string name="qr_pairing_no_camera_body">未偵測到網路攝影機。您仍然可以手動輸入地址和密鑰。\n___XYZ_分割___\n手動輸入\n___XYZ_分割___\n關閉\n___XYZ_分割___\n重新產生群組密鑰？\n___XYZ_分割___\n所有連接的裝置都必須重新配對。如果您認為未經授權的裝置知道目前金鑰，請使用此選項。\n___XYZ_分割___\n取消\n___XYZ_分割___\n再生\n___XYZ_分割___\n連接到 XYZPH0XYZ？\n___XYZ_分割___\n偵測到 WFAS 邀請用於從該裝置進行串流傳輸。您現在想連接嗎？\n___XYZ_分割___\n偵測到用於多播接收的 WFAS 邀請。您現在想連接嗎？\n___XYZ_分割___\n該設備正在傳輸。連接將停止該傳輸。\n___XYZ_分割___\n忽略\n___XYZ_分割___\n連接\n___XYZ_分割___\n音訊傳輸\n___XYZ_分割___\n您正在發送的串流的即時狀態，帶有音量控制。\n___XYZ_分割___\n音訊接收\n___XYZ_分割___\n您正在接收的串流的即時狀態。\n___XYZ_分割___\n自動連線\n___XYZ_分割___\n後台搜尋您的加星標伺服器。\n___XYZ_分割___\n自動化\n___XYZ_分割___\n有關被拒絕的外部命令的警告。\n___XYZ_分割___\n外部命令被阻止\n___XYZ_分割___\n命令到達時沒有有效令牌，因此未執行。開啟自動化和腳本將目前令牌複製到您的自動化。\n___XYZ_分割___\n當外部命令關閉時，命令到達。如果您期望這樣做，請在自動化和腳本中啟用它們。\n___XYZ_分割___\n傳輸音訊</string>
     <string name="qr_pairing_no_camera_manual">Enter manually</string>
     <string name="qr_pairing_no_camera_close">Close</string>
-
     <string name="qr_pairing_regenerate_confirm_title">Regenerate the group key?</string>
     <string name="qr_pairing_regenerate_confirm_body">All connected devices will have to pair again. Use this option if you think an unauthorized device knows the current key.</string>
     <string name="qr_pairing_regenerate_confirm_cancel">Cancel</string>
     <string name="qr_pairing_regenerate_confirm_confirm">Regenerate</string>
-
     <string name="qr_pairing_deeplink_confirm_title">Connect to %1$s?</string>
     <string name="qr_pairing_deeplink_confirm_body_unicast">A WFAS invite was detected for streaming from that device. Do you want to connect now?</string>
     <string name="qr_pairing_deeplink_confirm_body_multicast">A WFAS invite was detected for multicast reception. Do you want to connect now?</string>
     <string name="qr_pairing_deeplink_confirm_stops_server">This device is transmitting right now. Connecting will stop that transmission.</string>
     <string name="qr_pairing_deeplink_confirm_ignore">Ignore</string>
     <string name="qr_pairing_deeplink_confirm_connect">Connect</string>
-
     <string name="notif_channel_server_name">Audio transmission</string>
     <string name="notif_channel_server_desc">Live status of the stream you are sending, with volume controls.</string>
     <string name="notif_channel_client_name">Audio reception</string>
@@ -573,10 +548,10 @@
     <string name="notif_channel_automation_name">Automation</string>
     <string name="notif_channel_automation_desc">Warnings about external commands that were refused.</string>
     <string name="notif_automation_blocked_title">External command blocked</string>
-    <string name="notif_automation_blocked_token">A command arrived without a valid token and was not executed. Open Automation &amp; Scripting to copy the current token into your automation.</string>
-    <string name="notif_automation_blocked_disabled">A command arrived while external commands are turned off. Enable them in Automation &amp; Scripting if you expected this.</string>
+    <string name="notif_automation_blocked_token">A command arrived without a valid token and was not executed. Open Automation &amp;amp; Scripting to copy the current token into your automation.</string>
+    <string name="notif_automation_blocked_disabled">A command arrived while external commands are turned off. Enable them in Automation &amp;amp; Scripting if you expected this.</string>
     <string name="notif_server_title">Transmitting audio</string>
-    <string name="notif_client_title">Receiving audio</string>
+    <string name="notif_client_title">接收音訊\n___XYZ_分割___\n自動連線\n___XYZ_分割___\n開始…\n___XYZ_分割___\n正在連線…\n___XYZ_分割___\n體積 XYZPH0XYZ%%\n___XYZ_分割___\n靜音\n___XYZ_分割___\n停止\n___XYZ_分割___\n大聲一點\n___XYZ_分割___\n更安靜\n___XYZ_分割___\n靜音\n___XYZ_分割___\n直播\n___XYZ_分割___\n掃描\n___XYZ_分割___\nSnapcast 伺服器（多房間）\n___XYZ_分割___\n向任何 Snapclient 提供同步音訊：Raspberry Pi、ESP32、Home Assistant、Snapcast 應用程式\n___XYZ_分割___\nSnapcast 串流端口\n___XYZ_分割___\n客戶端連接音訊的 TCP 連接埠（預設 1704）\n___XYZ_分割___\nSnapcast 控制端口\n___XYZ_分割___\n用於管理群組和磁碟區的 JSON-RPC 連接埠（預設 1705）\n___XYZ_分割___\nSnapcast 編解碼器\n___XYZ_分割___\n音訊在離開該設備之前是如何編碼的\n___XYZ_分割___\n區塊大小\n___XYZ_分割___\n每個資料包中傳輸的音訊量\n___XYZ_分割___\n客戶端緩衝區\n___XYZ_分割___\n客戶端提前多久安排播放（以毫秒為單位）\n___XYZ_分割___\n流名稱</string>
     <string name="notif_auto_connect_title">Automatic connection</string>
     <string name="notif_starting">Starting…</string>
     <string name="notif_connecting">Connecting…</string>
@@ -588,8 +563,6 @@
     <string name="notif_chip_muted">Mute</string>
     <string name="notif_chip_live">Live</string>
     <string name="notif_chip_scanning">Scan</string>
-
-
     <string name="settings_item_snapcast_title">Snapcast server (multiroom)</string>
     <string name="settings_item_snapcast_desc">Serve synchronised audio to any snapclient: Raspberry Pi, ESP32, Home Assistant, the Snapcast apps</string>
     <string name="settings_item_snapcast_port_title">Snapcast stream port</string>
@@ -603,7 +576,7 @@
     <string name="settings_item_snapcast_buffer_title">Client buffer</string>
     <string name="settings_item_snapcast_buffer_desc">How far ahead clients schedule playback, in milliseconds</string>
     <string name="settings_item_snapcast_name_title">Stream name</string>
-    <string name="settings_item_snapcast_name_desc">Identifier shown to clients and control apps</string>
+    <string name="settings_item_snapcast_name_desc">向客戶端和控制應用程式顯示的標識符\n___XYZ_分割___\n未壓縮，每個客戶端約 1.5 Mbps，無編碼延遲\n___XYZ_分割___\n無損，大約一半頻寬，增加一點延遲\n___XYZ_分割___\n有損、最低頻寬、需要 48000 Hz 立體聲\n___XYZ_分割___\nOpus 需要 48000 Hz 立體聲\n___XYZ_分割___\n使用目前音訊設置，伺服器將回退到 PCM。\n___XYZ_分割___\n每個區塊 XYZPH0XYZ 毫秒\n___XYZ_分割___\n發現\n___XYZ_分割___\n啟動伺服器以透過 mDNS 通告流。客戶會自動找到它。\n___XYZ_分割___\n編解碼器不可用\n___XYZ_分割___\nXYZPH0XYZ 在此裝置上不可用，而是以 XYZPH1XYZ 串流傳輸\n___XYZ_分割___\n為 XYZPH2XYZ 用戶端提供 XYZPH0XYZ (XYZPH1XYZ) 服務，XYZPH3XYZ 控制連接\n___XYZ_分割___\nXYZPH0XYZ - 音量 XYZPH1XYZ%%，延遲 XYZPH2XYZ 毫秒\n___XYZ_分割___\n網路\n___XYZ_分割___\n離線\n___XYZ_分割___\nSnapcast 多房間\n___XYZ_分割___\nXYZPH0XYZ 用戶端同步播放\n___XYZ_分割___\n串流\n___XYZ_分割___\n編解碼器\n___XYZ_分割___\n控制\n___XYZ_分割___\n還沒有客戶端連線。將 snapclient 指向此裝置或讓它透過 mDNS 查找流。\n___XYZ_分割___\n發現\n___XYZ_分割___\n透過 mDNS 發布廣告\n___XYZ_分割___\n未公佈 - 手動連接\n___XYZ_分割___\n連接埠 XYZPH0XYZ 不可用</string>
     <string name="snapcast_codec_pcm_desc">Uncompressed, about 1.5 Mbps per client, no encoding delay</string>
     <string name="snapcast_codec_flac_desc">Lossless, roughly half the bandwidth, adds a little delay</string>
     <string name="snapcast_codec_opus_desc">Lossy, lowest bandwidth, needs 48000 Hz stereo</string>
@@ -618,19 +591,17 @@
     <string name="snapcast_client_detail">%1$s - volume %2$d%%, latency %3$d ms</string>
     <string name="snapcast_client_online">online</string>
     <string name="snapcast_client_offline">offline</string>
-
     <string name="snapcast_card_title">Snapcast multiroom</string>
     <string name="snapcast_card_connections">%1$d client(s) playing in sync</string>
     <string name="snapcast_card_endpoint">Stream</string>
     <string name="snapcast_card_codec">Codec</string>
     <string name="snapcast_card_control">Control</string>
     <string name="snapcast_card_no_clients">No client connected yet. Point a snapclient at this device or let it find the stream over mDNS.</string>
-
     <string name="snapcast_card_discovery">Discovery</string>
     <string name="snapcast_discovery_on">advertised over mDNS</string>
     <string name="snapcast_discovery_off">not advertised - connect manually</string>
     <string name="snapcast_port_blocked">port %1$d not available</string>
-    <string name="snapcast_bind_error">Could not open a port: %1$s. Another Snapcast server may already be running, or the firewall is blocking it.</string>
+    <string name="snapcast_bind_error">無法開啟連接埠：%1$s。另一個 Snapcast 伺服器可能已經在運行，或者防火牆正在阻止它。\n___XYZ_分割___\n如何連接\n___XYZ_分割___\n該網路上的用戶端自行查找串流。如果沒有，請將其指向下面的地址。\n___XYZ_分割___\n自動發現已關閉，因此用戶端必須明確指向該位址。\n___XYZ_分割___\n%1$s 需要</string>
     <string name="snapcast_how_to_connect">How to connect</string>
     <string name="snapcast_how_to_connect_auto">Clients on this network find the stream on their own. If one does not, point it at the address below.</string>
     <string name="snapcast_how_to_connect_manual">Automatic discovery is off, so clients must be pointed at this address explicitly.</string>

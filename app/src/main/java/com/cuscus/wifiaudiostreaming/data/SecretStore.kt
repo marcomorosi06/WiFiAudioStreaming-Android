@@ -159,6 +159,27 @@ class SecretStore private constructor(private val prefs: SharedPreferences) {
         prefs.edit().remove(AUTO_CONNECT_KEY_PREFIX + ref).commit()
     }
 
+    
+    fun serverKeyAccount(serverId: String): String =
+        "server_key_" + serverId.trim().lowercase().replace(':', '_').replace('.', '_').replace('-', '_')
+
+    @Synchronized
+    fun storeServerKey(serverId: String, key: String) {
+        if (serverId.isBlank()) return
+        prefs.edit().putString(serverKeyAccount(serverId), key).commit()
+    }
+
+    fun loadServerKey(serverId: String): String? {
+        if (serverId.isBlank()) return null
+        return prefs.getString(serverKeyAccount(serverId), null)?.takeIf { it.isNotBlank() }
+    }
+
+    @Synchronized
+    fun clearServerKey(serverId: String) {
+        if (serverId.isBlank()) return
+        prefs.edit().remove(serverKeyAccount(serverId)).commit()
+    }
+
     companion object {
         private const val FILE_NAME = "wfas_secrets"
         private const val MASTER_KEY_ALIAS = "wfas_secrets_master_key"
