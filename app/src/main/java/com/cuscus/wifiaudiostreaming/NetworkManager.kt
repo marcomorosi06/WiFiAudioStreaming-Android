@@ -2209,6 +2209,16 @@ object NetworkManager {
 
                         val cnonce = WfasAuth.nonceHex()
                         var helloMsg = "${clientHelloMessage()};cnonce=$cnonce"
+                        val sStore = com.cuscus.wifiaudiostreaming.data.SecretStore.get(context)
+                        if (clientPresharedKey.isEmpty()) {
+                            val savedKey = (if (serverInfo.hostname.isNotBlank()) sStore.loadServerKey(serverInfo.hostname) else null)
+                                ?: sStore.loadServerKey(serverInfo.ip)
+                                ?: sStore.loadServerKey("${serverInfo.ip}:${serverInfo.port}")
+                                ?: ""
+                            if (savedKey.isNotEmpty()) {
+                                clientPresharedKey = savedKey
+                            }
+                        }
                         var proved = false
                         var clientSnonce = ""
                         var clientKey = clientPresharedKey
@@ -2220,6 +2230,12 @@ object NetworkManager {
                         var handshakeOk = false
 
                         suspend fun promptKeyAndRestart(wrong: Boolean): Boolean {
+                            if (wrong) {
+                                val sStore = com.cuscus.wifiaudiostreaming.data.SecretStore.get(context)
+                                if (serverInfo.hostname.isNotBlank()) sStore.clearServerKey(serverInfo.hostname)
+                                sStore.clearServerKey(serverInfo.ip)
+                                sStore.clearServerKey("${serverInfo.ip}:${serverInfo.port}")
+                            }
                             val k = requestKeyFromUi(wrong) ?: return false
                             if (k.isBlank()) return false
                             clientKey = k
@@ -2310,6 +2326,12 @@ object NetworkManager {
                                     }
                                 }
                                 ackMsg.startsWith(NetworkSettings.HELLO_ACK_PREFIX) -> {
+                                    if (clientKey.isNotEmpty()) {
+                                        val sStore = com.cuscus.wifiaudiostreaming.data.SecretStore.get(context)
+                                        if (serverInfo.hostname.isNotBlank()) sStore.storeServerKey(serverInfo.hostname, clientKey)
+                                        sStore.storeServerKey(serverInfo.ip, clientKey)
+                                        sStore.storeServerKey("${serverInfo.ip}:${serverInfo.port}", clientKey)
+                                    }
                                     val serverVersion = parseProtocolVersion(ackMsg)
                                     if (serverVersion != WFAS_PROTOCOL_VERSION) {
                                         signalProtocolMismatch(serverVersion, PeerRole.SENDER)
