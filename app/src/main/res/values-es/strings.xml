@@ -59,7 +59,7 @@
     <string name="settings_item_packet_size_desc">Bytes de audio por paquete de red (transmisión y micrófono). Inferior = paquetes más pequeños, p.e. para microcontroladores.</string>
     <string name="transmission_mode_title">Modo de transmisión</string>
     <string name="multicast_mode_title">Multidifusión</string>
-    <string name="multicast_mode_desc">Para múltiples clientes, mayor latencia</string>
+    <string name="multicast_mode_desc">Para múltiples dispositivos (Multicast), mayor latencia</string>
     <string name="unicast_mode_title">Cliente único</string>
     <string name="unicast_mode_desc">Conexión directa, menor latencia</string>
     <string name="settings_group_network">Red</string>
@@ -84,8 +84,8 @@
     <string name="buffer_size_value">%1$d B</string>
     <string name="mode_multicast">Multidifusión</string>
     <string name="mode_unicast">Unidifusión</string>
-    <string name="sec_encrypted">cifrado</string>
-    <string name="sec_key">Se requiere clave</string>
+    <string name="sec_encrypted">Cifrado</string>
+    <string name="sec_key">Requiere contraseña</string>
     <string name="sec_ask">Aprobación</string>
     <string name="mic_sends">Envía micrófono</string>
     <string name="mic_wants">Acepta respuesta</string>
@@ -352,7 +352,7 @@
     <string name="status_group_rekeyed">Clave de grupo cambiada por el remitente</string>
     <string name="status_unauthorized">Conexión rechazada por el servidor</string>
     <string name="status_awaiting_approval">Esperando que el otro dispositivo lo apruebe...</string>
-    <string name="status_key_required">Este servidor requiere una clave</string>
+    <string name="status_key_required">Este servidor requiere contraseña</string>
     <string name="settings_group_security">Seguridad</string>
     <string name="settings_item_security_mode_title">Requerir autorización (servidor)</string>
     <string name="settings_item_security_mode_desc">Elija quién puede conectarse cuando este dispositivo es el servidor</string>
@@ -373,9 +373,9 @@
     <string name="auth_request_body">%1$s quiere conectarse a este dispositivo.</string>
     <string name="auth_allow">Permitir</string>
     <string name="auth_deny">Negar</string>
-    <string name="key_dialog_title">Se requiere clave</string>
-    <string name="key_dialog_body">Este servidor requiere una clave. Ingrese para conectarse:</string>
-    <string name="key_dialog_wrong">Clave equivocada. Intentar otra vez:</string>
+    <string name="key_dialog_title">Contraseña requerida</string>
+    <string name="key_dialog_body">Este servidor requiere contraseña. Ingrésela para conectarse:</string>
+    <string name="key_dialog_wrong">Contraseña incorrecta. Inténtelo de nuevo:</string>
     <string name="key_dialog_connect">Conectar</string>
     <string name="key_dialog_cancel">Cancelar</string>
     <string name="server_silent_title">El otro dispositivo no responde</string>
@@ -417,7 +417,7 @@
     <string name="multicast_locked_by_rtp">RTP lo requiere</string>
     <string name="multicast_locked_by_http">HTTP lo requiere</string>
     <string name="multicast_locked_by_both">RTP y HTTP lo requieren</string>
-    <string name="multicast_locked_hint">Estos protocolos transmiten a todos los oyentes a la vez, por lo que el modo de cliente único no es posible. Desactívelos en Configuración para desbloquear esto.</string>
+    <string name="multicast_locked_hint">Estos protocolos transmiten a todos los oyentes a la vez, por lo que el modo de dispositivo único (Unicast) no es posible. Desactívelos en Configuración para desbloquear esto.</string>
     <string name="status_unsupported_format">No se puede reproducir esta transmisión: el servidor envía %1$s, que este dispositivo no admite.</string>
     <string name="settings_group_developer">Desarrollador</string>
     <string name="settings_item_developer_title">Características del desarrollador</string>
@@ -473,7 +473,7 @@
     <string name="dlna_card_format">Formato</string>
     <string name="dlna_card_no_targets">No se seleccionó ningún renderizador. Elija uno en Configuración.</string>
     <string name="dlna_card_connections">Conexión(es) activa(s) %1$d</string>
-    <string name="server_key_required_title">Falta la llave</string>
+    <string name="server_key_required_title">Falta la contraseña</string>
     <string name="server_key_required_desc">En el modo Clave, la clave no puede estar vacía. Ingrese uno en Seguridad o cambie a Código QR para que se genere por usted.</string>
     <string name="sec_mode_qr">Código QR</string>
     <string name="sec_mode_qr_info_title">Clave generada automáticamente</string>
@@ -606,16 +606,27 @@
     <string name="snapcast_how_to_connect_auto">Los clientes de esta red encuentran la transmisión por sí mismos. Si no es así, indíquelo en la dirección que aparece a continuación.</string>
     <string name="snapcast_how_to_connect_manual">La detección automática está desactivada, por lo que los clientes deben apuntar explícitamente a esta dirección.</string>
     <string name="multicast_locked_by">Requerido por %1$s</string>
-    <string name="lang_auto">Auto (System Default)</string>
-    <string name="lang_selector_title">Language</string>
-    <string name="lang_selector_desc">Select interface display language</string>
-    <string name="saved_servers_title">Saved Servers</string>
-    <string name="saved_servers_desc">Manage servers and encrypted credentials remembered on this device</string>
-    <string name="saved_servers_empty">No saved servers with stored credentials yet</string>
-    <string name="saved_servers_forget">Forget</string>
+    <string name="lang_auto">Automático (Sistema)</string>
+    <string name="lang_selector_title">Idioma de la aplicación</string>
+    <string name="lang_selector_desc">Cambiar el idioma de la interfaz en tiempo real</string>
+    <string name="saved_servers_title">Servidores guardados</string>
+    <string name="saved_servers_desc">Administrar contraseñas guardadas para servidores de audio</string>
+    <string name="saved_servers_empty">No hay servidores guardados. Marque \"Recordar contraseña\" al conectar.</string>
+    <string name="saved_servers_forget">Olvidar</string>
     <string name="saved_servers_last_connected">Last connected: %s</string>
-    <string name="remember_password_label">Remember password</string>
-    <string name="server_persist_title">Keep Server Running After Disconnect</string>
-    <string name="server_persist_desc">When client disconnects, do not automatically stop server (Unicast mode only)</string>
+    <string name="remember_password_label">Recordar contraseña</string>
+    <string name="server_persist_title">Mantener servidor activo tras desconexión (Unicast)</string>
+    <string name="server_persist_desc">Mantiene el servidor en espera de nuevas conexiones cuando un cliente se desconecta</string>
     <string name="recent_servers_label">Recent Servers:</string>
+    <string name="receive_client">Recibir (Cliente)</string>
+    <string name="send_server">Transmitir (Servidor)</string>
+    <string name="multicast_mode">Modo Multidifusión (Multicast)</string>
+    <string name="multicast_description">Enviar audio a múltiples dispositivos simultáneamente</string>
+    <string name="unicast">Unidifusión (Unicast)</string>
+    <string name="multicast">Multidifusión (Multicast)</string>
+    <string name="status_key_accepted">Contraseña aceptada - descifrando transmisión</string>
+    <string name="auth_key_label">Contraseña</string>
+    <string name="auth_key_hint">Ambos dispositivos deben ingresar la misma contraseña. Nunca se envía por red.</string>
+    <string name="auth_key_show">Mostrar contraseña</string>
+    <string name="auth_key_hide">Ocultar contraseña</string>
 </resources>

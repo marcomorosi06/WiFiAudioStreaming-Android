@@ -647,4 +647,16 @@
     <string name="server_persist_title">Keep Server Running After Disconnect</string>
     <string name="server_persist_desc">When client disconnects, do not automatically stop server (Unicast mode only)</string>
     <string name="recent_servers_label">Recent Servers:</string>
+
+    <string name="receive_client">Receive (Client)</string>
+    <string name="send_server">Send (Server)</string>
+    <string name="multicast_mode">Multicast Mode</string>
+    <string name="multicast_description">Send to multiple clients simultaneously</string>
+    <string name="unicast">Unicast</string>
+    <string name="multicast">Multicast</string>
+    <string name="auth_key_label">Key</string>
+    <string name="auth_key_hint">Both devices must enter the same key. It is never sent over the network.</string>
+    <string name="auth_key_show">Show key</string>
+    <string name="auth_key_hide">Hide key</string>
+    <string name="status_key_accepted">Key accepted - decrypting stream</string>
 </resources>

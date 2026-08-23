@@ -51,7 +51,7 @@
     <string name="settings_option_stereo">Stereo</string>
     <string name="settings_group_performance">Performance</string>
     <string name="settings_item_buffer_size_title">Buffer Size</string>
-    <string name="settings_item_buffer_size_desc">较小的缓冲区可以减少延迟，但可能会导致丢失\n___XYZ_分割___\n延迟\n___XYZ_分割___\n播放缓冲区深度。更高=更稳定，更多延迟。\n___XYZ_分割___\n高级\n___XYZ_分割___\n数据包大小\n___XYZ_分割___\n每个网络数据包的音频字节数（流和麦克风）。较低 = 较小的数据包，例如对于微控制器。\n___XYZ_分割___\n传输方式\n___XYZ_分割___\n组播\n___XYZ_分割___\n对于多个客户端，延迟较高\n___XYZ_分割___\n单一客户端\n___XYZ_分割___\n直连，延迟更低\n___XYZ_分割___\n网络\n___XYZ_分割___\n串流端口\n___XYZ_分割___\n单播/组播流的端口\n___XYZ_分割___\n实验特点\n___XYZ_分割___\n启用实验性功能\n___XYZ_分割___\n警告：这些选项不稳定并且可能不起作用。\n___XYZ_分割___\n警告\n___XYZ_分割___\n实验性功能正在开发中，可能会导致崩溃或意外行为。使用风险自负。\n___XYZ_分割___\n无论如何启用\n___XYZ_分割___\n取消\n___XYZ_分割___\n客户选项\n___XYZ_分割___\n共享麦克风\n___XYZ_分割___\n通过桌面说话（Discord、Zoom、游戏...）\n___XYZ_分割___\n主音频端口</string>
+    <string name="settings_item_buffer_size_desc">较小的缓冲区可以减少延迟，但可能会导致丢失\n___XYZ_分割___\n延迟\n___XYZ_分割___\n播放缓冲区深度。更高=更稳定，更多延迟。\n___XYZ_分割___\n高级\n___XYZ_分割___\n数据包大小\n___XYZ_分割___\n每个网络数据包的音频字节数（流和麦克风）。较低 = 较小的数据包，例如对于微控制器。\n___XYZ_分割___\n传输方式\n___XYZ_分割___\n组播\n___XYZ_分割___\n对于多个接收端端，延迟较高\n___XYZ_分割___\n单一接收端端\n___XYZ_分割___\n直连，延迟更低\n___XYZ_分割___\n网络\n___XYZ_分割___\n串流端口\n___XYZ_分割___\n单播/组播流的端口\n___XYZ_分割___\n实验特点\n___XYZ_分割___\n启用实验性功能\n___XYZ_分割___\n警告：这些选项不稳定并且可能不起作用。\n___XYZ_分割___\n警告\n___XYZ_分割___\n实验性功能正在开发中，可能会导致崩溃或意外行为。使用风险自负。\n___XYZ_分割___\n无论如何启用\n___XYZ_分割___\n取消\n___XYZ_分割___\n接收端选项\n___XYZ_分割___\n共享麦克风\n___XYZ_分割___\n通过桌面说话（Discord、Zoom、游戏...）\n___XYZ_分割___\n主音频端口</string>
     <string name="settings_item_latency_title">Latency</string>
     <string name="settings_item_latency_desc">Playback buffer depth. Higher = more stable, more delay.</string>
     <string name="settings_group_advanced">Advanced</string>
@@ -76,7 +76,7 @@
     <string name="send_mic_to_server_title">Share Microphone</string>
     <string name="send_mic_to_server_subtitle">Speak through the desktop (Discord, Zoom, games...)</string>
     <string name="main_audio_port_title">Main Audio Port</string>
-    <string name="main_audio_port_desc">从服务器接收音频的端口\n___XYZ_分割___\n客户端麦克风端口\n___XYZ_分割___\n将麦克风发送到服务器的端口\n___XYZ_分割___\n端口号 (1024-65535)\n___XYZ_分割___\n公开选拔\n___XYZ_分割___\nXYZPH0XYZ B\n___XYZ_分割___\n组播\n___XYZ_分割___\n单播\n___XYZ_分割___\n加密的\n___XYZ_分割___\n需要钥匙\n___XYZ_分割___\n批准\n___XYZ_分割___\n发送麦克风\n___XYZ_分割___\n接受对讲\n___XYZ_分割___\n享受 WiFi 音频流吗？\n___XYZ_分割___\n这个应用程序是免费且无广告的，由一个人在业余时间制作。如果它对您有用，关于 Ko-fi 的小技巧可以帮助它保持活力。没有压力，一切都会顺利进行。\n___XYZ_分割___\n支持 Ko-fi ☕\n___XYZ_分割___\n也许稍后\n___XYZ_分割___\n不显示\n30天\n___XYZ_分割___\n空闲\n___XYZ_分割___\n错误：麦克风权限被拒绝。\n___XYZ_分割___\n麦克风发送错误：XYZPH0XYZ\n___XYZ_分割___\n服务器不接受麦克风，麦克风未发送\n___XYZ_分割___\n正在端口 XYZPH0XYZ 上等待客户端...\n___XYZ_分割___\n客户端连接：XYZPH0XYZ。开始…\n___XYZ_分割___\n客户端 XYZPH0XYZ 握手失败</string>
+    <string name="main_audio_port_desc">从服务器接收音频的端口\n___XYZ_分割___\n接收端端麦克风端口\n___XYZ_分割___\n将麦克风发送到服务器的端口\n___XYZ_分割___\n端口号 (1024-65535)\n___XYZ_分割___\n公开选拔\n___XYZ_分割___\nXYZPH0XYZ B\n___XYZ_分割___\n组播\n___XYZ_分割___\n单播\n___XYZ_分割___\n加密的\n___XYZ_分割___\n需要密码\n___XYZ_分割___\n批准\n___XYZ_分割___\n发送麦克风\n___XYZ_分割___\n接受对讲\n___XYZ_分割___\n享受 WiFi 音频流吗？\n___XYZ_分割___\n这个应用程序是免费且无广告的，由一个人在业余时间制作。如果它对您有用，关于 Ko-fi 的小技巧可以帮助它保持活力。没有压力，一切都会顺利进行。\n___XYZ_分割___\n支持 Ko-fi ☕\n___XYZ_分割___\n也许稍后\n___XYZ_分割___\n不显示\n30天\n___XYZ_分割___\n空闲\n___XYZ_分割___\n错误：麦克风权限被拒绝。\n___XYZ_分割___\n麦克风发送错误：XYZPH0XYZ\n___XYZ_分割___\n服务器不接受麦克风，麦克风未发送\n___XYZ_分割___\n正在端口 XYZPH0XYZ 上等待接收端端...\n___XYZ_分割___\n接收端端连接：XYZPH0XYZ。开始…\n___XYZ_分割___\n接收端端 XYZPH0XYZ 握手失败</string>
     <string name="client_mic_port_title">Client Microphone Port</string>
     <string name="client_mic_port_desc">Port to send the microphone to the server</string>
     <string name="port_number_label">Port Number (1024-65535)</string>
@@ -84,9 +84,9 @@
     <string name="buffer_size_value">%1$d B</string>
     <string name="mode_multicast">Multicast</string>
     <string name="mode_unicast">Unicast</string>
-    <string name="sec_encrypted">Encrypted</string>
-    <string name="sec_key">Key required</string>
-    <string name="sec_ask">Approval</string>
+    <string name="sec_encrypted">已加密</string>
+    <string name="sec_key">需要密码</string>
+    <string name="sec_ask">需要确认</string>
     <string name="mic_sends">Sends microphone</string>
     <string name="mic_wants">Accepts talk-back</string>
     <string name="donation_title">Enjoying WiFi Audio Streaming?</string>
@@ -101,7 +101,7 @@
     <string name="status_waiting_for_client">Waiting for client on port %1$d…</string>
     <string name="status_client_connected">Client connected: %1$s. Starting…</string>
     <string name="status_handshake_failed_from_client">Handshake failed from client %1$s</string>
-    <string name="status_server_error">服务器错误：%1$s\n___XYZ_分割___\n网络无法访问——等待恢复\n___XYZ_分割___\n网络恢复，再次串流\n___XYZ_分割___\n服务器停止了。\n___XYZ_分割___\n正在联系服务器 %1$s...\n___XYZ_分割___\n等待确认（ACK）...\n___XYZ_分割___\n握手失败：意外响应“%1$s”\n___XYZ_分割___\n流媒体…\n___XYZ_分割___\n正在加入多播组...\n___XYZ_分割___\n错误：端口已在使用中。请再试一次。\n___XYZ_分割___\n客户端错误：%1$s\n___XYZ_分割___\n客户停了下来。\n___XYZ_分割___\n欢迎来到\nWiFi 音频流！\n___XYZ_分割___\n将您的手机变成 PC 的 WiFi 扬声器。首先，您需要桌面软件。\n___XYZ_分割___\n下载桌面应用程序\n___XYZ_分割___\n访问 %1$s\n___XYZ_分割___\n通过 WiFi 获得水晶般清晰的音频\n___XYZ_分割___\n使用 WiFi 网络传输或接收低延迟音频。\n___XYZ_分割___\n无线音箱\n___XYZ_分割___\n在手机上收听电脑的音频。该应用程序会自动检测您的 WiFi 网络上的服务器。\n___XYZ_分割___\nWiFi音源\n___XYZ_分割___\n通过 WiFi 网络将音乐、游戏或语音从手机传输到电脑。\n___XYZ_分割___\n控制您的网络\n___XYZ_分割___\n优化设置以使流适应您的 WiFi 网络的强度。\n___XYZ_分割___\n跳过</string>
+    <string name="status_server_error">服务器错误：%1$s\n___XYZ_分割___\n网络无法访问——等待恢复\n___XYZ_分割___\n网络恢复，再次串流\n___XYZ_分割___\n服务器停止了。\n___XYZ_分割___\n正在联系服务器 %1$s...\n___XYZ_分割___\n等待确认（ACK）...\n___XYZ_分割___\n握手失败：意外响应“%1$s”\n___XYZ_分割___\n流媒体…\n___XYZ_分割___\n正在加入多播组...\n___XYZ_分割___\n错误：端口已在使用中。请再试一次。\n___XYZ_分割___\n接收端端错误：%1$s\n___XYZ_分割___\n接收端停了下来。\n___XYZ_分割___\n欢迎来到\nWiFi 音频流！\n___XYZ_分割___\n将您的手机变成 PC 的 WiFi 扬声器。首先，您需要桌面软件。\n___XYZ_分割___\n下载桌面应用程序\n___XYZ_分割___\n访问 %1$s\n___XYZ_分割___\n通过 WiFi 获得水晶般清晰的音频\n___XYZ_分割___\n使用 WiFi 网络传输或接收低延迟音频。\n___XYZ_分割___\n无线音箱\n___XYZ_分割___\n在手机上收听电脑的音频。该应用程序会自动检测您的 WiFi 网络上的服务器。\n___XYZ_分割___\nWiFi音源\n___XYZ_分割___\n通过 WiFi 网络将音乐、游戏或语音从手机传输到电脑。\n___XYZ_分割___\n控制您的网络\n___XYZ_分割___\n优化设置以使流适应您的 WiFi 网络的强度。\n___XYZ_分割___\n跳过</string>
     <string name="status_link_lost_waiting">Network unreachable — waiting for it to come back</string>
     <string name="status_link_restored">Network back, streaming again</string>
     <string name="status_server_stopped">Server stopped.</string>
@@ -176,7 +176,7 @@
     <string name="settings_item_usb_latency_desc">Jitter buffer used instead of the audio one while the USB link is active. Lower means less latency but more risk of dropouts. Some devices deliver USB packets in bursts and need more buffer here than over Wi-Fi, not less.</string>
     <string name="usb_status_ready_short">Connected over USB</string>
     <string name="usb_status_ready">Connected via %1$s (%2$s)</string>
-    <string name="usb_status_cable_no_tether">检测到电缆，USB 网络共享已关闭\n___XYZ_分割___\n未检测到 USB 电缆\n___XYZ_分割___\n启用 USB 网络共享\n___XYZ_分割___\n在计算机上，使应用程序保持自动接口选择：它会自行找到 USB 链接。\n___XYZ_分割___\n使用VPN？\n___XYZ_分割___\n设备发现无法通过 VPN 进行，组播数据包无法通过隧道传输。如果您仅通过 VPN 连接（不在同一 Wi-Fi 上），请选择单播模式并手动输入服务器 IP。多播需要相同的本地网络。\n___XYZ_分割___\n您的IP：XYZPH0XYZ\n___XYZ_分割___\n服务器协议\n___XYZ_分割___\nWFAS（本地）\n___XYZ_分割___\n低延迟自定义协议，由移动和桌面应用程序使用。\n___XYZ_分割___\n断开连接后保持服务器运行\n___XYZ_分割___\n在单播中，客户端离开会结束会话，而不是服务器：它保持端口打开并等待下一个。多播已经以这种方式工作。\n___XYZ_分割___\nRTP/PCM 流\n___XYZ_分割___\nVLC、Kodi 或 FFplay 的标准协议。\n___XYZ_分割___\nHTTP 网络流\n___XYZ_分割___\n直接流式传输到网络浏览器。\n___XYZ_分割___\nHTTP 端口\n___XYZ_分割___\nWeb 界面的端口。\n___XYZ_分割___\n网络编解码器（兼容性）\n___XYZ_分割___\n选择 Opus 以实现低延迟，或选择 AAC 以实现 Safari/iOS。\n___XYZ_分割___\n作品（Chrome / 火狐）\n___XYZ_分割___\nAAC（Safari / iOS）\n___XYZ_分割___\nRTP端口\n___XYZ_分割___\nRTP 流的端口\n___XYZ_分割___\n启用 RTP 流时会强制执行多播。</string>
+    <string name="usb_status_cable_no_tether">检测到电缆，USB 网络共享已关闭\n___XYZ_分割___\n未检测到 USB 电缆\n___XYZ_分割___\n启用 USB 网络共享\n___XYZ_分割___\n在计算机上，使应用程序保持自动接口选择：它会自行找到 USB 链接。\n___XYZ_分割___\n使用VPN？\n___XYZ_分割___\n设备发现无法通过 VPN 进行，组播数据包无法通过隧道传输。如果您仅通过 VPN 连接（不在同一 Wi-Fi 上），请选择单播模式并手动输入服务器 IP。多播需要相同的本地网络。\n___XYZ_分割___\n您的IP：XYZPH0XYZ\n___XYZ_分割___\n服务器协议\n___XYZ_分割___\nWFAS（本地）\n___XYZ_分割___\n低延迟自定义协议，由移动和桌面应用程序使用。\n___XYZ_分割___\n断开连接后保持服务器运行\n___XYZ_分割___\n在单播中，接收端端离开会结束会话，而不是服务器：它保持端口打开并等待下一个。多播已经以这种方式工作。\n___XYZ_分割___\nRTP/PCM 流\n___XYZ_分割___\nVLC、Kodi 或 FFplay 的标准协议。\n___XYZ_分割___\nHTTP 网络流\n___XYZ_分割___\n直接流式传输到网络浏览器。\n___XYZ_分割___\nHTTP 端口\n___XYZ_分割___\nWeb 界面的端口。\n___XYZ_分割___\n网络编解码器（兼容性）\n___XYZ_分割___\n选择 Opus 以实现低延迟，或选择 AAC 以实现 Safari/iOS。\n___XYZ_分割___\n作品（Chrome / 火狐）\n___XYZ_分割___\nAAC（Safari / iOS）\n___XYZ_分割___\nRTP端口\n___XYZ_分割___\nRTP 流的端口\n___XYZ_分割___\n启用 RTP 流时会强制执行多播。</string>
     <string name="usb_status_no_cable">No USB cable detected</string>
     <string name="usb_action_open_tethering">Enable USB tethering</string>
     <string name="usb_hint_desktop">On the computer, keep the app on automatic interface selection: it will find the USB link on its own.</string>
@@ -226,7 +226,7 @@
     <string name="onboarding_proto1_desc">Requires the WiFi Audio Streaming app on both devices. It offers the best synchronization, ideal for gaming and watching videos.</string>
     <string name="onboarding_proto2_title">RTP Stream</string>
     <string name="onboarding_proto2_desc">Stream to external media players like VLC, Kodi, or FFplay. Just save the SDP file from the app and open it with your favorite player.</string>
-    <string name="onboarding_proto3_title">HTTP 网络流\n___XYZ_分割___\n直接从任何网络浏览器（Chrome、Safari、智能电视）收听，无需安装任何内容。只需键入服务器的 IP 地址和端口。\n___XYZ_分割___\nDLNA\n___XYZ_分割___\n将音频直接推送到网络上已有的 DLNA 渲染器 - 智能电视、AV 接收器、网络扬声器。无需在其上安装任何内容：选择设备即可开始播放。\n___XYZ_分割___\n快播\n___XYZ_分割___\n同步多房间音频。网络上的任何 Snapclient（Raspberry Pi、ESP32、Home Assistant、Snapcast 应用程序）都会加入并与其他客户端保持完美同步。\n___XYZ_分割___\n注意：Web 浏览器对 HTTP 流强制执行内部缓冲，这不可避免地会导致 1-3 秒的延迟。这是正常现象，无法绕过。\n___XYZ_分割___\n开始串流\n___XYZ_分割___\n刷新\n___XYZ_分割___\n未找到服务器\n___XYZ_分割___\n停止服务器\n___XYZ_分割___\n断开连接\n___XYZ_分割___\n流媒体活跃\n___XYZ_分割___\n已连接\n___XYZ_分割___\n服务器管理器\n___XYZ_分割___\n客户经理\n___XYZ_分割___\nIP: XYZPH0XYZ\n___XYZ_分割___\n空闲\n___XYZ_分割___\n\n___XYZ_分割___\n服务器管理器\n___XYZ_分割___\n客户经理\n___XYZ_分割___\n快速设置图块\n___XYZ_分割___\n客户端平铺固定IP\n___XYZ_分割___\n例如，192.168.1.50\n___XYZ_分割___\n当您从通知栏启动接收器时，将自动使用此 IP 地址。</string>
+    <string name="onboarding_proto3_title">HTTP 网络流\n___XYZ_分割___\n直接从任何网络浏览器（Chrome、Safari、智能电视）收听，无需安装任何内容。只需键入服务器的 IP 地址和端口。\n___XYZ_分割___\nDLNA\n___XYZ_分割___\n将音频直接推送到网络上已有的 DLNA 渲染器 - 智能电视、AV 接收器、网络扬声器。无需在其上安装任何内容：选择设备即可开始播放。\n___XYZ_分割___\n快播\n___XYZ_分割___\n同步多房间音频。网络上的任何 Snapclient（Raspberry Pi、ESP32、Home Assistant、Snapcast 应用程序）都会加入并与其他接收端端保持完美同步。\n___XYZ_分割___\n注意：Web 浏览器对 HTTP 流强制执行内部缓冲，这不可避免地会导致 1-3 秒的延迟。这是正常现象，无法绕过。\n___XYZ_分割___\n开始串流\n___XYZ_分割___\n刷新\n___XYZ_分割___\n未已发现的服务器\n___XYZ_分割___\n停止服务器\n___XYZ_分割___\n断开连接\n___XYZ_分割___\n流媒体活跃\n___XYZ_分割___\n已连接\n___XYZ_分割___\n服务器管理器\n___XYZ_分割___\n接收端经理\n___XYZ_分割___\nIP: XYZPH0XYZ\n___XYZ_分割___\n空闲\n___XYZ_分割___\n\n___XYZ_分割___\n服务器管理器\n___XYZ_分割___\n接收端经理\n___XYZ_分割___\n快速设置图块\n___XYZ_分割___\n接收端端平铺固定IP\n___XYZ_分割___\n例如，192.168.1.50\n___XYZ_分割___\n当您从通知栏启动接收器时，将自动使用此 IP 地址。</string>
     <string name="onboarding_proto3_desc">Listen directly from any web browser (Chrome, Safari, Smart TVs) without installing anything. Just type the server\'s IP address and port.</string>
     <string name="onboarding_proto4_title">DLNA</string>
     <string name="onboarding_proto4_desc">Push the audio straight to the DLNA renderers already on your network — Smart TVs, AV receivers, network speakers. Nothing to install on them: pick the device and it starts playing.</string>
@@ -251,7 +251,7 @@
     <string name="settings_tile_ip_label">Client Tile Fixed IP</string>
     <string name="settings_tile_ip_placeholder">e.g., 192.168.1.50</string>
     <string name="settings_tile_ip_description">This IP address will be used automatically when you start the receiver from the notification shade.</string>
-    <string name="shortcut_start_server_short">启动服务器\n___XYZ_分割___\n启动音频服务器\n___XYZ_分割___\n停止\n___XYZ_分割___\n停止串流\n___XYZ_分割___\n这里隐藏着一些东西......\n___XYZ_分割___\n你越来越暖和了...\n___XYZ_分割___\n一个秘密正在等待着……\n___XYZ_分割___\n继续走，不要停下来！\n___XYZ_分割___\n快到了...\n___XYZ_分割___\n最后一次触摸...\n___XYZ_分割___\n正在侦听优先级服务器...\n___XYZ_分割___\n自动连接优先级\n___XYZ_分割___\nIP地址\n___XYZ_分割___\nWi-Fi 网络（可选）\n___XYZ_分割___\n钥匙（可选）\n___XYZ_分割___\n密钥已保存 — 要替换的类型\n___XYZ_分割___\n删除已保存的密钥\n___XYZ_分割___\n启用\n___XYZ_分割___\n添加服务器\n___XYZ_分割___\n向上移动\n___XYZ_分割___\n下移\n___XYZ_分割___\n删除\n___XYZ_分割___\n订购服务器。该应用程序将尝试从顶部开始连接。\n___XYZ_分割___\n使用当前的 Wi-Fi\n___XYZ_分割___\n连接到 Wi-Fi 网络并启用“位置”以读取 SSID。</string>
+    <string name="shortcut_start_server_short">启动服务器\n___XYZ_分割___\n启动音频服务器\n___XYZ_分割___\n停止\n___XYZ_分割___\n停止串流\n___XYZ_分割___\n这里隐藏着一些东西......\n___XYZ_分割___\n你越来越暖和了...\n___XYZ_分割___\n一个秘密正在等待着……\n___XYZ_分割___\n继续走，不要停下来！\n___XYZ_分割___\n快到了...\n___XYZ_分割___\n最后一次触摸...\n___XYZ_分割___\n正在侦听优先级服务器...\n___XYZ_分割___\n自动连接优先级\n___XYZ_分割___\nIP地址\n___XYZ_分割___\nWi-Fi 网络（可选）\n___XYZ_分割___\n密码（可选）\n___XYZ_分割___\n密码已保存 — 要替换的类型\n___XYZ_分割___\n删除已保存的密码\n___XYZ_分割___\n启用\n___XYZ_分割___\n添加服务器\n___XYZ_分割___\n向上移动\n___XYZ_分割___\n下移\n___XYZ_分割___\n删除\n___XYZ_分割___\n订购服务器。该应用程序将尝试从顶部开始连接。\n___XYZ_分割___\n使用当前的 Wi-Fi\n___XYZ_分割___\n连接到 Wi-Fi 网络并启用“位置”以读取 SSID。</string>
     <string name="shortcut_start_server_long">Start Audio Server</string>
     <string name="shortcut_stop_short">Stop</string>
     <string name="shortcut_stop_long">Stop Streaming</string>
@@ -276,7 +276,7 @@
     <string name="auto_connect_priority_desc">Order servers. The app will attempt to connect starting from the top.</string>
     <string name="auto_connect_use_current_wifi">Use current Wi-Fi</string>
     <string name="auto_connect_ssid_error">Connect to a Wi-Fi network and enable Location to read the SSID.</string>
-    <string name="auto_connect_wifi_hint">读取网络名称并在此处输入\n___XYZ_分割___\n在后台自动连接\n___XYZ_分割___\n让应用程序在后台保持活动状态以自动连接到加星标的服务器。\n___XYZ_分割___\n个性化\n___XYZ_分割___\n背景频谱图\n___XYZ_分割___\n在活动流式传输期间在后台显示视觉音频频谱图。\n___XYZ_分割___\n频谱图风格\n___XYZ_分割___\n在清脆的条形或流畅的波浪之间进行选择。\n___XYZ_分割___\n酒吧和高峰\n___XYZ_分割___\n具有下降峰帽和重力物理的垂直条。\n___XYZ_分割___\n流体波\n___XYZ_分割___\n具有 3 个连续曲线波（低音、中音、高音）的流体多频段。\n___XYZ_分割___\n仅在黑屏中显示\n___XYZ_分割___\n仅当暗屏模式处于活动状态时才显示频谱图。\n___XYZ_分割___\n凹槽水平\n___XYZ_分割___\n自适应频谱对比度和旋律跟踪（0 至 160）。\n___XYZ_分割___\n连接声音\n___XYZ_分割___\n当客户端连接到服务器时播放声音\n___XYZ_分割___\n自定义连接声音\n___XYZ_分割___\n未选择文件（使用默认值）\n___XYZ_分割___\n选择文件\n___XYZ_分割___\n断开声音\n___XYZ_分割___\n当客户端与服务器断开连接时播放声音\n___XYZ_分割___\n麦克风静音\n___XYZ_分割___\n麦克风处于活动状态</string>
+    <string name="auto_connect_wifi_hint">读取网络名称并在此处输入\n___XYZ_分割___\n在后台自动连接\n___XYZ_分割___\n让应用程序在后台保持活动状态以自动连接到加星标的服务器。\n___XYZ_分割___\n个性化\n___XYZ_分割___\n背景频谱图\n___XYZ_分割___\n在活动流式传输期间在后台显示视觉音频频谱图。\n___XYZ_分割___\n频谱图风格\n___XYZ_分割___\n在清脆的条形或流畅的波浪之间进行选择。\n___XYZ_分割___\n酒吧和高峰\n___XYZ_分割___\n具有下降峰帽和重力物理的垂直条。\n___XYZ_分割___\n流体波\n___XYZ_分割___\n具有 3 个连续曲线波（低音、中音、高音）的流体多频段。\n___XYZ_分割___\n仅在黑屏中显示\n___XYZ_分割___\n仅当暗屏模式处于活动状态时才显示频谱图。\n___XYZ_分割___\n凹槽水平\n___XYZ_分割___\n自适应频谱对比度和旋律跟踪（0 至 160）。\n___XYZ_分割___\n连接声音\n___XYZ_分割___\n当接收端端连接到服务器时播放声音\n___XYZ_分割___\n自定义连接声音\n___XYZ_分割___\n未选择文件（使用默认值）\n___XYZ_分割___\n选择文件\n___XYZ_分割___\n断开声音\n___XYZ_分割___\n当接收端端与服务器断开连接时播放声音\n___XYZ_分割___\n麦克风静音\n___XYZ_分割___\n麦克风处于活动状态</string>
     <string name="auto_connect_switch_title">Auto-Connect in Background</string>
     <string name="auto_connect_switch_desc">Keep the app active in background to automatically connect to starred servers.</string>
     <string name="settings_group_personalization">Personalization</string>
@@ -326,7 +326,7 @@
     <string name="scripting_security_state_off">Blocked</string>
     <string name="scripting_security_explainer">Commands from outside the app (NFC tags, Tasker, MacroDroid, ADB) stay refused until you turn them on here. Once on, only commands carrying the token below run: the URIs and commands generated on this screen already include it. Leave this off if you do not use automations.</string>
     <string name="scripting_security_reveal">Show or hide the token</string>
-    <string name="scripting_security_copy_token">复制令牌\n___XYZ_分割___\n生成新令牌\n___XYZ_分割___\n任何持有令牌的人都可以驱动该应用程序。重新生成它会使已设置的每个 URI、NFC 标签和自动化失效。\n___XYZ_分割___\n保存\n___XYZ_分割___\n更新\n___XYZ_分割___\n立即运行\n___XYZ_分割___\n取消编辑\n___XYZ_分割___\n保存的脚本\n___XYZ_分割___\n尚未保存脚本。\n___XYZ_分割___\nXYZPH0XYZ 参数\n___XYZ_分割___\n编辑\n___XYZ_分割___\n删除\n___XYZ_分割___\n默认\n___XYZ_分割___\n开\n___XYZ_分割___\n关闭\n___XYZ_分割___\n启动服务器\n___XYZ_分割___\n连接客户端\n___XYZ_分割___\n停止\n___XYZ_分割___\n切换\n___XYZ_分割___\n更改设置\n___XYZ_分割___\n关闭\n___XYZ_分割___\n协议版本不兼容\n___XYZ_分割___\n服务器未响应连接请求。如果您可以在列表中看到它但无法连接，则它可能正在运行旧版本的应用程序：在该设备上更新它。\n___XYZ_分割___\n发件人更改了组密钥\n___XYZ_分割___\n连接被服务器拒绝</string>
+    <string name="scripting_security_copy_token">复制令牌\n___XYZ_分割___\n生成新令牌\n___XYZ_分割___\n任何持有令牌的人都可以驱动该应用程序。重新生成它会使已设置的每个 URI、NFC 标签和自动化失效。\n___XYZ_分割___\n保存\n___XYZ_分割___\n更新\n___XYZ_分割___\n立即运行\n___XYZ_分割___\n取消编辑\n___XYZ_分割___\n保存的脚本\n___XYZ_分割___\n尚未保存脚本。\n___XYZ_分割___\nXYZPH0XYZ 参数\n___XYZ_分割___\n编辑\n___XYZ_分割___\n删除\n___XYZ_分割___\n默认\n___XYZ_分割___\n开\n___XYZ_分割___\n关闭\n___XYZ_分割___\n启动服务器\n___XYZ_分割___\n连接接收端端\n___XYZ_分割___\n停止\n___XYZ_分割___\n切换\n___XYZ_分割___\n更改设置\n___XYZ_分割___\n关闭\n___XYZ_分割___\n协议版本不兼容\n___XYZ_分割___\n服务器未响应连接请求。如果您可以在列表中看到它但无法连接，则它可能正在运行旧版本的应用程序：在该设备上更新它。\n___XYZ_分割___\n发件人更改了组密码\n___XYZ_分割___\n连接被服务器拒绝</string>
     <string name="scripting_security_regenerate">Generate a new token</string>
     <string name="scripting_security_share_warning">Anyone holding the token can drive the app. Regenerating it invalidates every URI, NFC tag and automation already set up.</string>
     <string name="scripting_save">Save</string>
@@ -351,8 +351,8 @@
     <string name="status_server_silent_maybe_outdated">The server is not answering the connection request. If you can see it in the list but it will not connect, it is probably running an older version of the app: update it on that device.</string>
     <string name="status_group_rekeyed">Group key changed by the sender</string>
     <string name="status_unauthorized">Connection refused by the server</string>
-    <string name="status_awaiting_approval">等待其他设备批准...\n___XYZ_分割___\n该服务器需要密钥\n___XYZ_分割___\n安全性\n___XYZ_分割___\n需要授权（服务器）\n___XYZ_分割___\n选择当该设备是服务器时谁可以连接\n___XYZ_分割___\n关闭\n___XYZ_分割___\n每次都询问\n___XYZ_分割___\n预共享密钥\n___XYZ_分割___\n关闭\n___XYZ_分割___\n询问\n___XYZ_分割___\n钥匙\n___XYZ_分割___\n钥匙\n___XYZ_分割___\n弱键\n___XYZ_分割___\n公平密钥\n___XYZ_分割___\n强键\n___XYZ_分割___\n两个设备必须输入相同的密钥。它永远不会通过网络发送。\n___XYZ_分割___\n加密音频\n___XYZ_分割___\n使用 ChaCha20-Poly1305 端到端加密音频。需要密钥模式（预共享密钥）。\n___XYZ_分割___\n允许连接吗？\n___XYZ_分割___\nXYZPH0XYZ 想要连接到该设备。\n___XYZ_分割___\n允许\n___XYZ_分割___\n否认\n___XYZ_分割___\n需要钥匙\n___XYZ_分割___\n该服务器需要密钥。输入它进行连接：\n___XYZ_分割___\n钥匙错误。再试一次：</string>
-    <string name="status_key_required">This server requires a key</string>
+    <string name="status_awaiting_approval">等待其他设备批准...\n___XYZ_分割___\n该服务器需要密码\n___XYZ_分割___\n安全性\n___XYZ_分割___\n需要授权（服务器）\n___XYZ_分割___\n选择当该设备是服务器时谁可以连接\n___XYZ_分割___\n关闭\n___XYZ_分割___\n每次都询问\n___XYZ_分割___\n预共享密码\n___XYZ_分割___\n关闭\n___XYZ_分割___\n询问\n___XYZ_分割___\n密码\n___XYZ_分割___\n密码\n___XYZ_分割___\n弱键\n___XYZ_分割___\n公平密码\n___XYZ_分割___\n强键\n___XYZ_分割___\n两个设备必须输入相同的密码。它永远不会通过网络发送。\n___XYZ_分割___\n加密音频\n___XYZ_分割___\n使用 ChaCha20-Poly1305 端到端加密音频。需要密码模式（预共享密码）。\n___XYZ_分割___\n允许连接吗？\n___XYZ_分割___\nXYZPH0XYZ 想要连接到该设备。\n___XYZ_分割___\n允许\n___XYZ_分割___\n否认\n___XYZ_分割___\n需要密码\n___XYZ_分割___\n该服务器需要密码。输入它进行连接：\n___XYZ_分割___\n密码错误。再试一次：</string>
+    <string name="status_key_required">该服务器需要密码验证</string>
     <string name="settings_group_security">Security</string>
     <string name="settings_item_security_mode_title">Require authorization (server)</string>
     <string name="settings_item_security_mode_desc">Choose who may connect when this device is the server</string>
@@ -373,11 +373,11 @@
     <string name="auth_request_body">%1$s wants to connect to this device.</string>
     <string name="auth_allow">Allow</string>
     <string name="auth_deny">Deny</string>
-    <string name="key_dialog_title">Key required</string>
-    <string name="key_dialog_body">This server requires a key. Enter it to connect:</string>
-    <string name="key_dialog_wrong">Wrong key. Try again:</string>
-    <string name="key_dialog_connect">连接\n___XYZ_分割___\n取消\n___XYZ_分割___\n其他设备没有应答\n___XYZ_分割___\n“XYZPH0XYZ”从未应答连接请求。最可能的原因是它正在运行旧版本的应用程序，该应用程序无法与此版本通信 - 更新该设备上的应用程序。否则，请检查防火墙是否未阻止该端口。\n___XYZ_分割___\n另一台设备需要更新\n___XYZ_分割___\n该设备需要更新\n___XYZ_分割___\n这两个应用程序运行不兼容的 WFAS 协议版本（本设备：vXYZPH0XYZ，另一端：vXYZPH1XYZ）。连接已关闭。请更新，以便两台设备都运行最新版本。\n___XYZ_分割___\n正在传输的设备正在运行旧版本的应用程序（WFAS 协议 vXYZPH0XYZ，此设备使用 vXYZPH1XYZ），因此连接已关闭。更新传输设备上的应用程序。\n___XYZ_分割___\n正在接收的设备正在运行旧版本的应用程序（WFAS 协议 vXYZPH0XYZ，此设备使用 vXYZPH1XYZ），因此连接已关闭。更新接收设备上的应用程序。\n___XYZ_分割___\n此设备正在运行旧版本的应用程序（WFAS 协议 vXYZPH0XYZ，其他设备使用 vXYZPH1XYZ），因此连接已关闭。更新此设备上的应用程序。\n___XYZ_分割___\n打开下载\n___XYZ_分割___\n从网站下载\n___XYZ_分割___\n在 GitHub 上打开\n___XYZ_分割___\n黑屏\n___XYZ_分割___\n双击返回\n___XYZ_分割___\n不在那里，伙计，在别的地方\n___XYZ_分割___\n为了获得最佳质量，请保持此应用程序在屏幕上打开并且手机解锁。离开应用程序或锁定设备可能会导致音频失真。\n___XYZ_分割___\n触觉反馈\n___XYZ_分割___\n点击、切换和按键操作时振动\n___XYZ_分割___\n黑色屏幕轮廓\n___XYZ_分割___\n保持控件显示为白色轮廓而不是全黑屏幕\n___XYZ_分割___\n显示支持消息\n___XYZ_分割___\n带回您忽略的 Ko-fi 消息\n___XYZ_分割___\nWFAS v2 协议\n___XYZ_分割___\n参考 GitHub 上的 C99 实现</string>
-    <string name="key_dialog_cancel">Cancel</string>
+    <string name="key_dialog_title">需要密码</string>
+    <string name="key_dialog_body">该服务器需要密码验证，请输入密码以连接：</string>
+    <string name="key_dialog_wrong">密码错误，请重试：</string>
+    <string name="key_dialog_connect">连接</string>
+    <string name="key_dialog_cancel">取消</string>
     <string name="server_silent_title">The other device is not answering</string>
     <string name="server_silent_body">“%1$s” never answered the connection request. The most likely reason is that it is running an older version of the app, which cannot talk to this one — update the app on that device. Otherwise, check that a firewall is not blocking the port.</string>
     <string name="protocol_incompatible_title">The other device needs an update</string>
@@ -401,7 +401,7 @@
     <string name="settings_item_show_donation_desc">Bring back the Ko-fi message you dismissed</string>
     <string name="source_code_protocol">WFAS v2 Protocol</string>
     <string name="source_code_protocol_desc">Reference C99 implementation on GitHub</string>
-    <string name="welcome_eyebrow">通过 WiFi 传输音频\n___XYZ_分割___\n你的电话，\n你的扬声器。\n___XYZ_分割___\n将音频从您的电脑发送到此设备，反之亦然。低延迟，通过您自己的网络，云中没有任何内容。\n___XYZ_分割___\n获取桌面应用程序\n___XYZ_分割___\n您想要配对的计算机上需要\n___XYZ_分割___\n自动更新检查\n___XYZ_分割___\n每次启动时，应用程序都会询问 GitHub 是否存在更新版本。\n___XYZ_分割___\nGitHub 是微软旗下的一家美国公司。每个请求都必须向他们透露您的 IP 地址以及请求时间。不会发送任何其他内容：没有帐户、没有标识符、没有使用数据。关闭此功能，应用程序永远不会自行连接网络 - 您仍然可以随时从“设置”中手动检查。\n___XYZ_分割___\n开启·每次启动时进行检查\n___XYZ_分割___\n关闭 · 该应用程序从不联系 GitHub\n___XYZ_分割___\n更多详情\n___XYZ_分割___\n细节较少\n___XYZ_分割___\n组播锁定\n___XYZ_分割___\nRTP需要它\n___XYZ_分割___\nHTTP 需要它\n___XYZ_分割___\nRTP 和 HTTP 需要它\n___XYZ_分割___\n这些协议同时流向每个侦听器，因此单客户端模式是不可能的。在“设置”中将其关闭即可解锁。\n___XYZ_分割___\n无法播放该流：服务器发送 XYZPH0XYZ，该设备不支持。\n___XYZ_分割___\n开发商\n___XYZ_分割___\n开发者特色\n___XYZ_分割___\n显示高级实验选项\n___XYZ_分割___\n降噪\n___XYZ_分割___\n消除来自模拟源的电源嗡嗡声和嘶嘶声\n___XYZ_分割___\n强度：XYZPH0XYZ%%\n___XYZ_分割___\n仅适用于嘈杂的模拟发送器，例如对线路输出进行采样的微控制器。在干净的数字音频上，它只能添加伪影。如果发送器已经消除了其一侧的噪音，请勿使用它。</string>
+    <string name="welcome_eyebrow">通过 WiFi 传输音频\n___XYZ_分割___\n你的电话，\n你的扬声器。\n___XYZ_分割___\n将音频从您的电脑发送到此设备，反之亦然。低延迟，通过您自己的网络，云中没有任何内容。\n___XYZ_分割___\n获取桌面应用程序\n___XYZ_分割___\n您想要配对的计算机上需要\n___XYZ_分割___\n自动更新检查\n___XYZ_分割___\n每次启动时，应用程序都会询问 GitHub 是否存在更新版本。\n___XYZ_分割___\nGitHub 是微软旗下的一家美国公司。每个请求都必须向他们透露您的 IP 地址以及请求时间。不会发送任何其他内容：没有帐户、没有标识符、没有使用数据。关闭此功能，应用程序永远不会自行连接网络 - 您仍然可以随时从“设置”中手动检查。\n___XYZ_分割___\n开启·每次启动时进行检查\n___XYZ_分割___\n关闭 · 该应用程序从不联系 GitHub\n___XYZ_分割___\n更多详情\n___XYZ_分割___\n细节较少\n___XYZ_分割___\n组播锁定\n___XYZ_分割___\nRTP需要它\n___XYZ_分割___\nHTTP 需要它\n___XYZ_分割___\nRTP 和 HTTP 需要它\n___XYZ_分割___\n这些协议同时流向每个侦听器，因此单接收端端模式是不可能的。在“设置”中将其关闭即可解锁。\n___XYZ_分割___\n无法播放该流：服务器发送 XYZPH0XYZ，该设备不支持。\n___XYZ_分割___\n开发商\n___XYZ_分割___\n开发者特色\n___XYZ_分割___\n显示高级实验选项\n___XYZ_分割___\n降噪\n___XYZ_分割___\n消除来自模拟源的电源嗡嗡声和嘶嘶声\n___XYZ_分割___\n强度：XYZPH0XYZ%%\n___XYZ_分割___\n仅适用于嘈杂的模拟发送器，例如对线路输出进行采样的微控制器。在干净的数字音频上，它只能添加伪影。如果发送器已经消除了其一侧的噪音，请勿使用它。</string>
     <string name="welcome_headline">Your phone,\nyour speaker.</string>
     <string name="welcome_body">Send audio from your PC to this device, or the other way round. Low latency, over your own network, nothing in the cloud.</string>
     <string name="welcome_step_desktop_title">Get the desktop app</string>
@@ -426,7 +426,7 @@
     <string name="nr_desc">Cleans mains hum and hiss from analog sources</string>
     <string name="nr_strength">Strength: %1$d%%</string>
     <string name="nr_hint">Only for noisy analog senders, such as a microcontroller sampling a line-out. On clean digital audio it can only add artifacts. Do not use it if the sender already removes noise on its side.</string>
-    <string name="status_server_busy">该服务器已经在流式传输到另一台设备。\n___XYZ_分割___\n从网站下载\n___XYZ_分割___\n当安全模式设置为“密钥”时可用\n___XYZ_分割___\n始终开启：具有多播功能的 QR 模式需要加密\n___XYZ_分割___\n复制了！\n___XYZ_分割___\n已复制到剪贴板！\n___XYZ_分割___\n点击复制IP\n___XYZ_分割___\n复制\n___XYZ_分割___\n已复制！\n___XYZ_分割___\n复制网址\n___XYZ_分割___\n浏览器\n___XYZ_分割___\n静音\n___XYZ_分割___\n0%（静音）\n___XYZ_分割___\n100%（标准）\n___XYZ_分割___\n200%（最大）\n___XYZ_分割___\nDLNA / UPnP 渲染器\n___XYZ_分割___\n将音频推送到 AV 接收器、条形音箱和智能电视 — 无需应用程序\n___XYZ_分割___\nDLNA 媒体端口\n___XYZ_分割___\n渲染器连接回的 TCP 端口\n___XYZ_分割___\n音频格式\n___XYZ_分割___\n自动（协商）\n___XYZ_分割___\n询问每个渲染器支持什么并选择最佳匹配。受到推崇的。\n___XYZ_分割___\n未压缩的 16 位 PCM，~1.4 Mbps。最低的延迟，最广泛的兼容性。\n___XYZ_分割___\n流式 WAV 标头内未压缩的 PCM。对一些较旧的固件有帮助。\n___XYZ_分割___\n压缩后，约 320 kbps。不适用于 Android。</string>
+    <string name="status_server_busy">该服务器已经在流式传输到另一台设备。\n___XYZ_分割___\n从网站下载\n___XYZ_分割___\n当安全模式设置为“密码”时可用\n___XYZ_分割___\n始终开启：具有多播功能的 QR 模式需要加密\n___XYZ_分割___\n复制了！\n___XYZ_分割___\n已复制到剪贴板！\n___XYZ_分割___\n点击复制IP\n___XYZ_分割___\n复制\n___XYZ_分割___\n已复制！\n___XYZ_分割___\n复制网址\n___XYZ_分割___\n浏览器\n___XYZ_分割___\n静音\n___XYZ_分割___\n0%（静音）\n___XYZ_分割___\n100%（标准）\n___XYZ_分割___\n200%（最大）\n___XYZ_分割___\nDLNA / UPnP 渲染器\n___XYZ_分割___\n将音频推送到 AV 接收器、条形音箱和智能电视 — 无需应用程序\n___XYZ_分割___\nDLNA 媒体端口\n___XYZ_分割___\n渲染器连接回的 TCP 端口\n___XYZ_分割___\n音频格式\n___XYZ_分割___\n自动（协商）\n___XYZ_分割___\n询问每个渲染器支持什么并选择最佳匹配。受到推崇的。\n___XYZ_分割___\n未压缩的 16 位 PCM，~1.4 Mbps。最低的延迟，最广泛的兼容性。\n___XYZ_分割___\n流式 WAV 标头内未压缩的 PCM。对一些较旧的固件有帮助。\n___XYZ_分割___\n压缩后，约 320 kbps。不适用于 Android。</string>
     <string name="changelog_download_from_website">Download from the website</string>
     <string name="settings_item_encryption_needs_key">Available when the security mode is set to Key</string>
     <string name="settings_item_encryption_locked_qr_multicast">Always on: QR mode with multicast requires encryption</string>
@@ -451,7 +451,7 @@
     <string name="dlna_format_lpcm_desc">Uncompressed 16 bit PCM, ~1.4 Mbps. Lowest latency, widest compatibility.</string>
     <string name="dlna_format_wav_desc">Uncompressed PCM inside a streaming WAV header. Helps some older firmware.</string>
     <string name="dlna_format_mp3_desc">Compressed, ~320 kbps. Not available on Android.</string>
-    <string name="dlna_format_adts_desc">压缩的 AAC。高效，但渲染器支持最不稳定。\n___XYZ_分割___\n网络上的渲染器\n___XYZ_分割___\n重新扫描\n___XYZ_分割___\n正在搜索渲染器...\n___XYZ_分割___\n未找到 DLNA 渲染器。确保设备已打开且位于同一网络上。\n___XYZ_分割___\n流式传输开始时，系统会记住并自动重新连接选定的渲染器。\n___XYZ_分割___\n离线\n___XYZ_分割___\n后备\n___XYZ_分割___\n演奏\n___XYZ_分割___\n正在连接…\n___XYZ_分割___\n正在重试...\n___XYZ_分割___\n握手失败\n___XYZ_分割___\n复制诊断\n___XYZ_分割___\n清除选择\n___XYZ_分割___\nDLNA 诊断已复制到剪贴板\n___XYZ_分割___\n和\n___XYZ_分割___\n使用 XYZPH0XYZ 进行流式传输\n___XYZ_分割___\nDLNA输出\n___XYZ_分割___\n媒体端点\n___XYZ_分割___\n格式\n___XYZ_分割___\n未选择渲染器。在“设置”中选择一项。\n___XYZ_分割___\nXYZPH0XYZ 活动连接\n___XYZ_分割___\n钥匙丢失\n___XYZ_分割___\n在密钥模式下密钥不能为空。在“安全性”下输入一个，或切换到二维码，让其为您生成。\n___XYZ_分割___\n二维码</string>
+    <string name="dlna_format_adts_desc">压缩的 AAC。高效，但渲染器支持最不稳定。\n___XYZ_分割___\n网络上的渲染器\n___XYZ_分割___\n重新扫描\n___XYZ_分割___\n正在搜索渲染器...\n___XYZ_分割___\n未找到 DLNA 渲染器。确保设备已打开且位于同一网络上。\n___XYZ_分割___\n流式传输开始时，系统会记住并自动重新连接选定的渲染器。\n___XYZ_分割___\n离线\n___XYZ_分割___\n后备\n___XYZ_分割___\n演奏\n___XYZ_分割___\n正在连接…\n___XYZ_分割___\n正在重试...\n___XYZ_分割___\n握手失败\n___XYZ_分割___\n复制诊断\n___XYZ_分割___\n清除选择\n___XYZ_分割___\nDLNA 诊断已复制到剪贴板\n___XYZ_分割___\n和\n___XYZ_分割___\n使用 XYZPH0XYZ 进行流式传输\n___XYZ_分割___\nDLNA输出\n___XYZ_分割___\n媒体端点\n___XYZ_分割___\n格式\n___XYZ_分割___\n未选择渲染器。在“设置”中选择一项。\n___XYZ_分割___\nXYZPH0XYZ 活动连接\n___XYZ_分割___\n密码丢失\n___XYZ_分割___\n在密码模式下密码不能为空。在“安全性”下输入一个，或切换到二维码，让其为您生成。\n___XYZ_分割___\n二维码</string>
     <string name="dlna_devices_label">Renderers on the network</string>
     <string name="dlna_rescan">Rescan</string>
     <string name="dlna_scanning">Searching for renderers…</string>
@@ -476,7 +476,7 @@
     <string name="server_key_required_title">Key missing</string>
     <string name="server_key_required_desc">In Key mode the key cannot be empty. Enter one under Security, or switch to QR Code to have it generated for you.</string>
     <string name="sec_mode_qr">QR Code</string>
-    <string name="sec_mode_qr_info_title">自动生成密钥\n___XYZ_分割___\n为每个邀请自动生成一个随机密钥 - 比手动选择的密码更安全。无需记住或大声说出密码。\n___XYZ_分割___\n邀请\n___XYZ_分割___\n邀请设备\n___XYZ_分割___\n生成邀请码\n___XYZ_分割___\n扫描连接\n___XYZ_分割___\n从接收设备扫描此代码。仅对一对配对有效。\n___XYZ_分割___\n从接收设备扫描此代码即可加入群组。\n___XYZ_分割___\n于 XYZPH0XYZ 到期\n___XYZ_分割___\n已过期\n___XYZ_分割___\n扫描时遇到问题？点击纯黑白版本的代码。\n___XYZ_分割___\n点击代码可返回彩色版本。\n___XYZ_分割___\n密钥（手动输入）\n___XYZ_分割___\n显示密钥\n___XYZ_分割___\n隐藏键\n___XYZ_分割___\n音频加密已打开：多播组没有握手，因此如果没有它，密钥将无法保护任何内容。\n___XYZ_分割___\n还没有网络地址。连接到 Wi-Fi 网络并重试。\n___XYZ_分割___\n复制\n___XYZ_分割___\n钥匙已复制\n___XYZ_分割___\n关闭\n___XYZ_分割___\nXYZPH0XYZ · 端口 XYZPH1XYZ\n___XYZ_分割___\n重新生成密钥\n___XYZ_分割___\n扫描二维码\n___XYZ_分割___\n扫描邀请码\n___XYZ_分割___\n将相机对准其他设备显示的二维码。</string>
+    <string name="sec_mode_qr_info_title">自动生成密码\n___XYZ_分割___\n为每个邀请自动生成一个随机密码 - 比手动选择的密码更安全。无需记住或大声说出密码。\n___XYZ_分割___\n邀请\n___XYZ_分割___\n邀请设备\n___XYZ_分割___\n生成邀请码\n___XYZ_分割___\n扫描连接\n___XYZ_分割___\n从接收设备扫描此代码。仅对一对配对有效。\n___XYZ_分割___\n从接收设备扫描此代码即可加入群组。\n___XYZ_分割___\n于 XYZPH0XYZ 到期\n___XYZ_分割___\n已过期\n___XYZ_分割___\n扫描时遇到问题？点击纯黑白版本的代码。\n___XYZ_分割___\n点击代码可返回彩色版本。\n___XYZ_分割___\n密码（手动输入）\n___XYZ_分割___\n显示密码\n___XYZ_分割___\n隐藏键\n___XYZ_分割___\n音频加密已打开：多播组没有握手，因此如果没有它，密码将无法保护任何内容。\n___XYZ_分割___\n还没有网络地址。连接到 Wi-Fi 网络并重试。\n___XYZ_分割___\n复制\n___XYZ_分割___\n密码已复制\n___XYZ_分割___\n关闭\n___XYZ_分割___\nXYZPH0XYZ · 端口 XYZPH1XYZ\n___XYZ_分割___\n重新生成密码\n___XYZ_分割___\n扫描二维码\n___XYZ_分割___\n扫描邀请码\n___XYZ_分割___\n将相机对准其他设备显示的二维码。</string>
     <string name="sec_mode_qr_info_body">Automatically generates a random key for each invite — more secure than a manually chosen password. No password to remember or say out loud.</string>
     <string name="qr_invite_button">Invite</string>
     <string name="qr_invite_button_multicast">Invite device</string>
@@ -501,7 +501,7 @@
     <string name="qr_scan_button">Scan QR</string>
     <string name="qr_scan_title">Scan the invite code</string>
     <string name="qr_scan_hint">Point the camera at the QR code shown by the other device.</string>
-    <string name="qr_scan_torch">火炬\n___XYZ_分割___\n关闭扫描仪\n___XYZ_分割___\n相机权限被拒绝\n___XYZ_分割___\n嗯……你想让我扫描一下吗？这不是 WFAS 二维码！\n___XYZ_分割___\n该邀请已过期。要求一份新鲜的。\n___XYZ_分割___\n已找到邀请\n___XYZ_分割___\n二维码已过期\n___XYZ_分割___\n出于安全原因，此代码不再有效。生成新邀请以继续。\n___XYZ_分割___\n生成新代码\n___XYZ_分割___\n关闭\n___XYZ_分割___\n代码无法识别\n___XYZ_分割___\n扫描的代码不是有效的 WFAS 邀请。确保您正在扫描其他设备生成的代码。\n___XYZ_分割___\n再试一次\n___XYZ_分割___\n取消\n___XYZ_分割___\n邀请不再有效\n___XYZ_分割___\n另一台设备拒绝了此邀请。它可能已被更新的密钥替换，或者组密钥已重新生成。要求一个新的代码。\n___XYZ_分割___\n扫描新代码\n___XYZ_分割___\n关闭\n___XYZ_分割___\n这是你自己的代码\n___XYZ_分割___\n该邀请是由同一设备生成的，因此没有任何可连接的内容。从应接收音频的设备上扫描它。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n这个群已经变了\n___XYZ_分割___\n该多播组的密钥在代码生成后被更新。向广播设备请求新的邀请。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n相机不可用</string>
+    <string name="qr_scan_torch">火炬\n___XYZ_分割___\n关闭扫描仪\n___XYZ_分割___\n相机权限被拒绝\n___XYZ_分割___\n嗯……你想让我扫描一下吗？这不是 WFAS 二维码！\n___XYZ_分割___\n该邀请已过期。要求一份新鲜的。\n___XYZ_分割___\n已找到邀请\n___XYZ_分割___\n二维码已过期\n___XYZ_分割___\n出于安全原因，此代码不再有效。生成新邀请以继续。\n___XYZ_分割___\n生成新代码\n___XYZ_分割___\n关闭\n___XYZ_分割___\n代码无法识别\n___XYZ_分割___\n扫描的代码不是有效的 WFAS 邀请。确保您正在扫描其他设备生成的代码。\n___XYZ_分割___\n再试一次\n___XYZ_分割___\n取消\n___XYZ_分割___\n邀请不再有效\n___XYZ_分割___\n另一台设备拒绝了此邀请。它可能已被更新的密码替换，或者组密码已重新生成。要求一个新的代码。\n___XYZ_分割___\n扫描新代码\n___XYZ_分割___\n关闭\n___XYZ_分割___\n这是你自己的代码\n___XYZ_分割___\n该邀请是由同一设备生成的，因此没有任何可连接的内容。从应接收音频的设备上扫描它。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n这个群已经变了\n___XYZ_分割___\n该多播组的密码在代码生成后被更新。向广播设备请求新的邀请。\n___XYZ_分割___\n明白了\n___XYZ_分割___\n相机不可用</string>
     <string name="qr_scan_close">Close scanner</string>
     <string name="qr_scan_permission_denied">Camera permission denied</string>
     <string name="qr_scan_not_wfas">Ehm… you want me to scan that? That\'s not a WFAS QR code!</string>
@@ -526,7 +526,7 @@
     <string name="qr_pairing_epoch_mismatch_body">This multicast group\'s key was updated after the code was generated. Ask the broadcasting device for a new invite.</string>
     <string name="qr_pairing_epoch_mismatch_button">Got it</string>
     <string name="qr_pairing_no_camera_title">Camera unavailable</string>
-    <string name="qr_pairing_no_camera_body">未检测到网络摄像头。您仍然可以手动输入地址和密钥。\n___XYZ_分割___\n手动输入\n___XYZ_分割___\n关闭\n___XYZ_分割___\n重新生成组密钥？\n___XYZ_分割___\n所有连接的设备都必须重新配对。如果您认为未经授权的设备知道当前密钥，请使用此选项。\n___XYZ_分割___\n取消\n___XYZ_分割___\n再生\n___XYZ_分割___\n连接到 XYZPH0XYZ？\n___XYZ_分割___\n检测到 WFAS 邀请用于从该设备进行流式传输。您现在想连接吗？\n___XYZ_分割___\n检测到用于多播接收的 WFAS 邀请。您现在想连接吗？\n___XYZ_分割___\n该设备正在传输。连接将停止该传输。\n___XYZ_分割___\n忽略\n___XYZ_分割___\n连接\n___XYZ_分割___\n音频传输\n___XYZ_分割___\n您正在发送的流的实时状态，带有音量控制。\n___XYZ_分割___\n音频接收\n___XYZ_分割___\n您正在接收的流的实时状态。\n___XYZ_分割___\n自动连接\n___XYZ_分割___\n后台搜索您的加星标服务器。\n___XYZ_分割___\n自动化\n___XYZ_分割___\n有关被拒绝的外部命令的警告。\n___XYZ_分割___\n外部命令被阻止\n___XYZ_分割___\n命令到达时没有有效令牌，因此未执行。打开自动化和脚本将当前令牌复制到您的自动化中。\n___XYZ_分割___\n当外部命令关闭时，命令到达。如果您期望这样做，请在自动化和脚本中启用它们。\n___XYZ_分割___\n传输音频</string>
+    <string name="qr_pairing_no_camera_body">未检测到网络摄像头。您仍然可以手动输入地址和密码。\n___XYZ_分割___\n手动输入\n___XYZ_分割___\n关闭\n___XYZ_分割___\n重新生成组密码？\n___XYZ_分割___\n所有连接的设备都必须重新配对。如果您认为未经授权的设备知道当前密码，请使用此选项。\n___XYZ_分割___\n取消\n___XYZ_分割___\n再生\n___XYZ_分割___\n连接到 XYZPH0XYZ？\n___XYZ_分割___\n检测到 WFAS 邀请用于从该设备进行流式传输。您现在想连接吗？\n___XYZ_分割___\n检测到用于多播接收的 WFAS 邀请。您现在想连接吗？\n___XYZ_分割___\n该设备正在传输。连接将停止该传输。\n___XYZ_分割___\n忽略\n___XYZ_分割___\n连接\n___XYZ_分割___\n音频传输\n___XYZ_分割___\n您正在发送的流的实时状态，带有音量控制。\n___XYZ_分割___\n音频接收\n___XYZ_分割___\n您正在接收的流的实时状态。\n___XYZ_分割___\n自动连接\n___XYZ_分割___\n后台搜索您的加星标服务器。\n___XYZ_分割___\n自动化\n___XYZ_分割___\n有关被拒绝的外部命令的警告。\n___XYZ_分割___\n外部命令被阻止\n___XYZ_分割___\n命令到达时没有有效令牌，因此未执行。打开自动化和脚本将当前令牌复制到您的自动化中。\n___XYZ_分割___\n当外部命令关闭时，命令到达。如果您期望这样做，请在自动化和脚本中启用它们。\n___XYZ_分割___\n传输音频</string>
     <string name="qr_pairing_no_camera_manual">Enter manually</string>
     <string name="qr_pairing_no_camera_close">Close</string>
     <string name="qr_pairing_regenerate_confirm_title">Regenerate the group key?</string>
@@ -551,7 +551,7 @@
     <string name="notif_automation_blocked_token">A command arrived without a valid token and was not executed. Open Automation &amp;amp; Scripting to copy the current token into your automation.</string>
     <string name="notif_automation_blocked_disabled">A command arrived while external commands are turned off. Enable them in Automation &amp;amp; Scripting if you expected this.</string>
     <string name="notif_server_title">Transmitting audio</string>
-    <string name="notif_client_title">接收音频\n___XYZ_分割___\n自动连接\n___XYZ_分割___\n开始…\n___XYZ_分割___\n正在连接…\n___XYZ_分割___\n体积 XYZPH0XYZ%%\n___XYZ_分割___\n静音\n___XYZ_分割___\n停止\n___XYZ_分割___\n大声一点\n___XYZ_分割___\n更安静\n___XYZ_分割___\n静音\n___XYZ_分割___\n直播\n___XYZ_分割___\n扫描\n___XYZ_分割___\nSnapcast 服务器（多房间）\n___XYZ_分割___\n向任何 Snapclient 提供同步音频：Raspberry Pi、ESP32、Home Assistant、Snapcast 应用程序\n___XYZ_分割___\nSnapcast 流端口\n___XYZ_分割___\n客户端连接音频的 TCP 端口（默认 1704）\n___XYZ_分割___\nSnapcast 控制端口\n___XYZ_分割___\n用于管理组和卷的 JSON-RPC 端口（默认 1705）\n___XYZ_分割___\nSnapcast 编解码器\n___XYZ_分割___\n音频在离开该设备之前是如何编码的\n___XYZ_分割___\n块大小\n___XYZ_分割___\n每个数据包中传输的音频量\n___XYZ_分割___\n客户端缓冲区\n___XYZ_分割___\n客户端提前多长时间安排播放（以毫秒为单位）\n___XYZ_分割___\n流名称</string>
+    <string name="notif_client_title">接收音频\n___XYZ_分割___\n自动连接\n___XYZ_分割___\n开始…\n___XYZ_分割___\n正在连接…\n___XYZ_分割___\n体积 XYZPH0XYZ%%\n___XYZ_分割___\n静音\n___XYZ_分割___\n停止\n___XYZ_分割___\n大声一点\n___XYZ_分割___\n更安静\n___XYZ_分割___\n静音\n___XYZ_分割___\n直播\n___XYZ_分割___\n扫描\n___XYZ_分割___\nSnapcast 服务器（多房间）\n___XYZ_分割___\n向任何 Snapclient 提供同步音频：Raspberry Pi、ESP32、Home Assistant、Snapcast 应用程序\n___XYZ_分割___\nSnapcast 流端口\n___XYZ_分割___\n接收端端连接音频的 TCP 端口（默认 1704）\n___XYZ_分割___\nSnapcast 控制端口\n___XYZ_分割___\n用于管理组和卷的 JSON-RPC 端口（默认 1705）\n___XYZ_分割___\nSnapcast 编解码器\n___XYZ_分割___\n音频在离开该设备之前是如何编码的\n___XYZ_分割___\n块大小\n___XYZ_分割___\n每个数据包中传输的音频量\n___XYZ_分割___\n接收端端缓冲区\n___XYZ_分割___\n接收端端提前多长时间安排播放（以毫秒为单位）\n___XYZ_分割___\n流名称</string>
     <string name="notif_auto_connect_title">Automatic connection</string>
     <string name="notif_starting">Starting…</string>
     <string name="notif_connecting">Connecting…</string>
@@ -576,7 +576,7 @@
     <string name="settings_item_snapcast_buffer_title">Client buffer</string>
     <string name="settings_item_snapcast_buffer_desc">How far ahead clients schedule playback, in milliseconds</string>
     <string name="settings_item_snapcast_name_title">Stream name</string>
-    <string name="settings_item_snapcast_name_desc">向客户端和控制应用程序显示的标识符\n___XYZ_分割___\n未压缩，每个客户端约 1.5 Mbps，无编码延迟\n___XYZ_分割___\n无损，大约一半带宽，增加一点延迟\n___XYZ_分割___\n有损、最低带宽、需要 48000 Hz 立体声\n___XYZ_分割___\nOpus 需要 48000 Hz 立体声\n___XYZ_分割___\n使用当前音频设置，服务器将回退到 PCM。\n___XYZ_分割___\n每个块 XYZPH0XYZ 毫秒\n___XYZ_分割___\n发现\n___XYZ_分割___\n启动服务器以通过 mDNS 通告流。客户会自动找到它。\n___XYZ_分割___\n编解码器不可用\n___XYZ_分割___\nXYZPH0XYZ 在此设备上不可用，而是作为 XYZPH1XYZ 进行流式传输\n___XYZ_分割___\n为 XYZPH2XYZ 客户端提供 XYZPH0XYZ (XYZPH1XYZ) 服务，XYZPH3XYZ 控制连接\n___XYZ_分割___\nXYZPH0XYZ - 音量 XYZPH1XYZ%%，延迟 XYZPH2XYZ 毫秒\n___XYZ_分割___\n在线\n___XYZ_分割___\n离线\n___XYZ_分割___\nSnapcast 多房间\n___XYZ_分割___\nXYZPH0XYZ 客户端同步播放\n___XYZ_分割___\n串流\n___XYZ_分割___\n编解码器\n___XYZ_分割___\n控制\n___XYZ_分割___\n还没有客户端连接。将 snapclient 指向此设备或让它通过 mDNS 查找流。\n___XYZ_分割___\n发现\n___XYZ_分割___\n通过 mDNS 发布广告\n___XYZ_分割___\n未公布 - 手动连接\n___XYZ_分割___\n端口 XYZPH0XYZ 不可用</string>
+    <string name="settings_item_snapcast_name_desc">向接收端端和控制应用程序显示的标识符\n___XYZ_分割___\n未压缩，每个接收端端约 1.5 Mbps，无编码延迟\n___XYZ_分割___\n无损，大约一半带宽，增加一点延迟\n___XYZ_分割___\n有损、最低带宽、需要 48000 Hz 立体声\n___XYZ_分割___\nOpus 需要 48000 Hz 立体声\n___XYZ_分割___\n使用当前音频设置，服务器将回退到 PCM。\n___XYZ_分割___\n每个块 XYZPH0XYZ 毫秒\n___XYZ_分割___\n发现\n___XYZ_分割___\n启动服务器以通过 mDNS 通告流。接收端会自动找到它。\n___XYZ_分割___\n编解码器不可用\n___XYZ_分割___\nXYZPH0XYZ 在此设备上不可用，而是作为 XYZPH1XYZ 进行流式传输\n___XYZ_分割___\n为 XYZPH2XYZ 接收端端提供 XYZPH0XYZ (XYZPH1XYZ) 服务，XYZPH3XYZ 控制连接\n___XYZ_分割___\nXYZPH0XYZ - 音量 XYZPH1XYZ%%，延迟 XYZPH2XYZ 毫秒\n___XYZ_分割___\n在线\n___XYZ_分割___\n离线\n___XYZ_分割___\nSnapcast 多房间\n___XYZ_分割___\nXYZPH0XYZ 接收端端同步播放\n___XYZ_分割___\n串流\n___XYZ_分割___\n编解码器\n___XYZ_分割___\n控制\n___XYZ_分割___\n还没有接收端端连接。将 snapclient 指向此设备或让它通过 mDNS 查找流。\n___XYZ_分割___\n发现\n___XYZ_分割___\n通过 mDNS 发布广告\n___XYZ_分割___\n未公布 - 手动连接\n___XYZ_分割___\n端口 XYZPH0XYZ 不可用</string>
     <string name="snapcast_codec_pcm_desc">Uncompressed, about 1.5 Mbps per client, no encoding delay</string>
     <string name="snapcast_codec_flac_desc">Lossless, roughly half the bandwidth, adds a little delay</string>
     <string name="snapcast_codec_opus_desc">Lossy, lowest bandwidth, needs 48000 Hz stereo</string>
@@ -601,21 +601,32 @@
     <string name="snapcast_discovery_on">advertised over mDNS</string>
     <string name="snapcast_discovery_off">not advertised - connect manually</string>
     <string name="snapcast_port_blocked">port %1$d not available</string>
-    <string name="snapcast_bind_error">无法打开端口：%1$s。另一个 Snapcast 服务器可能已经在运行，或者防火墙正在阻止它。\n___XYZ_分割___\n如何连接\n___XYZ_分割___\n该网络上的客户端自行查找流。如果没有，请将其指向下面的地址。\n___XYZ_分割___\n自动发现已关闭，因此客户端必须明确指向该地址。\n___XYZ_分割___\n%1$s 需要</string>
+    <string name="snapcast_bind_error">无法打开端口：%1$s。另一个 Snapcast 服务器可能已经在运行，或者防火墙正在阻止它。\n___XYZ_分割___\n如何连接\n___XYZ_分割___\n该网络上的接收端端自行查找流。如果没有，请将其指向下面的地址。\n___XYZ_分割___\n自动发现已关闭，因此接收端端必须明确指向该地址。\n___XYZ_分割___\n%1$s 需要</string>
     <string name="snapcast_how_to_connect">How to connect</string>
     <string name="snapcast_how_to_connect_auto">Clients on this network find the stream on their own. If one does not, point it at the address below.</string>
     <string name="snapcast_how_to_connect_manual">Automatic discovery is off, so clients must be pointed at this address explicitly.</string>
     <string name="multicast_locked_by">Required by %1$s</string>
-    <string name="lang_auto">Auto (System Default)</string>
-    <string name="lang_selector_title">Language</string>
-    <string name="lang_selector_desc">Select interface display language</string>
-    <string name="saved_servers_title">Saved Servers</string>
-    <string name="saved_servers_desc">Manage servers and encrypted credentials remembered on this device</string>
-    <string name="saved_servers_empty">No saved servers with stored credentials yet</string>
-    <string name="saved_servers_forget">Forget</string>
+    <string name="lang_auto">自动 (系统默认)</string>
+    <string name="lang_selector_title">应用语言</string>
+    <string name="lang_selector_desc">实时切换界面显示语言</string>
+    <string name="saved_servers_title">已保存的服务器</string>
+    <string name="saved_servers_desc">管理已加密保存的音频服务器密码</string>
+    <string name="saved_servers_empty">暂无已保存的服务器。连接时勾选“记住密码”即可在此管理。</string>
+    <string name="saved_servers_forget">忘记密码</string>
     <string name="saved_servers_last_connected">Last connected: %s</string>
-    <string name="remember_password_label">Remember password</string>
-    <string name="server_persist_title">Keep Server Running After Disconnect</string>
-    <string name="server_persist_desc">When client disconnects, do not automatically stop server (Unicast mode only)</string>
+    <string name="remember_password_label">记住密码</string>
+    <string name="server_persist_title">断开连接后保持发送端 (Server)运行 (单播)</string>
+    <string name="server_persist_desc">接收端 (Client)断开后，发送端 (Server)继续保持运行并等待新连接</string>
     <string name="recent_servers_label">Recent Servers:</string>
+    <string name="receive_client">接收端 (Client)</string>
+    <string name="send_server">发送端 (Server)</string>
+    <string name="multicast_mode">组播模式 (Multicast)</string>
+    <string name="multicast_description">同时向多个设备发送音频</string>
+    <string name="unicast">单播 (单设备)</string>
+    <string name="multicast">组播 (多设备)</string>
+    <string name="status_key_accepted">密码验证通过 - 正在解密音频流</string>
+    <string name="auth_key_label">密码</string>
+    <string name="auth_key_hint">两端设备必须输入相同的密码。密码绝不会在网络上传输。</string>
+    <string name="auth_key_show">显示密码</string>
+    <string name="auth_key_hide">隐藏密码</string>
 </resources>
