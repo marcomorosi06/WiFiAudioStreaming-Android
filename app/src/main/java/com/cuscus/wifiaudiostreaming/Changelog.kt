@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
@@ -34,6 +51,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SpeakerGroup
@@ -109,6 +127,32 @@ data class ChangelogEntry(
 object Changelog {
 
     val entries: List<ChangelogEntry> = listOf(
+        ChangelogEntry(
+            version = "1.2.1",
+            date = Bilingual("September 2026", "Settembre 2026"),
+            headline = Bilingual(
+                "Your phone can listen too: join Snapcast systems and play RTP streams straight from the Receive screen.",
+                "Ora il telefono sa anche ascoltare: entra negli impianti Snapcast e riproduci i flussi RTP direttamente dalla schermata Ricevi."
+            ),
+            items = listOf(
+                ChangelogItem(
+                    icon = Icons.Filled.SpeakerGroup,
+                    title = Bilingual("Join a Snapcast system", "Entra in un impianto Snapcast"),
+                    body = Bilingual(
+                        "Connect as a client to any Snapcast server, found on its own on the network or added by address, and play in sync with the other rooms. The same card shows every client in the system, with volume, mute, latency and groups at hand.",
+                        "Collegati come client a qualsiasi server Snapcast, trovato da solo in rete o aggiunto per indirizzo, e suona in sincrono con le altre stanze. La stessa scheda mostra tutti i client dell'impianto, con volume, muto, latenza e gruppi a portata di mano."
+                    )
+                ),
+                ChangelogItem(
+                    icon = Icons.Filled.Radio,
+                    title = Bilingual("Listen to RTP streams", "Ascolta i flussi RTP"),
+                    body = Bilingual(
+                        "Receive audio over RTP, multicast included, from ffmpeg, VLC, a hardware sender or another WFAS device. Import the .sdp file or paste the descriptor and the fields fill themselves in; on Android the stream must be L16 (raw PCM).",
+                        "Ricevi l'audio via RTP, multicast compreso, da ffmpeg, VLC, un trasmettitore hardware o un altro dispositivo WFAS. Importa il file .sdp o incolla il descrittore e i campi si compilano da soli; su Android il flusso deve essere L16 (PCM grezzo)."
+                    )
+                )
+            )
+        ),
         ChangelogEntry(
             version = "1.2.0",
             date = Bilingual("August 2026", "Agosto 2026"),

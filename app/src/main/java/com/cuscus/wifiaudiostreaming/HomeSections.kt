@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2026 Marco Morosi
+ *
+ * Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+ * the European Commission - subsequent versions of the EUPL (the "Licence");
+ * You may not use this work except in compliance with the Licence.
+ * You may obtain a copy of the Licence at:
+ *
+ * https://joinup.ec.europa.eu/software/page/eupl
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Licence is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Licence for the specific language governing permissions and
+ * limitations under the Licence.
+ */
+
 package com.cuscus.wifiaudiostreaming
 
 import androidx.compose.animation.AnimatedContent
@@ -793,6 +810,7 @@ fun ExpressiveSourceSection(
 
         val keyBased = secMode == "KEY" || secMode == "QR"
         val encryptionLocked = SecurityMode.encryptionForced(secMode, multicastActive)
+        val encryptionOn = (encryptionEnabled || encryptionLocked) && keyBased
 
         ExpressiveToggleTile(
             icon = if (keyBased) Icons.Outlined.EnhancedEncryption else Icons.Outlined.LockOpen,
@@ -805,11 +823,56 @@ fun ExpressiveSourceSection(
                     else -> R.string.settings_item_encryption_needs_key
                 }
             ),
-            checked = (encryptionEnabled || encryptionLocked) && keyBased,
+            checked = encryptionOn,
             enabled = keyBased && !encryptionLocked,
             accent = accent,
             onCheckedChange = onEncryptionChange
         )
+
+        AnimatedVisibility(
+            visible = encryptionOn,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column {
+                Spacer(Modifier.height(10.dp))
+                EncryptionNoticeCard(accent = accent)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EncryptionNoticeCard(accent: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Info,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = accent
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.encryption_notice_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                color = accent
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.encryption_notice_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

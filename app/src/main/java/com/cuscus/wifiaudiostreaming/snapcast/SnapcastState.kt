@@ -520,7 +520,7 @@ class SnapcastState(
                 id = id,
                 name = entry.stringAt("name") ?: "",
                 muted = entry.boolAt("muted") ?: false,
-                streamId = entry.stringAt("stream_id") ?: streamId,
+                streamId = streamId,
                 clientIds = entry.field("clients").asArray().mapNotNull { it.asString() }
             )
         }

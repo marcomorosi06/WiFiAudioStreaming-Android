@@ -1,0 +1,129 @@
+name: Reproducible APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build unsigned release APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: debian:bookworm-slim
+    env:
+      ANDROID_HOME: /opt/android-sdk
+      ANDROID_SDK_ROOT: /opt/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+    outputs:
+      sha256: ${{ steps.apk.outputs.sha256 }}
+    steps:
+      - name: Install build tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          mkdir -p /usr/share/man/man1 "$ANDROID_HOME"
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git unzip openjdk-17-jdk-headless
+          java -version
+
+      - name: Check out the source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.4.0
+
+      - name: Install the Android SDK
+        uses: android-actions/setup-android@v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+
+      - name: Build the unsigned release APK
+        run: sh ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache --no-daemon
+
+      - name: Name and hash the APK
+        id: apk
+        run: |
+          out=app/build/outputs/apk/release
+          version=$(sed -n 's/.*"versionName": *"\([^"]*\)".*/\1/p' "$out/output-metadata.json" | head -n 1)
+          name="wifi-audio-streaming-v${version}-unsigned.apk"
+          cp "$out/app-release-unsigned.apk" "$name"
+          sha=$(sha256sum "$name" | cut -d ' ' -f 1)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          {
+            echo "### $name"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| SHA-256 | \`$sha\` |"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| Ref | \`$GITHUB_REF_NAME\` |"
+            echo "| Image | \`debian:bookworm-slim\` |"
+            echo "| JDK | \`$(java -version 2>&1 | head -n 1)\` |"
+            echo "| Command | \`sh ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache --no-daemon\` |"
+            echo
+            echo "Sign without re-aligning, so the signed APK is this exact file plus the signature:"
+            echo
+            echo "\`apksigner sign --alignment-preserved true --v1-signing-enabled false --ks release.jks --out ${name%-unsigned.apk}.apk $name\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the unsigned APK
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          path: ${{ steps.apk.outputs.name }}
+          archive: false
+          if-no-files-found: error
+
+  verify:
+    name: Rebuild elsewhere and compare
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build on two CPU cores
+        run: taskset -c 0,1 sh ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache --no-daemon
+
+      - name: Compare with the first build
+        env:
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          actual=$(sha256sum app/build/outputs/apk/release/app-release-unsigned.apk | cut -d ' ' -f 1)
+          echo "first build:  $EXPECTED"
+          echo "second build: $actual"
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "::error::The two builds differ, so IzzyOnDroid would not be able to reproduce this APK. Compare them with diffoscope before signing."
+            exit 1
+          fi
+          echo "### Reproducible: the second build is byte-identical" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the mismatching APK
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: mismatching-rebuild
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: ignore

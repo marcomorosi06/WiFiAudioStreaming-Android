@@ -26,6 +26,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            isCrunchPngs = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,6 +46,9 @@ android {
     packaging {
         resources {
             excludes += "META-INF/versions/**"
+        }
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
         }
     }
 }

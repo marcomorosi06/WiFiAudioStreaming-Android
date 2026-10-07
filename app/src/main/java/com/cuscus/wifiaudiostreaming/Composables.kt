@@ -270,7 +270,7 @@ fun WiFiAudioStreamingApp(
                     isMulticast = isMulticastMode,
                     rtpEnabled = appSettings.rtpEnabled,
                     forceMulticast = appSettings.httpEnabled || appSettings.dlnaEnabled ||
-                        appSettings.snapcastEnabled,
+                            appSettings.snapcastEnabled,
                     onStreamInternalChange = onStreamInternalChange,
                     onStreamMicChange = onStreamMicChange,
                     onMulticastChange = onMulticastModeChange,
@@ -1415,19 +1415,27 @@ fun SettingsTextFieldItem(
      */
     numeric: Boolean = true,
     maxLength: Int = if (numeric) 5 else 40,
+    commitWhileTyping: Boolean = !numeric,
     onValueChange: (String) -> Unit
 ) {
-    var text by remember(value) { mutableStateOf(value) }
+    var text by remember { mutableStateOf(value) }
+    var edited by remember { mutableStateOf(false) }
     var hadFocus by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val fieldHaptics = rememberAppHaptics()
 
+    LaunchedEffect(value) {
+        if (!edited) text = value
+    }
+
     fun commit() {
+        if (!numeric) text = text.trim()
         if (text != value) onValueChange(text)
         // Campo svuotato e lasciato li': si rimette quello che c'era. Un
         // riquadro vuoto al posto di un'impostazione fa credere di averla
         // persa.
         if (text.isBlank()) text = value
+        edited = false
     }
 
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
@@ -1446,6 +1454,8 @@ fun SettingsTextFieldItem(
                 else newValue.none { it.isISOControl() }
                 if (ok && newValue.length <= maxLength) {
                     text = newValue
+                    edited = true
+                    if (commitWhileTyping) onValueChange(newValue)
                 }
             },
             label = { Text(title) },
@@ -5496,7 +5506,7 @@ fun ScriptingScreen(
                             ScriptActionButton(
                                 icon = Icons.Outlined.Save,
                                 label = if (editingId == null) stringResource(R.string.scripting_save)
-                                        else stringResource(R.string.scripting_update),
+                                else stringResource(R.string.scripting_update),
                                 container = accent,
                                 content = MaterialTheme.colorScheme.surfaceContainerLowest,
                                 modifier = Modifier.weight(1f)
@@ -6157,7 +6167,7 @@ private fun ScriptLibraryItem(
                 )
                 Text(
                     text = (action?.let { scriptActionLabel(it) } ?: script.actionId) +
-                        "  ·  " + stringResource(R.string.scripting_param_count, script.params.size),
+                            "  ·  " + stringResource(R.string.scripting_param_count, script.params.size),
                     style = MaterialTheme.typography.labelSmall,
                     letterSpacing = 0.5.sp,
                     color = cs.onSurfaceVariant

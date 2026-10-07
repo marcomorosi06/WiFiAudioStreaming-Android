@@ -1,0 +1,4 @@
+🔊 Snapcast client: join a multiroom system and play in sync with the other rooms
+🎛️ See every Snapcast client and set volume, mute, latency and groups
+📡 RTP client: listen to streams from ffmpeg, VLC or hardware senders, multicast included
+📄 Import an .sdp file or paste the descriptor to set up an RTP source

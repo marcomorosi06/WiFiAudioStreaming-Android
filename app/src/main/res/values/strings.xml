@@ -442,6 +442,8 @@
     <string name="changelog_download_from_website">Download from the website</string>
     <string name="settings_item_encryption_needs_key">Available when the security mode is set to Key</string>
     <string name="settings_item_encryption_locked_qr_multicast">Always on: QR mode with multicast requires encryption</string>
+    <string name="encryption_notice_title">Experimental encryption</string>
+    <string name="encryption_notice_body">Audio encryption is implemented as a student project and provided purely on an experimental, \"as-is\" basis. It has not undergone formal security audits, may contain implementation flaws, and should never be relied upon for sensitive or hostile environments. Use at your own risk.</string>
     <string name="copied">Copied!</string>
     <string name="copied_to_clipboard">Copied to clipboard!</string>
     <string name="tap_to_copy_ip">Tap to copy IP</string>
