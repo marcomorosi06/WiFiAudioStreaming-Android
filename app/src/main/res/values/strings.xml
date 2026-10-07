@@ -104,7 +104,7 @@
     <string name="status_client_connected">Client connected: %1$s. Starting…</string>
     <string name="status_handshake_failed_from_client">Handshake failed from client %1$s</string>
     <string name="status_server_error">Server error: %1$s</string>
-    <string name="status_link_lost_waiting">Network unreachable — waiting for it to come back</string>
+    <string name="status_link_lost_waiting">Network unreachable: waiting for it to come back</string>
     <string name="status_link_restored">Network back, streaming again</string>
     <string name="status_server_stopped">Server stopped.</string>
     <string name="status_contacting_server">Contacting server %1$s…</string>
@@ -238,7 +238,7 @@
     <string name="onboarding_proto3_desc">Listen directly from any web browser (Chrome, Safari, Smart TVs) without installing anything. Just type the server\'s IP address and port.</string>
 
     <string name="onboarding_proto4_title">DLNA</string>
-    <string name="onboarding_proto4_desc">Push the audio straight to the DLNA renderers already on your network — Smart TVs, AV receivers, network speakers. Nothing to install on them: pick the device and it starts playing.</string>
+    <string name="onboarding_proto4_desc">Push the audio straight to the DLNA renderers already on your network: Smart TVs, AV receivers, network speakers. Nothing to install on them: pick the device and it starts playing.</string>
 
     <string name="onboarding_proto5_title">Snapcast</string>
     <string name="onboarding_proto5_desc">Synchronised multiroom audio. Any snapclient on the network (Raspberry Pi, ESP32, Home Assistant, the Snapcast apps) joins in and stays perfectly in sync with the others.</string>
@@ -276,7 +276,7 @@
     <string name="auto_connect_ip_label">IP Address</string>
     <string name="auto_connect_ssid_label">Wi-Fi Network (Optional)</string>
     <string name="auto_connect_key_label">Key (optional)</string>
-    <string name="auto_connect_key_saved">Key saved — type to replace</string>
+    <string name="auto_connect_key_saved">Key saved. Type to replace</string>
     <string name="auto_connect_key_clear">Remove saved key</string>
     <string name="auto_connect_enabled_label">Enabled</string>
     <string name="auto_connect_add_button">Add Server</string>
@@ -391,7 +391,7 @@
     <string name="key_dialog_connect">Connect</string>
     <string name="key_dialog_cancel">Cancel</string>
     <string name="server_silent_title">The other device is not answering</string>
-    <string name="server_silent_body">“%1$s” never answered the connection request. The most likely reason is that it is running an older version of the app, which cannot talk to this one — update the app on that device. Otherwise, check that a firewall is not blocking the port.</string>
+    <string name="server_silent_body">“%1$s” never answered the connection request. The most likely reason is that it is running an older version of the app, which cannot talk to this one: update the app on that device. Otherwise, check that a firewall is not blocking the port.</string>
     <string name="protocol_incompatible_title">The other device needs an update</string>
     <string name="protocol_incompatible_title_local">This device needs an update</string>
     <string name="protocol_incompatible_body">The two apps are running incompatible WFAS protocol versions (this device: v%1$d, other end: v%2$d). The connection was closed. Please update so both devices run the latest version.</string>
@@ -420,7 +420,7 @@
     <string name="welcome_step_desktop_desc">Needed on the computer you want to pair with</string>
     <string name="welcome_privacy_title">Automatic update check</string>
     <string name="welcome_privacy_desc">On every launch the app asks GitHub whether a newer version exists.</string>
-    <string name="welcome_privacy_detail">GitHub is a US company owned by Microsoft. Every request necessarily reveals your IP address to them, along with the time of the request. Nothing else is sent: no account, no identifier, no usage data. Turn this off and the app never contacts the network on its own — you can still check manually from Settings at any time.</string>
+    <string name="welcome_privacy_detail">GitHub is a US company owned by Microsoft. Every request necessarily reveals your IP address to them, along with the time of the request. Nothing else is sent: no account, no identifier, no usage data. Turn this off and the app never contacts the network on its own. You can still check manually from Settings at any time.</string>
     <string name="welcome_privacy_on">On · checks at every launch</string>
     <string name="welcome_privacy_off">Off · the app never contacts GitHub</string>
     <string name="more_details">More details</string>
@@ -457,7 +457,7 @@
     <string name="volume_preset_max">200% (Max)</string>
 
     <string name="settings_item_dlna_title">DLNA / UPnP renderers</string>
-    <string name="settings_item_dlna_desc">Push audio to AV receivers, soundbars and smart TVs — no app needed</string>
+    <string name="settings_item_dlna_desc">Push audio to AV receivers, soundbars and smart TVs: no app needed</string>
     <string name="settings_item_dlna_port_title">DLNA media port</string>
     <string name="settings_item_dlna_port_desc">TCP port the renderer connects back to</string>
     <string name="dlna_format_label">Audio format</string>
@@ -494,7 +494,7 @@
 
     <string name="sec_mode_qr">QR Code</string>
     <string name="sec_mode_qr_info_title">Key generated automatically</string>
-    <string name="sec_mode_qr_info_body">Automatically generates a random key for each invite — more secure than a manually chosen password. No password to remember or say out loud.</string>
+    <string name="sec_mode_qr_info_body">Automatically generates a random key for each invite. More secure than a manually chosen password. No password to remember or say out loud.</string>
 
     <string name="qr_invite_button">Invite</string>
     <string name="qr_invite_button_multicast">Invite device</string>
@@ -738,7 +738,7 @@
     <string name="rtp_buffer_ms">%1$d ms</string>
     <string name="rtp_buffer_low">low</string>
     <string name="rtp_buffer_hint">If the buffer keeps dropping towards zero the audio arrives in bursts and you will hear stutter. Raise the latency in the audio settings.</string>
-    <string name="rtp_hint_multicast">Nothing yet. Check that the sender is running and that multicast reaches this phone — Wi-Fi client isolation and VPNs usually block it.</string>
+    <string name="rtp_hint_multicast">Nothing yet. Check that the sender is running and that multicast reaches this phone: Wi-Fi client isolation and VPNs usually block it.</string>
     <string name="rtp_hint_firewall">Nothing yet. Check the port, and that nothing on the network is dropping the packets.</string>
     <string name="rtp_val_port">Port must be between 1 and 65535.</string>
     <string name="rtp_val_rate">Sample rate must be between 8000 and 192000 Hz.</string>

@@ -31,7 +31,7 @@
     <string name="status_client_connected">Client connesso: %1$s. Avvio…</string>
     <string name="status_handshake_failed_from_client">Handshake fallito dal client %1$s</string>
     <string name="status_server_error">Errore server: %1$s</string>
-    <string name="status_link_lost_waiting">Rete non raggiungibile — aspetto che torni</string>
+    <string name="status_link_lost_waiting">Rete non raggiungibile: aspetto che torni</string>
     <string name="status_link_restored">Rete tornata, trasmissione ripresa</string>
     <string name="status_server_stopped">Server fermato.</string>
     <string name="status_contacting_server">Contatto il server %1$s…</string>
@@ -238,7 +238,7 @@
     <string name="onboarding_proto3_desc">Ascolta direttamente da qualsiasi browser web (Chrome, Safari, Smart TV) senza installare nulla. Basta digitare l\'indirizzo IP e la porta del server.</string>
 
     <string name="onboarding_proto4_title">DLNA</string>
-    <string name="onboarding_proto4_desc">Manda l\'audio direttamente ai renderer DLNA già presenti sulla tua rete — Smart TV, sintoamplificatori, diffusori di rete. Su di loro non serve installare nulla: scegli il dispositivo e parte.</string>
+    <string name="onboarding_proto4_desc">Manda l\'audio direttamente ai renderer DLNA già presenti sulla tua rete: Smart TV, sintoamplificatori, diffusori di rete. Su di loro non serve installare nulla: scegli il dispositivo e parte.</string>
 
     <string name="onboarding_proto5_title">Snapcast</string>
     <string name="onboarding_proto5_desc">Audio multiroom sincronizzato. Qualsiasi snapclient sulla rete (Raspberry Pi, ESP32, Home Assistant, le app Snapcast) si unisce e resta perfettamente in sincrono con gli altri.</string>
@@ -276,7 +276,7 @@
     <string name="auto_connect_ip_label">Indirizzo IP</string>
     <string name="auto_connect_ssid_label">Rete Wi-Fi (Opzionale)</string>
     <string name="auto_connect_key_label">Chiave (opzionale)</string>
-    <string name="auto_connect_key_saved">Chiave salvata — digita per sostituirla</string>
+    <string name="auto_connect_key_saved">Chiave salvata: digita per sostituirla</string>
     <string name="auto_connect_key_clear">Rimuovi la chiave salvata</string>
     <string name="auto_connect_enabled_label">Abilitato</string>
     <string name="auto_connect_add_button">Aggiungi Server</string>
@@ -420,7 +420,7 @@
     <string name="welcome_step_desktop_desc">Serve sul computer che vuoi collegare</string>
     <string name="welcome_privacy_title">Controllo automatico aggiornamenti</string>
     <string name="welcome_privacy_desc">A ogni avvio l\'app chiede a GitHub se esiste una versione più recente.</string>
-    <string name="welcome_privacy_detail">GitHub è un\'azienda statunitense di proprietà di Microsoft. Ogni richiesta rivela necessariamente il tuo indirizzo IP, insieme all\'orario della richiesta. Non viene inviato altro: nessun account, nessun identificativo, nessun dato d\'uso. Se lo disattivi, l\'app non contatta mai la rete da sola — puoi comunque controllare a mano dalle impostazioni quando vuoi.</string>
+    <string name="welcome_privacy_detail">GitHub è un\'azienda statunitense di proprietà di Microsoft. Ogni richiesta rivela necessariamente il tuo indirizzo IP, insieme all\'orario della richiesta. Non viene inviato altro: nessun account, nessun identificativo, nessun dato d\'uso. Se lo disattivi, l\'app non contatta mai la rete da sola: puoi comunque controllare a mano dalle impostazioni quando vuoi.</string>
     <string name="welcome_privacy_on">Attivo · controlla a ogni avvio</string>
     <string name="welcome_privacy_off">Disattivo · l\'app non contatta mai GitHub</string>
     <string name="more_details">Più dettagli</string>
@@ -457,7 +457,7 @@
     <string name="volume_preset_max">200% (Max)</string>
 
     <string name="settings_item_dlna_title">Renderer DLNA / UPnP</string>
-    <string name="settings_item_dlna_desc">Invia l\'audio ad ampli, soundbar e smart TV — nessuna app necessaria</string>
+    <string name="settings_item_dlna_desc">Invia l\'audio ad ampli, soundbar e smart TV: nessuna app necessaria</string>
     <string name="settings_item_dlna_port_title">Porta media DLNA</string>
     <string name="settings_item_dlna_port_desc">Porta TCP a cui il renderer si collega</string>
     <string name="dlna_format_label">Formato audio</string>
@@ -738,7 +738,7 @@
     <string name="rtp_buffer_ms">%1$d ms</string>
     <string name="rtp_buffer_low">basso</string>
     <string name="rtp_buffer_hint">Se il buffer continua a scendere verso zero l\'audio arriva a raffiche e si sentono gli scatti. Alza la latenza nelle impostazioni audio.</string>
-    <string name="rtp_hint_multicast">Ancora niente. Controlla che il trasmettitore sia acceso e che il multicast arrivi a questo telefono — l\'isolamento dei client Wi-Fi e le VPN di solito lo bloccano.</string>
+    <string name="rtp_hint_multicast">Ancora niente. Controlla che il trasmettitore sia acceso e che il multicast arrivi a questo telefono: l\'isolamento dei client Wi-Fi e le VPN di solito lo bloccano.</string>
     <string name="rtp_hint_firewall">Ancora niente. Controlla la porta, e che niente in rete stia scartando i pacchetti.</string>
     <string name="rtp_val_port">La porta deve stare fra 1 e 65535.</string>
     <string name="rtp_val_rate">La frequenza deve stare fra 8000 e 192000 Hz.</string>
