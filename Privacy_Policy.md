@@ -60,4 +60,4 @@ When streaming stops or the application is closed, all audio and network data ar
 ## 6. Contact  
 
 If you have any questions or concerns about this Privacy Policy, please contact me at:  
-**marcomorosi47@gmail.com**  
+**marcomorosi.dev@gmail.com**  
