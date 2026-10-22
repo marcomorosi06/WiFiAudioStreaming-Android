@@ -155,7 +155,9 @@ This project is free and open-source. If it helped you as much as it helped me, 
 
 # 📄 License
 
-This project is licensed under the **European Union Public Licence v1.2 (EUPL v1.2)**.
+Copyright (c) 2025-2026 Marco Morosi and contributors.
+
+This project is licensed under the **European Union Public Licence v1.2 (EUPL v1.2)**, except for the two sound files listed below.
 
 You are free to:
 
@@ -166,7 +168,7 @@ You are free to:
 
 **Key Obligations:**
 
-- **Copyleft**: If you modify and distribute the software, you must release it under the same EUPL license.
+- **Copyleft**: If you modify and distribute the software, you must release it under the EUPL (or, where its Article 5 allows it, under a compatible licence).
 - **Attribution**: You must retain all copyright, patent, and trademark notices.
 - **No Warranty**: The software is provided **"as is"**, without any warranties.
 
@@ -174,18 +176,22 @@ For the full legal text, see the `LICENSE.md` file included in this repository o
 
 The **app** is EUPL, but the **WFAS v2 wire protocol** is not locked up: a C reference implementation is published separately under the permissive **MIT License** ([`wfas-protocol`](https://github.com/marcomorosi06/wfas-protocol), © 2026 Marco Morosi), so anyone — including embedded/firmware projects — can implement WFAS v2 freely. The copyleft protects this app; the protocol stays open.
 
+**Not under the EUPL: the sounds.** `app/src/main/res/raw/connection_sound.wav` and `app/src/main/res/raw/disconnection_sound.wav` were generated with [ElevenLabs](https://elevenlabs.io) on its free plan, whose terms require the attribution "elevenlabs.io" and do not allow commercial use. If you redistribute this app, or a work based on it, for a commercial purpose, remove or replace them. Sound effects: elevenlabs.io
+
 ---
 
 # 🧩 Third-Party Software & Licenses
 
-This app uses several open-source components, each under its own licence. The
-complete attribution list is in **[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)**
-and is also available inside the app (Settings → *Open-source licenses*).
+This app contains open-source components, each under its own licence. The
+complete list, with the full licence texts and NOTICE files they require, is
+**[`app/src/main/res/raw/third_party_licenses.txt`](app/src/main/res/raw/third_party_licenses.txt)**,
+also shown inside the app (Settings → *Open-source licenses*);
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) summarises it.
 
-Components include the AndroidX libraries and Jetpack Compose (© The Android Open
-Source Project / Google LLC), Kotlin and kotlinx.coroutines, Ktor (© JetBrains)
-and Bouncy Castle — all under the Apache License 2.0 except Bouncy Castle (MIT-style
-Bouncy Castle Licence). See the full list for versions and copyrights.
+Almost everything is under the Apache License 2.0 (AndroidX and Jetpack Compose,
+CameraX, Kotlin, kotlinx, Ktor, ZXing, zxing-cpp, Tink, Gson, Typesafe Config,
+Jansi and a few annotation libraries); Bouncy Castle and SLF4J are under MIT-style
+licences.
 
 > Unlike the desktop app, the Android app does **not** bundle FFmpeg: AAC
 > encoding is performed by the platform's built-in `MediaCodec` API.
