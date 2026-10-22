@@ -57,7 +57,7 @@ Kotlin standard library and kotlin-reflect (built with Kotlin 2.0.21)
   Copyright JetBrains s.r.o. and respective authors and developers.
   NOTICE: B.5. The standard library contains code derived from GWT and
   Guava (Apache-2.0) and from Boost (Boost Software License 1.0, B.2).
-kotlinx.coroutines 1.8.1 (core, android, slf4j) - Copyright JetBrains s.r.o.
+kotlinx.coroutines 1.8.1 (core, android, jdk8, slf4j) - Copyright JetBrains s.r.o.
   and contributors. NOTICE: B.6
 kotlinx.serialization (core) - Copyright JetBrains s.r.o.
 Ktor 2.3.11 (client and server core, CIO, network, websockets, http, utils)
@@ -65,12 +65,12 @@ Ktor 2.3.11 (client and server core, CIO, network, websockets, http, utils)
 ZXing Core 3.5.3 (pairing QR codes) - Copyright the ZXing authors.
   NOTICE: B.7
 zxing-cpp 2.3.0 (Android wrapper and libzxingcpp_android.so: decoding the
-  QR codes from the camera, on the device) - Copyright Axel Waggershauser
-  and contributors
+  QR codes from the camera, on the device) - Copyright the ZXing authors,
+  Nu-book Inc., Axel Waggershauser, Huy Cuong Nguyen and contributors
 Tink (com.google.crypto.tink, used by AndroidX security-crypto) - Copyright
   Google LLC
 Gson 2.8.9 - Copyright Google Inc.
-Typesafe Config (used by Ktor server) - Copyright Lightbend, Inc.
+Typesafe Config (used by Ktor server) - Copyright Typesafe Inc.
 Jansi 2.4.1 (used by Ktor server; it also carries native libraries for
   Windows and macOS, unused on Android) - Copyright the original author or
   authors
