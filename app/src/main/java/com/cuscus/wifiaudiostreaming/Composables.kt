@@ -4403,6 +4403,7 @@ fun AutoConnectPriorityListManager(
                                 onListChange(updated)
                             },
                             label = { Text(stringResource(R.string.auto_connect_ssid_label)) },
+                            supportingText = { Text(stringResource(R.string.auto_connect_ssid_strict_hint)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
@@ -5264,6 +5265,7 @@ fun ScriptingScreen(
     ) {
         val context = LocalContext.current
         val clipboard = LocalClipboardManager.current
+        val copySensitive = rememberSensitiveCopy()
         val haptics = rememberAppHaptics()
         val accent = MaterialTheme.colorScheme.primary
 
@@ -5368,7 +5370,7 @@ fun ScriptingScreen(
                         onEnabledChange = onAutomationEnabledChange,
                         onCopyToken = {
                             haptics.confirm()
-                            clipboard.setText(AnnotatedString(automationToken))
+                            copySensitive(automationToken)
                         },
                         onRegenerate = {
                             haptics.confirm()
@@ -5452,7 +5454,7 @@ fun ScriptingScreen(
                             actionDesc = stringResource(R.string.scripting_copy_uri)
                         ) {
                             haptics.confirm()
-                            clipboard.setText(AnnotatedString(generatedUri))
+                            copySensitive(generatedUri)
                         }
 
                         Spacer(Modifier.height(16.dp))
@@ -5476,6 +5478,13 @@ fun ScriptingScreen(
                             clipboard.setText(AnnotatedString(broadcastAction))
                         }
 
+                        Text(
+                            text = stringResource(R.string.scripting_broadcast_package_hint, context.packageName),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp, end = 4.dp)
+                        )
+
                         Spacer(Modifier.height(16.dp))
 
                         Text(
@@ -5494,7 +5503,7 @@ fun ScriptingScreen(
                             actionDesc = stringResource(R.string.scripting_copy_adb)
                         ) {
                             haptics.confirm()
-                            clipboard.setText(AnnotatedString(adbCommand))
+                            copySensitive(adbCommand)
                         }
 
                         Spacer(Modifier.height(16.dp))
@@ -5634,10 +5643,8 @@ fun ScriptingScreen(
                             },
                             onCopy = {
                                 val action = ScriptActionType.fromId(script.actionId) ?: ScriptActionType.STOP
-                                clipboard.setText(
-                                    AnnotatedString(
-                                        ScriptCommand(action, script.params).withToken(signToken).toUri()
-                                    )
+                                copySensitive(
+                                    ScriptCommand(action, script.params).withToken(signToken).toUri()
                                 )
                             },
                             onShare = {

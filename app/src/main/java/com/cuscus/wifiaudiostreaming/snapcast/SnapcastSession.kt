@@ -407,22 +407,30 @@ class SnapcastSessionManager(
         discoveryRegistered = false
     }
 
+    /**
+     * A stable identity for this server in the Snapcast status, which every
+     * client on the network can read. Neither the hardware MAC nor ANDROID_ID:
+     * both identify the device. A random, locally administered address is
+     * generated once and kept, which keeps the identity stable across restarts
+     * and tells nobody which phone it is.
+     */
     private fun stableMacAddress(): String = runCatching {
-        val iface = preferredInterfaceProvider()
-        val bytes = iface?.hardwareAddress
-        if (bytes != null && bytes.isNotEmpty()) {
-            bytes.joinToString(":") { String.format("%02x", it) }
-        } else {
-            val id = android.provider.Settings.Secure.getString(
-                context.contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ) ?: "wfas"
-            id.padEnd(12, '0').take(12).chunked(2).joinToString(":")
-        }
+        val prefs = context.applicationContext
+            .getSharedPreferences(PREFS_SERVER_IDENTITY, Context.MODE_PRIVATE)
+        prefs.getString(KEY_SERVER_MAC, null)?.takeIf { it.isNotBlank() }?.let { return@runCatching it }
+        val bytes = ByteArray(6).also { java.security.SecureRandom().nextBytes(it) }
+        // Unicast, locally administered: the address can never collide with a
+        // vendor-assigned one.
+        bytes[0] = ((bytes[0].toInt() and 0xFC) or 0x02).toByte()
+        val mac = bytes.joinToString(":") { String.format("%02x", it) }
+        prefs.edit().putString(KEY_SERVER_MAC, mac).apply()
+        mac
     }.getOrDefault("")
 
     companion object {
         private const val TAG = "SnapcastServer"
+        private const val PREFS_SERVER_IDENTITY = "wfas_snapcast_server"
+        private const val KEY_SERVER_MAC = "server_mac"
         private const val QUEUE_CAPACITY = 64
     }
 }

@@ -17,8 +17,8 @@ android {
         applicationId = "com.cuscus.wifiaudiostreaming"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.2.1"
+        versionCode = 12
+        versionName = "1.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -81,14 +81,11 @@ dependencies {
     // ViewModel per Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
 
-    // Ktor per il networking
-    implementation("io.ktor:ktor-client-core:2.3.11")
-    implementation("io.ktor:ktor-client-cio:2.3.11") // Motore client
-    implementation("io.ktor:ktor-server-core:2.3.11")
-    implementation("io.ktor:ktor-server-cio:2.3.11") // Motore server
+    // Ktor: only the raw socket layer is used. The client and server modules
+    // were never imported and only added code (and known CVEs) to the APK.
     implementation("io.ktor:ktor-network:2.3.11")
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
 
     // Coroutine
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")

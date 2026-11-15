@@ -1,0 +1,3 @@
+🛡️ Clear notice before starting a server with a key set when other protocols are enabled
+🔒 Encryption is on by default in Key mode
+🧱 Stability and reliability improvements, updated libraries

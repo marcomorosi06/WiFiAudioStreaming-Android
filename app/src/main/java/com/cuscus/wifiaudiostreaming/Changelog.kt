@@ -128,6 +128,40 @@ object Changelog {
 
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            version = "1.2.2",
+            date = Bilingual("November 2026", "Novembre 2026"),
+            headline = Bilingual(
+                "Clearer information on what is protected, plus general improvements.",
+                "Informazioni più chiare su cosa è protetto, e miglioramenti generali."
+            ),
+            items = listOf(
+                ChangelogItem(
+                    icon = Icons.Filled.Shield,
+                    title = Bilingual("Know what is protected", "Sai cosa è protetto"),
+                    body = Bilingual(
+                        "The key, QR pairing and encryption apply to WFAS. With one of them set and RTP, HTTP, DLNA or Snapcast enabled, the app now asks before starting the server: keep only WFAS, continue, or cancel.",
+                        "La chiave, il pairing QR e la cifratura valgono per WFAS. Se ne hai impostato uno e sono attivi RTP, HTTP, DLNA o Snapcast, ora l'app chiede prima di avviare il server: tieni solo WFAS, continua o annulla."
+                    )
+                ),
+                ChangelogItem(
+                    icon = Icons.Filled.Lock,
+                    title = Bilingual("Encryption on by default", "Cifratura attiva di default"),
+                    body = Bilingual(
+                        "In Key mode encryption is now on by default.",
+                        "In modalità Chiave la cifratura ora è attiva di default."
+                    )
+                ),
+                ChangelogItem(
+                    icon = Icons.Filled.VpnKey,
+                    title = Bilingual("Under the hood", "Sotto il cofano"),
+                    body = Bilingual(
+                        "Stability and reliability improvements across the app, and updated libraries.",
+                        "Miglioramenti di stabilità e affidabilità in tutta l'app, e librerie aggiornate."
+                    )
+                )
+            )
+        ),
+        ChangelogEntry(
             version = "1.2.1",
             date = Bilingual("September 2026", "Settembre 2026"),
             headline = Bilingual(

@@ -35,9 +35,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.GppGood
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -800,6 +802,132 @@ fun ExpressiveKeyRequestDialog(
                         haptics.confirm()
                         onSubmit(keyText)
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Shown before a server starts when a key or QR pairing is configured and at
+ * least one protocol other than WFAS is enabled. The key and the encryption
+ * only apply to WFAS: RTP, HTTP, DLNA and Snapcast carry the same audio in
+ * cleartext and to anyone who asks, so the user confirms that knowingly.
+ *
+ * [onWfasOnly] is null when WFAS is not active on any link: switching the
+ * other protocols off would then leave nothing to serve.
+ */
+@Composable
+fun ExpressiveUnprotectedProtocolsDialog(
+    protocols: List<String>,
+    onWfasOnly: (() -> Unit)?,
+    onContinue: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+    val accent = MaterialTheme.colorScheme.error
+
+    Dialog(onDismissRequest = onCancel) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DialogShapeBadge(Icons.Outlined.LockOpen, accent, alert = true)
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = stringResource(R.string.unprotected_protocols_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(Modifier.height(18.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    protocols.forEach { name ->
+                        VersionChip(
+                            text = name,
+                            container = accent.copy(alpha = 0.16f),
+                            content = accent
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                Text(
+                    text = stringResource(
+                        R.string.unprotected_protocols_body,
+                        protocols.joinToString(", ")
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (onWfasOnly == null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(R.string.unprotected_protocols_nothing_left),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(28.dp))
+
+                if (onWfasOnly != null) {
+                    ExpressiveDialogButton(
+                        label = stringResource(R.string.unprotected_protocols_wfas_only),
+                        icon = Icons.Outlined.GppGood,
+                        container = MaterialTheme.colorScheme.primary,
+                        content = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        haptics.confirm()
+                        onWfasOnly()
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                ExpressiveDialogButton(
+                    label = stringResource(R.string.unprotected_protocols_continue),
+                    icon = Icons.Outlined.LockOpen,
+                    container = accent.copy(alpha = 0.16f),
+                    content = accent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.confirm()
+                    onContinue()
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                ExpressiveDialogButton(
+                    label = stringResource(R.string.cancel),
+                    icon = null,
+                    container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    content = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.tap()
+                    onCancel()
                 }
             }
         }

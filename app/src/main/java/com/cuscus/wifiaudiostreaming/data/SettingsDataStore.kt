@@ -170,7 +170,9 @@ data class AppSettings(
     val maxPayloadBytes: Int = 1390,
     val securityMode: String = "OFF",
     val authKey: String = "",
-    val encryptionEnabled: Boolean = false,
+    // On unless the user turned it off: with a key and no encryption the
+    // handshake is authenticated but the audio itself travels in cleartext.
+    val encryptionEnabled: Boolean = true,
     val qrPairingEnabled: Boolean = false,
     val manualAuthKey: String = "",
     val hapticsEnabled: Boolean = true,
@@ -392,7 +394,7 @@ class SettingsDataStore(context: Context) {
             maxPayloadBytes = preferences[PreferencesKeys.MAX_PAYLOAD] ?: 1390,
             securityMode = preferences[PreferencesKeys.SECURITY_MODE] ?: "OFF",
             authKey = authKeys.authKey,
-            encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: false,
+            encryptionEnabled = preferences[PreferencesKeys.ENCRYPTION_ENABLED] ?: true,
             qrPairingEnabled = preferences[PreferencesKeys.QR_PAIRING_ENABLED] ?: false,
             manualAuthKey = authKeys.manualAuthKey,
             usbModeEnabled = preferences[PreferencesKeys.USB_MODE_ENABLED] ?: false,
@@ -643,6 +645,19 @@ class SettingsDataStore(context: Context) {
             preferences[PreferencesKeys.RTP_ENABLED] = rtpEnabled
             preferences[PreferencesKeys.RTP_PORT] = rtpPort
             preferences[PreferencesKeys.HTTP_ENABLED] = httpEnabled
+        }
+    }
+
+    /**
+     * Turns off every protocol that carries the audio outside WFAS, in one
+     * edit so that nothing reading the settings in between sees half of it.
+     */
+    suspend fun disableNonWfasProtocols() {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.RTP_ENABLED] = false
+            preferences[PreferencesKeys.HTTP_ENABLED] = false
+            preferences[PreferencesKeys.DLNA_ENABLED] = false
+            preferences[PreferencesKeys.SNAPCAST_ENABLED] = false
         }
     }
 

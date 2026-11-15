@@ -133,6 +133,7 @@ fun QrInviteSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptics = rememberAppHaptics()
     val clipboard = LocalClipboardManager.current
+    val copySensitive = rememberSensitiveCopy()
     val accent = MaterialTheme.colorScheme.primary
 
     val ttl = (invite.expEpochSeconds - (System.currentTimeMillis() / 1000)).coerceAtLeast(1L)
@@ -263,7 +264,7 @@ fun QrInviteSheet(
                     copied = copied,
                     onCopy = {
                         haptics.confirm()
-                        clipboard.setText(AnnotatedString(invite.key))
+                        copySensitive(invite.key)
                         copied = true
                     }
                 )
@@ -1084,12 +1085,20 @@ fun QrDeepLinkConfirmDialog(
     payload: PairingPayload,
     serverRunning: Boolean,
     onConnect: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    micOn: Boolean = false
 ) {
-    val base = stringResource(
+    val main = stringResource(
         if (payload.isMulticast) R.string.qr_pairing_deeplink_confirm_body_multicast
         else R.string.qr_pairing_deeplink_confirm_body_unicast
     )
+    // A link can come from anywhere, so the dialog says when it points off the
+    // local network and when the microphone would follow the connection.
+    val notes = listOfNotNull(
+        if (!NetAddr.isLocalScope(payload.ip)) stringResource(R.string.qr_pairing_deeplink_public_ip) else null,
+        if (micOn && !payload.isMulticast) stringResource(R.string.qr_pairing_deeplink_mic_on) else null
+    )
+    val base = (listOf(main) + notes).joinToString("\n\n")
     val warning = stringResource(R.string.qr_pairing_deeplink_confirm_stops_server)
 
     QrTwoButtonDialog(

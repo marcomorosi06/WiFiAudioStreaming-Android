@@ -760,4 +760,25 @@
     <string name="sdp_warn_channels">Numero di canali insolito: se ne possono riprodurre solo 1 o 2.</string>
     <string name="notif_rtp_title">Flusso RTP</string>
 
+    <!-- Server start: key or QR pairing only protects WFAS -->
+    <string name="unprotected_protocols_title">Non protetto sugli altri protocolli</string>
+    <string name="unprotected_protocols_body">La chiave, il pairing QR e la cifratura proteggono solo WFAS. %1$s trasmetterà lo stesso audio senza cifratura e senza chiave: chiunque sulla rete può ascoltarlo.</string>
+    <string name="unprotected_protocols_wfas_only">Usa solo WFAS</string>
+    <string name="unprotected_protocols_continue">Continua senza protezione</string>
+    <string name="unprotected_protocols_nothing_left">WFAS non è attivo su nessun collegamento: spegnendo gli altri protocolli non resterebbe niente da trasmettere.</string>
+
+    <!-- Client microphone -->
+    <string name="status_mic_not_encrypted">Microfono di ritorno disattivato: un gruppo multicast cifrato non ha una chiave per il microfono, che viaggerebbe in chiaro.</string>
+
+    <!-- Auto-connect -->
+    <string name="auto_connect_ssid_unreadable">%1$s è legato a una rete Wi-Fi, ma Android non permette a questa app di leggerne il nome, quindi non viene collegato in automatico. Svuota il campo rete di quella voce per collegarti su qualsiasi rete.</string>
+    <string name="auto_connect_ssid_strict_hint">Con una rete impostata, la connessione automatica avviene solo se il nome della rete è leggibile e coincide; le versioni recenti di Android lo nascondono a questa app. Lascia vuoto per collegarti su qualsiasi rete.</string>
+
+    <!-- QR pairing link confirmation -->
+    <string name="qr_pairing_deeplink_public_ip">Questo indirizzo non è nella tua rete locale. Continua solo se sai chi ti ha mandato il link.</string>
+    <string name="qr_pairing_deeplink_mic_on">Il microfono di ritorno è attivo: se questo dispositivo lo accetta, durante la connessione gli verrà inviato il tuo microfono.</string>
+
+    <!-- Automation -->
+    <string name="scripting_broadcast_package_hint">In Tasker o MacroDroid imposta il pacchetto di destinazione %1$s: un broadcast inviato senza può essere letto da qualsiasi app, token compreso.</string>
+
 </resources>

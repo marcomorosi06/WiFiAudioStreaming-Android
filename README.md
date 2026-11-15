@@ -38,7 +38,7 @@ This application allows you to send your phone's audio to any device on the loca
 ## ✨ Key Features  
 
 * **Multi-Protocol Architecture**: Stream using the native low-latency protocol (**WFAS v2**), standard **RTP** for external media players, **HTTP** to listen directly from any web browser (Chrome, Safari, Smart TVs), **DLNA/UPnP** to push audio to AV receivers and smart TVs with no app on the receiving end, or **Snapcast** to drive a synchronised multiroom setup.
-* **Password Protection & End-to-End Encryption**: Choose who can connect with **Off**, **Ask**, or **Key** authorization modes. In Key mode, the client proves it knows the shared password through a mutual HMAC-SHA256 challenge-response (the password itself never touches the wire), and the same key derives per-session **ChaCha20-Poly1305** encryption — every audio packet is sealed and authenticated end-to-end, on both unicast and multicast, no PKI required. See [`WFAS_PROTOCOL.md`](WFAS_PROTOCOL.md).
+* **Password Protection & End-to-End Encryption**: Choose who can connect with **Off**, **Ask**, or **Key** authorization modes. In Key mode, the client proves it knows the shared password through a mutual HMAC-SHA256 challenge-response (the password itself never touches the wire), and the same key derives per-session **ChaCha20-Poly1305** encryption — on by default — so every audio packet is sealed and authenticated end-to-end, on both unicast and multicast, no PKI required. See [`WFAS_PROTOCOL.md`](WFAS_PROTOCOL.md). The key, QR pairing and encryption protect **WFAS only**: RTP, HTTP, DLNA and Snapcast carry the same audio without either, so with a key set and one of them enabled the app asks before starting the server.
 * **Smart Auto-Connect**: The app can automatically connect to prioritized IP addresses as soon as they are detected on the network, even in the background.
 * **Automation & Scripting**: Trigger the app from the outside via home-screen shortcuts, deep links (`wifiaudio://`), or broadcast intents (Tasker, MacroDroid, NFC tags). Save full server/client configurations as named, one-tap presets. External commands are refused until you enable them in *Automation & Scripting*, and once enabled every command coming from outside the app must carry a per-install secret token, shown on that same screen — the URIs and commands generated there already include it, so no other app on the device can drive the streaming. The token is sealed with an Android Keystore key that never leaves the device, and is excluded from cloud backup and device-to-device transfer, so it stays bound to the phone that generated it.
 * **Widgets & Quick Settings**: Control your server or client directly from your home screen using Material You widgets, or use the Quick Settings tiles in your notification shade for instant access.
@@ -47,7 +47,7 @@ This application allows you to send your phone's audio to any device on the loca
 * **Network Interface Selection**: Manually select your active network interface to bypass VPN routing issues or handle multiple Wi-Fi/LAN connections.
 * **Server Volume Control**: Adjust the transmission volume directly from the UI or by using your device's physical volume buttons while streaming.
 * **Dark Screen Mode**: When your phone is acting as a client, locking the screen or leaving the app lets Android throttle the background process to save battery, which can introduce audio artifacts. Dark Screen mode keeps the app active with the screen technically on, showing either a pure-black overlay or an outlined theme, ideal for OLED displays that want to look "off" without actually going to sleep.
-* **Automatic Update Checker**: Optionally check GitHub for new releases on startup, or trigger a manual check any time, with release notes shown right inside the app.
+* **Automatic Update Checker**: Checks GitHub for new releases on startup (on by default; you can turn it off during onboarding or in Settings), or on demand, with release notes shown right inside the app. The check is a single request to `api.github.com` for the latest release tag; see [`Privacy_Policy.md`](Privacy_Policy.md).
 * **Modern Interface**: Rebuilt from the ground up with **Jetpack Compose** and a full **Material 3 Expressive** redesign, featuring dynamic colors and bilingual support (EN/IT).
 
 ---
@@ -63,6 +63,8 @@ Users and integrators are responsible for evaluating whether WFAS's security pro
 The WFAS protocol and its reference implementations are provided under the terms of their respective open-source licenses. No additional security guarantees are implied beyond those explicitly documented by the protocol and implementation.
 
 Security issues should be reported to the project maintainers so they can be investigated and addressed in future releases.
+
+What the app sends, stores and to whom is described in [`Privacy_Policy.md`](Privacy_Policy.md).
 
 ---
 
@@ -155,7 +157,9 @@ This project is free and open-source. If it helped you as much as it helped me, 
 
 # 📄 License
 
-This project is licensed under the **European Union Public Licence v1.2 (EUPL v1.2)**.
+Copyright (c) 2025-2026 Marco Morosi and contributors.
+
+This project is licensed under the **European Union Public Licence v1.2 (EUPL v1.2)**, except for the two sound files listed below.
 
 You are free to:
 
@@ -166,7 +170,7 @@ You are free to:
 
 **Key Obligations:**
 
-- **Copyleft**: If you modify and distribute the software, you must release it under the same EUPL license.
+- **Copyleft**: If you modify and distribute the software, you must release it under the EUPL (or, where its Article 5 allows it, under a compatible licence).
 - **Attribution**: You must retain all copyright, patent, and trademark notices.
 - **No Warranty**: The software is provided **"as is"**, without any warranties.
 
@@ -174,18 +178,21 @@ For the full legal text, see the `LICENSE.md` file included in this repository o
 
 The **app** is EUPL, but the **WFAS v2 wire protocol** is not locked up: a C reference implementation is published separately under the permissive **MIT License** ([`wfas-protocol`](https://github.com/marcomorosi06/wfas-protocol), © 2026 Marco Morosi), so anyone — including embedded/firmware projects — can implement WFAS v2 freely. The copyleft protects this app; the protocol stays open.
 
+**Not under the EUPL: the sounds.** `app/src/main/res/raw/connection_sound.wav` and `app/src/main/res/raw/disconnection_sound.wav` were generated with [ElevenLabs](https://elevenlabs.io) on its free plan, whose terms require the attribution "elevenlabs.io" and do not allow commercial use. If you redistribute this app, or a work based on it, for a commercial purpose, remove or replace them. Sound effects: elevenlabs.io
+
 ---
 
 # 🧩 Third-Party Software & Licenses
 
-This app uses several open-source components, each under its own licence. The
-complete attribution list is in **[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)**
-and is also available inside the app (Settings → *Open-source licenses*).
+This app contains open-source components, each under its own licence. The
+complete list, with the full licence texts and NOTICE files they require, is
+**[`app/src/main/res/raw/third_party_licenses.txt`](app/src/main/res/raw/third_party_licenses.txt)**,
+also shown inside the app (Settings → *Open-source licenses*);
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) summarises it.
 
-Components include the AndroidX libraries and Jetpack Compose (© The Android Open
-Source Project / Google LLC), Kotlin and kotlinx.coroutines, Ktor (© JetBrains)
-and Bouncy Castle — all under the Apache License 2.0 except Bouncy Castle (MIT-style
-Bouncy Castle Licence). See the full list for versions and copyrights.
+Almost everything is under the Apache License 2.0 (AndroidX and Jetpack Compose,
+CameraX, Kotlin, kotlinx, Ktor, ZXing, zxing-cpp, Tink, Gson and a few
+annotation libraries); Bouncy Castle and SLF4J are under MIT-style licences.
 
 > Unlike the desktop app, the Android app does **not** bundle FFmpeg: AAC
 > encoding is performed by the platform's built-in `MediaCodec` API.

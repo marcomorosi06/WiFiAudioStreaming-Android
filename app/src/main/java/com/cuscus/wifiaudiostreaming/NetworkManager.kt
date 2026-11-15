@@ -163,6 +163,15 @@ object NetworkManager {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var donationTimerJob: Job? = null
 
+    /**
+     * The device name as it may appear in a beacon: the beacon is a list of
+     * `;`-separated fields, so a name with a `;` in it (it is user-editable)
+     * would shift every field after it, and control characters have no place
+     * in a name another device will print.
+     */
+    private fun beaconSafeName(name: String): String =
+        name.filterNot { it == ';' || it.isISOControl() }.trim().ifEmpty { "Android" }
+
     fun startDonationTimer(context: Context) {
         donationTimerJob?.cancel()
         val appCtx = context.applicationContext
@@ -198,6 +207,30 @@ object NetworkManager {
     // trip on a bad link, short enough that an unanswered one does not linger as
     // something to answer later.
     private const val CHALLENGE_TTL_MS = 15_000L
+    // Outstanding challenges are bounded, and a peer gets a new one at most this
+    // often: each challenge carries an HMAC over the key, so it is a sample for
+    // an offline guess, and an unbounded table is memory anyone can fill.
+    private const val MAX_PENDING_CHALLENGES = 64
+    private const val MIN_CHALLENGE_INTERVAL_MS = 1_000L
+    private const val HTTP_MAX_CONNECTIONS = 16
+    private const val HTTP_MAX_STREAMS = 4
+    private const val HTTP_REQUEST_TIMEOUT_MS = 5_000
+    private const val HTTP_MAX_HEADERS = 64
+    // Names a DNS-rebinding page cannot use: it needs a public, dotted domain
+    // it controls. Local resolvers answer for these suffixes and for bare names.
+    private val LOCAL_NAME_SUFFIXES = listOf(".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain")
+
+    private fun httpHostAllowed(hostHeader: String?): Boolean {
+        val raw = hostHeader?.trim()?.lowercase()?.ifBlank { null } ?: return false
+        val name = when {
+            raw.startsWith("[") -> raw.substringAfter('[').substringBefore(']')
+            raw.count { it == ':' } == 1 -> raw.substringBefore(':')
+            else -> raw
+        }
+        if (NetAddr.isLiteralAddress(name)) return true
+        if (name == "localhost" || !name.contains('.')) return true
+        return LOCAL_NAME_SUFFIXES.any { name.endsWith(it) }
+    }
 
     val dlnaTargets: kotlinx.coroutines.flow.StateFlow<List<DlnaTargetState>>
         get() = DlnaStatus.targets
@@ -801,6 +834,13 @@ object NetworkManager {
         clientIp: String?, // Usato se siamo in Unicast
         wifiIface: NetworkInterface?
     ) = launch(Dispatchers.IO) {
+        // Unicast RTP goes to the connected client only. Without its address the
+        // old fallback was the limited broadcast address, which handed the audio
+        // to every host on the segment.
+        if (!isMulticast && clientIp.isNullOrBlank()) {
+            Log.w(TAG, "[RTP] unicast senza indirizzo del client: flusso RTP non avviato")
+            return@launch
+        }
         val queue = java.util.concurrent.ArrayBlockingQueue<ByteArray>(25)
         rtpPcmQueue = queue
         rtpSkippedBytes.set(0L)
@@ -826,7 +866,7 @@ object NetworkManager {
         val destAddress = if (isMulticast) {
             InetAddress.getByName("239.255.0.1")
         } else {
-            InetAddress.getByName(clientIp ?: "255.255.255.255")
+            InetAddress.getByName(requireNotNull(clientIp))
         }
 
         try {
@@ -1037,7 +1077,9 @@ object NetworkManager {
                                     if (parts.size >= 4) {
                                         val hostname = parts[1]
 
-                                        if (message.contains("BYE")) {
+                                        // Only the mode field marks a shutdown beacon: a host
+                                        // whose name contains "BYE" is not leaving.
+                                        if (parts[2] == "BYE") {
                                             Log.d(TAG, "[DISCOVERY] BYE from $hostname, removing from list")
                                             discoveredDevices.value = discoveredDevices.value - hostname
                                         } else {
@@ -1128,14 +1170,14 @@ object NetworkManager {
         if (broadcastingJob?.isActive == true) return
         Log.d(TAG, "[BROADCAST] startBroadcastingPresence: isMulticast=$isMulticast port=$streamingPort iface=$networkInterfaceName rtp=$rtpEnabled")
         broadcastingJob = scope.launch {
-            val deviceName = try {
+            val deviceName = beaconSafeName(try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
                     Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
                         ?: "${Build.MANUFACTURER} ${Build.MODEL}"
                 } else {
                     "${Build.MANUFACTURER} ${Build.MODEL}"
                 }
-            } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" }
+            } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" })
 
             val mode = if (isMulticast) "MULTICAST" else "UNICAST"
             val protocolsStr = if (rtpEnabled) "protocols=WFAS,RTP" else "protocols=WFAS"
@@ -1198,14 +1240,14 @@ object NetworkManager {
     fun announceServerGone(context: Context, networkInterfaceName: String = "Auto") {
         scope.launch {
             runCatching {
-                val deviceName = try {
+                val deviceName = beaconSafeName(try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
                         Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
                             ?: "${Build.MANUFACTURER} ${Build.MODEL}"
                     } else {
                         "${Build.MANUFACTURER} ${Build.MODEL}"
                     }
-                } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" }
+                } catch (e: Exception) { "${Build.MANUFACTURER} ${Build.MODEL}" })
 
                 val message = "${NetworkSettings.DISCOVERY_MESSAGE};$deviceName;BYE;0"
                 val bytes = message.toByteArray()
@@ -1846,12 +1888,32 @@ object NetworkManager {
                     // overwrote whatever the previous caller was still answering - and the
                     // session keys were then derived from whichever pair of nonces
                     // happened to be left in it.
-                    class PendingChallenge(val cnonce: String, val snonce: String, val at: Long)
+                    class PendingChallenge(val cnonce: String, val snonce: String, val sproof: String, val at: Long)
                     val challenges = HashMap<String, PendingChallenge>()
                     fun challengeFor(peer: String): PendingChallenge? {
                         val now = System.currentTimeMillis()
                         challenges.entries.removeAll { now - it.value.at > CHALLENGE_TTL_MS }
                         return challenges[peer]
+                    }
+                    // The challenge to send in answer to a HELLO without a proof, or
+                    // null to stay silent. A resent HELLO (same cnonce) gets the same
+                    // challenge back, so crossing replies cannot leave the client
+                    // proving a nonce the server has already replaced. A new cnonce
+                    // from the same peer is answered at most once per interval, and
+                    // the table never grows past its cap.
+                    fun issueChallenge(peer: String, cnonce: String): PendingChallenge? {
+                        val now = System.currentTimeMillis()
+                        val existing = challengeFor(peer)
+                        if (existing != null) {
+                            if (existing.cnonce == cnonce) return existing
+                            if (now - existing.at < MIN_CHALLENGE_INTERVAL_MS) return null
+                        } else if (challenges.size >= MAX_PENDING_CHALLENGES) {
+                            return null
+                        }
+                        val snonce = WfasAuth.nonceHex()
+                        val fresh = PendingChallenge(cnonce, snonce, WfasAuth.proof(authKey, 'S', cnonce, snonce), now)
+                        challenges[peer] = fresh
+                        return fresh
                     }
                     // The nonces of the session that authenticated, kept for the key
                     // derivation below. Only ever written after a proof verified.
@@ -1867,7 +1929,7 @@ object NetworkManager {
                         val rxAt = System.currentTimeMillis()
                         val clientAddress = clientDatagram.address
                         val message = clientDatagram.packet.readText().trim()
-                        Log.d(TAG, "[SERVER][UNICAST] datagram ricevuto da $clientAddress: '$message'")
+                        Log.d(TAG, "[SERVER][UNICAST] datagram ricevuto da $clientAddress: '${WfasAuth.redactForLog(message)}'")
 
                         if (message == "MODE_PROBE") {
                             Log.d(TAG, "[SERVER][UNICAST] rispondo UNICAST a MODE_PROBE da $clientAddress")
@@ -1876,7 +1938,7 @@ object NetworkManager {
                         }
 
                         if (!message.startsWith(NetworkSettings.CLIENT_HELLO_MESSAGE)) {
-                            Log.w(TAG, "[SERVER][UNICAST] messaggio ignorato (non HELLO): '$message'")
+                            Log.w(TAG, "[SERVER][UNICAST] messaggio ignorato (non HELLO): '${WfasAuth.redactForLog(message)}'")
                             continue
                         }
 
@@ -1907,10 +1969,12 @@ object NetworkManager {
                                 val cproof = WfasAuth.getToken(message, "cproof")
                                 val cnonce = WfasAuth.getToken(message, "cnonce") ?: ""
                                 if (cproof == null) {
-                                    val snonce = WfasAuth.nonceHex()
-                                    challenges[challengeKey] = PendingChallenge(cnonce, snonce, System.currentTimeMillis())
-                                    val sproof = WfasAuth.proof(authKey, 'S', cnonce, snonce)
-                                    sendSocket.send(Datagram(buildPacket { writeText("${NetworkSettings.AUTH_REQUIRED_PREFIX};snonce=$snonce;sproof=$sproof") }, clientAddress))
+                                    val challenge = issueChallenge(challengeKey, cnonce)
+                                    if (challenge == null) {
+                                        Log.w(TAG, "[SERVER][UNICAST] challenge rate-limited for $clientAddress")
+                                        continue
+                                    }
+                                    sendSocket.send(Datagram(buildPacket { writeText("${NetworkSettings.AUTH_REQUIRED_PREFIX};snonce=${challenge.snonce};sproof=${challenge.sproof}") }, clientAddress))
                                     continue
                                 }
                                 // A proof is only an answer to a challenge we issued to this
@@ -2025,7 +2089,7 @@ object NetworkManager {
                                 while (isActive && clientAlive.get()) {
                                     val datagram = sendSocket.receive()
                                     val msg = datagram.packet.readText().trim()
-                                    Log.d(TAG, "[SERVER][UNICAST] byeJob ricevuto: '$msg' da ${datagram.address}")
+                                    Log.d(TAG, "[SERVER][UNICAST] byeJob ricevuto: '${WfasAuth.redactForLog(msg)}' da ${datagram.address}")
                                     // Solo il client collegato puo' pilotare questa sessione:
                                     // senza questo controllo un CLIENT_BYE di un terzo
                                     // dispositivo chiuderebbe la connessione altrui.
@@ -2177,13 +2241,26 @@ object NetworkManager {
         micSendDir = null
 
         // Il microfono e' un flusso nostro in salita: resta sulle impostazioni locali.
-        if (sendMicrophone) {
-            if (serverInfo.acceptsClientMic) {
-                micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
-            } else {
-                Log.i(TAG, "[CLIENT] mic richiesto ma ${serverInfo.ip} annuncia mic senza rx, non lo invio")
-                connectionStatus.value = context.getString(R.string.status_mic_not_accepted)
+        if (sendMicrophone && !serverInfo.acceptsClientMic) {
+            Log.i(TAG, "[CLIENT] mic richiesto ma ${serverInfo.ip} annuncia mic senza rx, non lo invio")
+            connectionStatus.value = context.getString(R.string.status_mic_not_accepted)
+        }
+        // The microphone starts only once the server has proved itself: after the
+        // unicast handshake, when the session key exists, or on the first valid
+        // multicast packet. Starting it earlier sent it in cleartext to a peer
+        // that had not authenticated yet, and could turn out to be a rogue one.
+        val micWanted = sendMicrophone && serverInfo.acceptsClientMic
+        val micStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun startMicOnce(encryptedMulticast: Boolean = false) {
+            if (!micWanted || !micStarted.compareAndSet(false, true)) return
+            if (encryptedMulticast) {
+                // A multicast group has no per-client key, so the talk-back would
+                // travel in cleartext next to an encrypted stream: fail closed.
+                Log.i(TAG, "[CLIENT] multicast cifrato: microfono di ritorno non inviato")
+                connectionStatus.value = context.getString(R.string.status_mic_not_encrypted)
+                return
             }
+            micStreamingJob = scope.launchMicSenderJob(context, serverInfo, sampleRate, channelConfig, bufferSize, micPort)
         }
 
         // Da qui in poi 'sampleRate' e 'channelConfig' sono quelli del flusso in arrivo.
@@ -2402,6 +2479,7 @@ object NetworkManager {
                         val recvDir: WfasCrypto.Dir? = sessionKeys?.second
                         micSendDir = if (sessionEncrypted) sessionKeys?.first else null
                         sessionEncryptedLive.value = sessionEncrypted && recvDir != null
+                        startMicOnce()
                         val recvWin = WfasCrypto.ReplayWindow()
                         var serverEncrypts = sessionEncrypted
 
@@ -2950,6 +3028,7 @@ object NetworkManager {
                                         if (dir != null) {
                                             val r = WfasCrypto.decryptPacket(dir, mcWin, audio, len)
                                             if (r is WfasCrypto.Decrypted.Ok && r.pcm.isNotEmpty()) {
+                                                startMicOnce(encryptedMulticast = true)
                                                 if (mcPlayout.shouldDrop(r.pcm.size)) return
                                                 val t = mcConcealTail
                                                 mcConcealTail = null
@@ -2967,6 +3046,7 @@ object NetworkManager {
                                     } else if (!mcEncRequired) {
                                         val pcmLen = len - MC_HEADER_SIZE
                                         if (pcmLen > 0) {
+                                            startMicOnce()
                                             if (mcPlayout.shouldDrop(pcmLen)) return
                                             mcRemember(audio, MC_HEADER_SIZE, pcmLen)
                                             val t = mcConcealTail
@@ -3196,15 +3276,52 @@ object NetworkManager {
             httpServerSocket = serverSocket
             println("HTTP Server avviato sulla porta $port")
 
+            // Anyone on the network can open this port, so what one caller can
+            // hold is bounded: a handful of encoders (each /stream takes a
+            // hardware codec), a cap on connections in flight, and a deadline
+            // for the request line.
+            val liveConnections = java.util.concurrent.atomic.AtomicInteger(0)
+            val liveStreams = java.util.concurrent.atomic.AtomicInteger(0)
             while (isActive) {
                 val client = serverSocket.accept()
+                if (liveConnections.incrementAndGet() > HTTP_MAX_CONNECTIONS) {
+                    liveConnections.decrementAndGet()
+                    runCatching { client.close() }
+                    continue
+                }
                 launch(Dispatchers.IO) {
+                    var streaming = false
                     try {
+                        client.soTimeout = HTTP_REQUEST_TIMEOUT_MS
                         val input = java.io.BufferedReader(java.io.InputStreamReader(client.inputStream))
                         val output = client.outputStream
                         val requestLine = input.readLine() ?: return@launch
+                        var host: String? = null
+                        var headerCount = 0
+                        while (true) {
+                            val line = input.readLine() ?: break
+                            if (line.isEmpty()) break
+                            if (++headerCount > HTTP_MAX_HEADERS) return@launch
+                            if (line.startsWith("host:", ignoreCase = true)) host = line.substringAfter(':').trim()
+                        }
+                        client.soTimeout = 0
+                        // A page on another domain that rebinds its DNS to this
+                        // phone would be same-origin with the stream and could read
+                        // it: only a Host that names this device locally is served.
+                        if (!httpHostAllowed(host)) {
+                            output.write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+                            output.flush()
+                            return@launch
+                        }
 
                         if (requestLine.startsWith("GET /stream ")) {
+                            if (liveStreams.incrementAndGet() > HTTP_MAX_STREAMS) {
+                                liveStreams.decrementAndGet()
+                                output.write("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+                                output.flush()
+                                return@launch
+                            }
+                            streaming = true
                             // --- IL BROWSER VUOLE L'AUDIO ---
                             output.write("HTTP/1.1 200 OK\r\nContent-Type: audio/aac\r\nConnection: keep-alive\r\nCache-Control: no-cache\r\n\r\n".toByteArray())
                             output.flush()
@@ -3308,13 +3425,13 @@ object NetworkManager {
                                         <button id="playBtn" class="play-btn" onclick="document.getElementById('player').style.display='block'; document.getElementById('player').play(); this.style.display='none';">▶ PLAY AUDIO</button>
 
                                         <div class="links">
-                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" target="_blank">💻 Get Desktop App (GitHub)</a>
-                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android" target="_blank">📱 Get Android App (GitHub)</a>
-                                            <a href="https://apt.izzysoft.de/fdroid/index/apk/com.cuscus.wifiaudiostreaming" target="_blank">📲 Get Android App (IzzyOnDroid)</a>
+                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Desktop" target="_blank" rel="noopener noreferrer">💻 Get Desktop App (GitHub)</a>
+                                            <a href="https://github.com/marcomorosi06/WiFiAudioStreaming-Android" target="_blank" rel="noopener noreferrer">📱 Get Android App (GitHub)</a>
+                                            <a href="https://apt.izzysoft.de/fdroid/index/apk/com.cuscus.wifiaudiostreaming" target="_blank" rel="noopener noreferrer">📲 Get Android App (IzzyOnDroid)</a>
                                         </div>
 
                                         <div class="kofi">
-                                            <a href="https://ko-fi.com/marcomorosi" target="_blank">☕ Support me on Ko-fi</a>
+                                            <a href="https://ko-fi.com/marcomorosi" target="_blank" rel="noopener noreferrer">☕ Support me on Ko-fi</a>
                                         </div>
                                     </div>
                                 </body>
@@ -3326,7 +3443,11 @@ object NetworkManager {
                             client.close()
                         }
                     } catch (e: Exception) {
-                        client.close()
+                        runCatching { client.close() }
+                    } finally {
+                        if (streaming) liveStreams.decrementAndGet()
+                        liveConnections.decrementAndGet()
+                        runCatching { client.close() }
                     }
                 }
             }

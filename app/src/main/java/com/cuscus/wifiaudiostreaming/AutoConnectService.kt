@@ -51,6 +51,9 @@ class AutoConnectService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var isConnecting = false
     private var listenJob: Job? = null
+    // The last entry reported as blocked by an unreadable network name, so the
+    // notice is posted once rather than on every beacon.
+    @Volatile private var lastSsidHintIp: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -174,12 +177,36 @@ class AutoConnectService : Service() {
                                     // Disabled entries are skipped, exactly as on the desktop.
                                     val validEntries = priorityList.filter { it.ip.isNotBlank() && it.enabled }
 
+                                    // An entry tied to a network matches only when the
+                                    // network name can be read and is the same. Android
+                                    // hides the name without Location, and treating that
+                                    // as a match made the filter a no-op: the saved IP on
+                                    // any other network got the connection, and the
+                                    // microphone with it.
+                                    val isSsidUnknown = currentSsid == "<unknown ssid>" || currentSsid.isEmpty()
+                                    var blockedByUnknownSsid: String? = null
                                     val matched = validEntries.firstOrNull { entry ->
                                         val cleanIp = entry.ip.trim()
                                         val cleanSsid = entry.ssid.trim().removePrefix("\"").removeSuffix("\"")
-                                        val isSsidUnknown = currentSsid == "<unknown ssid>" || currentSsid.isEmpty()
-                                        val matchesSsid = cleanSsid.isEmpty() || isSsidUnknown || cleanSsid == currentSsid
-                                        matchesSsid && cleanIp == remoteIp
+                                        if (cleanIp != remoteIp) return@firstOrNull false
+                                        when {
+                                            cleanSsid.isEmpty() -> true
+                                            isSsidUnknown -> {
+                                                blockedByUnknownSsid = cleanIp
+                                                false
+                                            }
+                                            else -> cleanSsid == currentSsid
+                                        }
+                                    }
+                                    val blockedIp = blockedByUnknownSsid
+                                    if (matched == null && blockedIp != null && blockedIp != lastSsidHintIp) {
+                                        lastSsidHintIp = blockedIp
+                                        Log.w("AutoConnect", "SSID non leggibile: voce $blockedIp legata a una rete, nessuna connessione")
+                                        NotificationCenter.post(
+                                            this@AutoConnectService,
+                                            NotificationCenter.ID_AUTO_CONNECT,
+                                            buildNotification(getString(R.string.auto_connect_ssid_unreadable, blockedIp), false)
+                                        )
                                     }
                                     // Only a configured, enabled entry is a target. An empty
                                     // list connects to nothing, matching the desktop, which

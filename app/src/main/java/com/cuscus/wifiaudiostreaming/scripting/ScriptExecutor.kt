@@ -141,6 +141,36 @@ object ScriptExecutor {
         )
     }
 
+    /**
+     * The same start with every protocol other than WFAS switched off. Those
+     * protocols also force multicast, so the mode is resolved again from the
+     * command and the settings instead of being copied from the full start.
+     */
+    fun resolveWfasOnlyParams(settings: AppSettings, command: ScriptCommand): ResolvedServerParams =
+        resolveServerParams(
+            settings.copy(
+                rtpEnabled = false,
+                httpEnabled = false,
+                dlnaEnabled = false,
+                snapcastEnabled = false
+            ),
+            command.copy(
+                params = command.params + mapOf(
+                    ScriptParams.RTP to "false",
+                    ScriptParams.HTTP to "false",
+                    ScriptParams.SNAPCAST to "false"
+                )
+            )
+        )
+
+    /** Display names of the protocols this start would serve without WFAS protection. */
+    fun unprotectedProtocols(params: ResolvedServerParams): List<String> = buildList {
+        if (params.rtpEnabled) add("RTP")
+        if (params.httpEnabled) add("HTTP")
+        if (params.dlnaEnabled) add("DLNA")
+        if (params.snapcastEnabled) add("Snapcast")
+    }
+
     fun startServerMicOnly(context: Context, params: ResolvedServerParams) {
         UsbLink.configure(context.applicationContext, params.usbMode, params.usbLatencyMs)
         val intent = Intent(context, AudioCaptureService::class.java).apply {

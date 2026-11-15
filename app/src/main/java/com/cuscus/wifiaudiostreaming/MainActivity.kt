@@ -108,6 +108,20 @@ class MainActivity : ComponentActivity() {
     private val pendingStopStreaming = mutableStateOf(false)
     private val forceDonation = mutableStateOf(false)
 
+    /**
+     * A server start held back for confirmation: a key or QR pairing is set,
+     * and some of the enabled protocols are not WFAS, so they would carry the
+     * audio without either. [wfasOnly] is the same start with those protocols
+     * switched off.
+     */
+    private class UnprotectedStart(
+        val params: ResolvedServerParams,
+        val wfasOnly: ResolvedServerParams,
+        val protocols: List<String>
+    )
+
+    private val pendingUnprotectedStart = mutableStateOf<UnprotectedStart?>(null)
+
     @RequiresApi(Build.VERSION_CODES.O)
     private val mediaProjectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -421,11 +435,30 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun requestServerStart(params: ResolvedServerParams) {
+    private fun requestServerStart(
+        params: ResolvedServerParams,
+        wfasOnly: ResolvedServerParams? = null,
+        confirmed: Boolean = false
+    ) {
+        if (!confirmed) {
+            val security = viewModel.appSettings.value?.securityMode
+            val unprotected = ScriptExecutor.unprotectedProtocols(params)
+            if (SecurityMode.requiresKey(security) && unprotected.isNotEmpty()) {
+                val stripped = wfasOnly ?: params.copy(
+                    rtpEnabled = false,
+                    httpEnabled = false,
+                    dlnaEnabled = false,
+                    snapcastEnabled = false
+                )
+                pendingUnprotectedStart.value = UnprotectedStart(params, stripped, unprotected)
+                return
+            }
+        }
+
         pendingServerParams = params
 
         if (params.streamInternal && !hasRecordAudioPermission()) {
-            onMicPermissionGranted = { requestServerStart(params) }
+            onMicPermissionGranted = { requestServerStart(params, confirmed = true) }
             recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
         }
@@ -466,14 +499,20 @@ class MainActivity : ComponentActivity() {
         val settings = viewModel.appSettings.value ?: return
         when (command.action) {
             ScriptActionType.START_SERVER ->
-                requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
+                requestServerStart(
+                    ScriptExecutor.resolveServerParams(settings, command),
+                    wfasOnly = ScriptExecutor.resolveWfasOnlyParams(settings, command)
+                )
 
             ScriptActionType.TOGGLE -> {
                 if (NetworkManager.isStreamingCurrent.value) {
                     ScriptExecutor.stop(this)
                     viewModel.setIsStreaming(false)
                 } else {
-                    requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
+                    requestServerStart(
+                        ScriptExecutor.resolveServerParams(settings, command),
+                        wfasOnly = ScriptExecutor.resolveWfasOnlyParams(settings, command)
+                    )
                 }
             }
 
@@ -847,6 +886,30 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        pendingUnprotectedStart.value?.let { pending ->
+            ExpressiveUnprotectedProtocolsDialog(
+                protocols = pending.protocols,
+                // Without WFAS on any link, switching the rest off leaves the
+                // server with nothing to stream, so that choice is not offered.
+                onWfasOnly = if (WfasPolicy.enabledAnywhere()) {
+                    {
+                        pendingUnprotectedStart.value = null
+                        lifecycleScope.launch {
+                            SettingsDataStore(applicationContext).disableNonWfasProtocols()
+                            requestServerStart(pending.wfasOnly, confirmed = true)
+                        }
+                    }
+                } else {
+                    null
+                },
+                onContinue = {
+                    pendingUnprotectedStart.value = null
+                    requestServerStart(pending.params, confirmed = true)
+                },
+                onCancel = { pendingUnprotectedStart.value = null }
+            )
+        }
+
         BlackoutOverlay(outlinedUi = currentSettings.blackoutOutlinedUi)
     }
 
@@ -909,7 +972,8 @@ class MainActivity : ComponentActivity() {
                 onConnect = {
                     startClientChecked { viewModel.confirmPendingPairing() }
                 },
-                onDismiss = { viewModel.dismissPendingPairing() }
+                onDismiss = { viewModel.dismissPendingPairing() },
+                micOn = viewModel.appSettings.value?.sendClientMicrophone == true
             )
         }
 
@@ -979,16 +1043,17 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startMediaProjectionRequest() {
         val settings = viewModel.appSettings.value ?: return
-        val command = ScriptCommand(
+        val userMulticast = viewModel.isMulticastMode.value
+        fun command(sidecars: Boolean) = ScriptCommand(
             ScriptActionType.START_SERVER,
-            mapOf(
-                "multicast" to (
-                    viewModel.isMulticastMode.value || settings.rtpEnabled || settings.httpEnabled ||
-                        settings.dlnaEnabled || settings.snapcastEnabled
-                    ).toString()
-            )
+            mapOf("multicast" to (userMulticast || sidecars).toString())
         )
-        requestServerStart(ScriptExecutor.resolveServerParams(settings, command))
+        val sidecars = settings.rtpEnabled || settings.httpEnabled ||
+            settings.dlnaEnabled || settings.snapcastEnabled
+        requestServerStart(
+            ScriptExecutor.resolveServerParams(settings, command(sidecars)),
+            wfasOnly = ScriptExecutor.resolveWfasOnlyParams(settings, command(false))
+        )
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (NetworkManager.isServerStreaming) {

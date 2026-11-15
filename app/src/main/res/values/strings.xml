@@ -760,4 +760,25 @@
     <string name="sdp_warn_channels">Unusual channel count: only 1 or 2 can be played.</string>
     <string name="notif_rtp_title">RTP stream</string>
 
+    <!-- Server start: key or QR pairing only protects WFAS -->
+    <string name="unprotected_protocols_title">Not protected on other protocols</string>
+    <string name="unprotected_protocols_body">The key, QR pairing and encryption only protect WFAS. %1$s will carry the same audio without encryption and without a key: anyone on the network can listen to it.</string>
+    <string name="unprotected_protocols_wfas_only">Use WFAS only</string>
+    <string name="unprotected_protocols_continue">Continue unprotected</string>
+    <string name="unprotected_protocols_nothing_left">WFAS is not active on any link, so turning the other protocols off would leave nothing to stream.</string>
+
+    <!-- Client microphone -->
+    <string name="status_mic_not_encrypted">Talk-back is off: an encrypted multicast group has no key for the microphone, and it would travel in cleartext.</string>
+
+    <!-- Auto-connect -->
+    <string name="auto_connect_ssid_unreadable">%1$s is tied to a Wi-Fi network, but Android does not let this app read the network name, so it is not joined automatically. Clear the network field of that entry to auto-connect on any network.</string>
+    <string name="auto_connect_ssid_strict_hint">With a network set, auto-connect only happens when the network name can be read and matches; recent Android versions hide it from this app. Leave it empty to connect on any network.</string>
+
+    <!-- QR pairing link confirmation -->
+    <string name="qr_pairing_deeplink_public_ip">This address is not on your local network. Only continue if you know who sent you this link.</string>
+    <string name="qr_pairing_deeplink_mic_on">Talk-back is on: if this device accepts it, your microphone will be sent to it while connected.</string>
+
+    <!-- Automation -->
+    <string name="scripting_broadcast_package_hint">In Tasker or MacroDroid set the target package to %1$s: a broadcast sent without it can be read by any app, token included.</string>
+
 </resources>
