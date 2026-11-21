@@ -123,6 +123,15 @@ class AutoConnectService : Service() {
                     continue
                 }
 
+                if (Wfas3Android.v3Enabled(applicationContext)) {
+                    // WFAS v3: the paired server used last, found by probes only it
+                    // recognises. The v2 entries are not tried: there is no silent
+                    // fallback to the old protocol.
+                    autoConnectV3(prefs)
+                    delay(15_000)
+                    continue
+                }
+
                 var targetServer: ServerInfo? = null
                 var matchedEntry: AutoConnectEntry? = null
                 val multicastLock = wifiManager.createMulticastLock("auto_connect_multicast_lock")
@@ -306,6 +315,26 @@ class AutoConnectService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    private fun autoConnectV3(prefs: com.cuscus.wifiaudiostreaming.data.AppSettings) {
+        val ctx = applicationContext
+        // A connection the user started is still searching or connecting: probing
+        // the same server now would cancel its search.
+        val cs = Wfas3Android.clientState.value
+        if (cs !is com.cuscus.wifiaudiostreaming.wfas3.Wfas3ClientState.Idle &&
+            cs !is com.cuscus.wifiaudiostreaming.wfas3.Wfas3ClientState.Stopped) return
+        if (Wfas3Android.pairs.value.isEmpty() && Wfas3Android.ensure(ctx, prefs) == null) return
+        val found = Wfas3Android.locate(ctx, 3000L)
+        if (found.isEmpty()) return
+        val slot = prefs.v3LastPair.takeIf { it in found.keys } ?: found.keys.singleOrNull() ?: return
+        Log.d("AutoConnect", "WFAS v3: paired server $slot answered, connecting")
+        val clientIntent = Intent(ctx, ClientService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(clientIntent)
+        else ctx.startService(clientIntent)
+        if (!Wfas3Android.connect(ctx, prefs, slot, found[slot], prefs.sendClientMicrophone)) {
+            ctx.stopService(clientIntent)
+        }
     }
 
     override fun onDestroy() {

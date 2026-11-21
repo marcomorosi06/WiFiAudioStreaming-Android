@@ -57,6 +57,8 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Podcasts
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.OutlinedButton
@@ -85,6 +87,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -192,6 +195,8 @@ fun ExpressiveHomeScreen(
     onMulticastModeChange: (Boolean) -> Unit,
     onToggleMode: (Boolean) -> Unit,
     onStartServer: () -> Unit,
+    // Start without asking for the microphone permission (the user's choice, see the hero).
+    onStartServerNoMic: () -> Unit = {},
     onStopServer: () -> Unit,
     onConnect: (ServerInfo) -> Unit,
     onConnectManual: (String) -> Unit,
@@ -216,9 +221,15 @@ fun ExpressiveHomeScreen(
     onOpenUsbTetherSettings: () -> Unit = {},
     onActivateWfas: () -> Unit = {},
     onScanQr: () -> Unit = {},
-    onGenerateInvite: (Boolean) -> Unit = {}
+    onGenerateInvite: (Boolean) -> Unit = {},
+    // WFAS v3 panels, given by the activity: server controls, the same while
+    // streaming, and the paired servers of the client.
+    v3ServerContent: @Composable () -> Unit = {},
+    v3LiveServerContent: @Composable () -> Unit = {},
+    v3ClientContent: @Composable () -> Unit = {}
 ) {
     val sourceReady = appSettings.streamInternal || appSettings.streamMic
+    val v3 = Wfas3Settings.isV3(appSettings)
 
     /*
      * Ricevere e' ricevere, da qualunque protocollo arrivi.
@@ -387,7 +398,7 @@ fun ExpressiveHomeScreen(
                 localIp = localIp,
                 hasMicPermission = hasMicPermission,
                 usbConnected = usbSession,
-                keyMissing = SecurityMode.requiresKey(appSettings.securityMode) &&
+                keyMissing = !v3 && SecurityMode.requiresKey(appSettings.securityMode) &&
                         !appSettings.qrPairingEnabled &&
                         appSettings.authKey.isBlank(),
                 canStartServer = WfasPolicy.canStartServerWith(
@@ -400,6 +411,7 @@ fun ExpressiveHomeScreen(
                 ),
                 onActivateWfas = onActivateWfas,
                 onStartServer = onStartServer,
+                onStartServerNoMic = onStartServerNoMic,
                 onStopServer = onStopLive
             )
 
@@ -438,7 +450,7 @@ fun ExpressiveHomeScreen(
                     noiseReductionStrength = appSettings.noiseReductionStrength,
                     onNoiseReductionChange = onNoiseReductionChange,
                     isMulticast = isMulticastMode || appSettings.rtpEnabled || appSettings.httpEnabled || appSettings.dlnaEnabled || appSettings.snapcastEnabled,
-                    qrPairingEnabled = appSettings.qrPairingEnabled &&
+                    qrPairingEnabled = !v3 && appSettings.qrPairingEnabled &&
                             SecurityMode.requiresKey(appSettings.securityMode),
                     onGenerateInvite = {
                         onGenerateInvite(
@@ -489,8 +501,11 @@ fun ExpressiveHomeScreen(
                         onStreamMicChange = onStreamMicChange,
                         onMulticastChange = onMulticastModeChange,
                         onSecurityChange = onSecurityChange,
-                        onEncryptionChange = onEncryptionChange
+                        onEncryptionChange = onEncryptionChange,
+                        showV2Security = !v3,
+                        showTransmission = !v3
                     )
+                    if (v3) v3ServerContent()
                     ExpressiveUsbSection(
                         isServer = true,
                         enabled = appSettings.usbModeEnabled,
@@ -499,6 +514,17 @@ fun ExpressiveHomeScreen(
                         onEnabledChange = onUsbModeChange,
                         onOpenTetherSettings = onOpenUsbTetherSettings
                     )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isServer && isStreaming && v3,
+                enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(280, delayMillis = 60)),
+                exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
+            ) {
+                Column {
+                    Spacer(Modifier.height(20.dp))
+                    v3LiveServerContent()
                 }
             }
 
@@ -561,81 +587,76 @@ fun ExpressiveHomeScreen(
                 exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                    // With v3 the paired servers come first: one tap and it plays.
+                    if (v3) v3ClientContent()
+
                     ExpressiveClientOptionsSection(
                         sendMicrophone = appSettings.sendClientMicrophone,
                         accent = accent,
                         onSendMicrophoneChange = onSendClientMicrophoneChange
                     )
 
-                    ExpressiveUsbSection(
-                        isServer = false,
-                        enabled = appSettings.usbModeEnabled,
-                        linkState = usbLinkState,
-                        accent = accent,
-                        onEnabledChange = onUsbModeChange,
-                        onOpenTetherSettings = onOpenUsbTetherSettings
-                    )
-
-                    Column {
-                        SectionHeader(stringResource(R.string.manual_ip_hint), accent)
-                        var manualIp by remember { mutableStateOf("") }
-                        OutlinedButton(
-                            onClick = onScanQr,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 10.dp)
-                        ) {
-                            Icon(
-                                Icons.Outlined.QrCodeScanner,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = stringResource(R.string.qr_scan_button),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = manualIp,
-                                onValueChange = { manualIp = it },
-                                placeholder = { Text("192.168.1.10  /  [fd00::1]") },
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            val haptics = rememberAppHaptics()
-                            FilledTonalIconButton(
-                                onClick = {
-                                    haptics.confirm()
-                                    onConnectManual(manualIp)
-                                },
-                                enabled = manualIp.isNotBlank(),
-                                modifier = Modifier.size(56.dp)
+                    if (v3) {
+                        // Everything below is a different way in, and each says
+                        // which protocol it uses, so that nobody coming from v2
+                        // takes it for the v3 list above.
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SectionHeader(stringResource(R.string.home_other_ways), accent)
+                            Disclosure(
+                                key = "home.address",
+                                icon = Icons.Outlined.Dns,
+                                title = stringResource(R.string.home_addr_title),
+                                detail = stringResource(R.string.home_addr_desc)
                             ) {
-                                Icon(
-                                    Icons.Outlined.Podcasts,
-                                    contentDescription = stringResource(R.string.connect_button_description)
+                                ManualAddressField(showQr = false, onScanQr = onScanQr, onConnectManual = onConnectManual)
+                            }
+                            ExpressiveUsbSection(
+                                isServer = false,
+                                enabled = appSettings.usbModeEnabled,
+                                linkState = usbLinkState,
+                                accent = accent,
+                                onEnabledChange = onUsbModeChange,
+                                onOpenTetherSettings = onOpenUsbTetherSettings,
+                                folded = true
+                            )
+                            val legacyCount = discoveredDevices.size
+                            Disclosure(
+                                key = "home.legacy",
+                                icon = Icons.Outlined.History,
+                                title = stringResource(R.string.home_legacy_title),
+                                detail = stringResource(R.string.home_legacy_desc),
+                                badge = if (legacyCount > 0) stringResource(R.string.home_legacy_found, legacyCount) else null
+                            ) {
+                                ExpressiveDiscoverySection(
+                                    devices = discoveredDevices,
+                                    accent = accent,
+                                    onConnect = onConnect,
+                                    onRefresh = onRefresh,
+                                    legacy = true
                                 )
                             }
                         }
+                    } else {
+                        ExpressiveUsbSection(
+                            isServer = false,
+                            enabled = appSettings.usbModeEnabled,
+                            linkState = usbLinkState,
+                            accent = accent,
+                            onEnabledChange = onUsbModeChange,
+                            onOpenTetherSettings = onOpenUsbTetherSettings
+                        )
+                        Column {
+                            SectionHeader(stringResource(R.string.manual_ip_hint), accent)
+                            ManualAddressField(showQr = true, onScanQr = onScanQr, onConnectManual = onConnectManual)
+                        }
+                        ExpressiveDiscoverySection(
+                            devices = discoveredDevices,
+                            accent = accent,
+                            onConnect = onConnect,
+                            onRefresh = onRefresh,
+                            legacy = false
+                        )
                     }
-
-                    ExpressiveDiscoverySection(
-                        devices = discoveredDevices,
-                        accent = accent,
-                        onConnect = onConnect,
-                        onRefresh = onRefresh
-                    )
 
                     // Gli impianti Snapcast stanno nella stessa schermata dei
                     // server WFAS — la domanda e' la stessa, "a cosa mi
@@ -656,6 +677,66 @@ fun ExpressiveHomeScreen(
         }
     } // end Scaffold
     } // end ambient Box
+}
+
+/**
+ * The address field. [showQr] adds the v2 invite scanner; v3 codes are
+ * scanned from the pairing dialog of v3.
+ */
+@Composable
+private fun ManualAddressField(showQr: Boolean, onScanQr: () -> Unit, onConnectManual: (String) -> Unit) {
+    var manualIp by rememberSaveable { mutableStateOf("") }
+    Column {
+        if (showQr) OutlinedButton(
+            onClick = onScanQr,
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp)
+        ) {
+            Icon(
+                Icons.Outlined.QrCodeScanner,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.qr_scan_button),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = manualIp,
+                onValueChange = { manualIp = it },
+                placeholder = { Text("192.168.1.10  /  [fd00::1]") },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(20.dp)
+            )
+            val haptics = rememberAppHaptics()
+            FilledTonalIconButton(
+                onClick = {
+                    haptics.confirm()
+                    onConnectManual(manualIp)
+                },
+                enabled = manualIp.isNotBlank(),
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.Podcasts,
+                    contentDescription = stringResource(R.string.connect_button_description)
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -713,6 +794,7 @@ private fun StateHero(
     spectrumActive: Boolean = false,
     onActivateWfas: () -> Unit = {},
     onStartServer: () -> Unit,
+    onStartServerNoMic: () -> Unit = {},
     onStopServer: () -> Unit
 ) {
     val haptics = rememberAppHaptics()
@@ -1029,6 +1111,7 @@ private fun StateHero(
         }
 
         var showMicExplanation by remember { mutableStateOf(false) }
+        var showMicBypass by remember { mutableStateOf(false) }
 
         if (isServer && phase == HeroPhase.Ready && !hasMicPermission) {
             Spacer(Modifier.height(16.dp))
@@ -1055,24 +1138,33 @@ private fun StateHero(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.12f),
-                        modifier = Modifier.clickable {
-                            haptics.tap()
-                            showMicExplanation = true
-                        }
-                    ) {
-                        Text(
-                            text = stringResource(R.string.mic_permission_why_button),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                        )
+                    MicChipButton(stringResource(R.string.mic_permission_why_button)) {
+                        haptics.tap()
+                        showMicExplanation = true
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    MicChipButton(stringResource(R.string.mic_permission_bypass_button)) {
+                        haptics.tap()
+                        showMicBypass = true
                     }
                 }
             }
+        }
+
+        if (showMicBypass) {
+            ExpressiveConfirmDialog(
+                icon = Icons.Outlined.MicOff,
+                title = stringResource(R.string.mic_permission_bypass_title),
+                body = stringResource(R.string.mic_permission_bypass_body),
+                confirmLabel = stringResource(R.string.mic_permission_bypass_confirm),
+                dismissLabel = stringResource(R.string.cancel),
+                onConfirm = {
+                    showMicBypass = false
+                    haptics.confirm()
+                    onStartServerNoMic()
+                },
+                onDismiss = { showMicBypass = false }
+            )
         }
 
         if (showMicExplanation) {
@@ -1214,6 +1306,24 @@ private fun StateHero(
                 }
             }
         }
+    }
+}
+
+/** One of the small buttons on the microphone chip of the hero. */
+@Composable
+private fun MicChipButton(text: String, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.12f),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
     }
 }
 
@@ -1402,7 +1512,11 @@ private fun LiveControls(
                 }
             }
 
-            if (developerMode) {
+            // The noise reduction works on v2 streams only: hidden while a v3 session plays.
+            val v3Session by Wfas3Android.clientState.collectAsState()
+            val v3Playing = v3Session !is com.cuscus.wifiaudiostreaming.wfas3.Wfas3ClientState.Idle &&
+                v3Session !is com.cuscus.wifiaudiostreaming.wfas3.Wfas3ClientState.Stopped
+            if (developerMode && !v3Playing) {
                 var nrLastTap by remember { mutableStateOf(0L) }
                 Surface(
                     shape = RoundedCornerShape(24.dp),

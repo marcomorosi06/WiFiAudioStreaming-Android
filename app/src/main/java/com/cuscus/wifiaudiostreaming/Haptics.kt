@@ -100,6 +100,30 @@ class AppHaptics(
             intArrayOf(HapticFeedbackConstants.VIRTUAL_KEY)
         )
     )
+
+    /** One step of a selector: a choice among a few values, a tab. */
+    fun segment() = fire(
+        *chain(
+            sdk(34, HapticFeedbackConstants.SEGMENT_FREQUENT_TICK),
+            intArrayOf(HapticFeedbackConstants.CLOCK_TICK),
+            intArrayOf(HapticFeedbackConstants.KEYBOARD_TAP)
+        )
+    )
+
+    /** Something went the way it should: a device paired, a session opened. */
+    fun success() = confirm()
+
+    /** Something did not work: a pairing failed, a connection was lost. */
+    fun failure() = reject()
+
+    /** Somebody asks something of this device: a pairing request, a code to compare. */
+    fun attention() = fire(
+        *chain(
+            sdk(30, HapticFeedbackConstants.GESTURE_START),
+            intArrayOf(HapticFeedbackConstants.LONG_PRESS),
+            intArrayOf(HapticFeedbackConstants.VIRTUAL_KEY)
+        )
+    )
 }
 
 @Composable

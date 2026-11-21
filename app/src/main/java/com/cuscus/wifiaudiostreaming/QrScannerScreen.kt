@@ -120,9 +120,13 @@ private const val REJECT_COOLDOWN_MS = 2800L
 @Composable
 fun QrScannerScreen(
     onScanned: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    // What counts as a code: a v2 invite by default; the WFAS v3 pairing
+    // dialog passes its own check.
+    accept: (String) -> Boolean = { WfasPairingUri.parse(it) != null }
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentAccept by rememberUpdatedState(accept)
     val haptics = rememberAppHaptics()
     val currentOnScanned by rememberUpdatedState(onScanned)
 
@@ -160,7 +164,7 @@ fun QrScannerScreen(
     val handleRaw: (String) -> Unit = remember {
         { raw ->
             if (!acceptedFlag.get()) {
-                if (WfasPairingUri.parse(raw) != null) {
+                if (currentAccept(raw)) {
                     acceptedFlag.set(true)
                     accepted = raw
                 } else if (System.currentTimeMillis() >= rejectUntil.get()) {

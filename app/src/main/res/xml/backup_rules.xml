@@ -9,6 +9,11 @@
     restoring an old copy of that would wind the replay floor back and let
     beacons this device has already rejected through again.
 -->
+<!--
+    WFAS v3 keys and pairings are in no_backup/wfas3, which the system never
+    backs up or transfers: restoring an older copy of a pairing would hand its
+    keys to two devices. They are encrypted with a Keystore key as well.
+-->
 <full-backup-content>
     <exclude domain="sharedpref" path="wfas_secrets.xml" />
     <exclude domain="file" path="datastore/" />

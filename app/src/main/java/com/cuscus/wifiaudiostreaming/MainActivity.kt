@@ -117,7 +117,8 @@ class MainActivity : ComponentActivity() {
     private class UnprotectedStart(
         val params: ResolvedServerParams,
         val wfasOnly: ResolvedServerParams,
-        val protocols: List<String>
+        val protocols: List<String>,
+        val bypassMic: Boolean = false
     )
 
     private val pendingUnprotectedStart = mutableStateOf<UnprotectedStart?>(null)
@@ -186,14 +187,33 @@ class MainActivity : ComponentActivity() {
             onMicPermissionGranted = null
         }
 
+    // Set while the camera permission is asked for the WFAS v3 pairing scanner.
+    private var v3ScanAfterPermission = false
+
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            val forV3 = v3ScanAfterPermission
+            v3ScanAfterPermission = false
             if (isGranted) {
-                viewModel.openScanner()
+                if (forV3) Wfas3UiState.scanning.value = true else viewModel.openScanner()
             } else {
                 Toast.makeText(this, R.string.qr_scan_permission_denied, Toast.LENGTH_LONG).show()
             }
         }
+
+    /** The scanner of the v3 pairing dialog: same camera checks as the v2 one. */
+    private fun requestV3Scan() {
+        if (!QrCameraSupport.hasCamera(this)) {
+            Wfas3UiState.noCamera.value = true
+            return
+        }
+        if (QrCameraSupport.hasPermission(this)) {
+            Wfas3UiState.scanning.value = true
+        } else {
+            v3ScanAfterPermission = true
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     private fun requestQrScan() {
         if (!QrCameraSupport.hasCamera(this)) {
@@ -256,15 +276,24 @@ class MainActivity : ComponentActivity() {
         intakeExternalCommand(intent)
 
         setContent {
-            WiFiAudioStreamingTheme {
-                val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
+            val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
+            // Android's animations turned off count as asking for calm motion.
+            val systemCalm = remember {
+                runCatching {
+                    android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+                }.getOrDefault(false)
+            }
+            val calm = systemCalm || (appSettings?.calmMotion ?: false)
+            WiFiAudioStreamingTheme(dynamicColor = appSettings?.dynamicColor ?: true, calm = calm) {
 
                 val blackoutActive = BlackoutController.active.value
                 val outlinedSkin = blackoutActive
 
                 CompositionLocalProvider(
                     LocalHapticsEnabled provides (appSettings?.hapticsEnabled ?: true),
-                    LocalOutlinedSkin provides outlinedSkin
+                    LocalOutlinedSkin provides outlinedSkin,
+                    LocalCalmMotion provides calm,
+                    LocalSystemCalmMotion provides systemCalm
                 ) {
                 MaterialTheme(
                     colorScheme = if (outlinedSkin) OutlinedSkin.colorScheme else MaterialTheme.colorScheme,
@@ -435,10 +464,18 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
+    /**
+     * [bypassMic]: the user chose "Bypass" on the microphone chip, believing
+     * this Android captures system audio without the microphone permission.
+     * It holds for this start only. Without the permission the phone's own
+     * microphone cannot be sent, so that source is left out; if the capture
+     * fails after all, the server stops with its usual error.
+     */
     private fun requestServerStart(
         params: ResolvedServerParams,
         wfasOnly: ResolvedServerParams? = null,
-        confirmed: Boolean = false
+        confirmed: Boolean = false,
+        bypassMic: Boolean = false
     ) {
         if (!confirmed) {
             val security = viewModel.appSettings.value?.securityMode
@@ -450,9 +487,16 @@ class MainActivity : ComponentActivity() {
                     dlnaEnabled = false,
                     snapcastEnabled = false
                 )
-                pendingUnprotectedStart.value = UnprotectedStart(params, stripped, unprotected)
+                pendingUnprotectedStart.value = UnprotectedStart(params, stripped, unprotected, bypassMic)
                 return
             }
+        }
+
+        if (bypassMic && params.streamInternal && !hasRecordAudioPermission()) {
+            val noMic = params.copy(streamMic = false)
+            pendingServerParams = noMic
+            launchProjection()
+            return
         }
 
         pendingServerParams = params
@@ -470,6 +514,10 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        launchProjection()
+    }
+
+    private fun launchProjection() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
@@ -537,6 +585,9 @@ class MainActivity : ComponentActivity() {
     private fun MainAppContent() {
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
         val currentSettings = appSettings!!
+        // A v2 server is joined only after the user has read what that means.
+        var pendingV2 by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
+        val v3On = Wfas3Settings.isV3(currentSettings)
 
         val showSettingsScreen = remember { mutableStateOf(false) }
         val showScriptingScreen = remember { mutableStateOf(false) }
@@ -651,7 +702,13 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(pendingConnectIp.value) {
             pendingConnectIp.value?.let { ip ->
                 pendingConnectIp.value = null
-                viewModel.startClientManually(ip)
+                if (v3On) {
+                    viewModel.connectManualV3(ip) { addr ->
+                        pendingV2 = addr to { startClientChecked { viewModel.startClientManually(addr) } }
+                    }
+                } else {
+                    viewModel.startClientManually(ip)
+                }
             }
         }
 
@@ -730,6 +787,9 @@ class MainActivity : ComponentActivity() {
             onStartServer = {
                 startMediaProjectionRequest()
             },
+            onStartServerNoMic = {
+                startMediaProjectionRequest(bypassMic = true)
+            },
             onStopServer = {
                 // Lo stato autorevole e' quello di NetworkManager, non il ruolo
                 // mostrato dalla UI: se i due divergono va fermato comunque tutto,
@@ -743,10 +803,25 @@ class MainActivity : ComponentActivity() {
                 viewModel.stopStreaming()
             },
             onConnect = { serverInfo ->
-                startClientChecked { viewModel.startClient(serverInfo) }
+                if (v3On) {
+                    // With v3 on, every server in this list is a v2 one.
+                    pendingV2 = serverInfo.hostname.ifBlank { serverInfo.ip } to {
+                        startClientChecked { viewModel.startClient(serverInfo) }
+                    }
+                } else {
+                    startClientChecked { viewModel.startClient(serverInfo) }
+                }
             },
             onConnectManual = { ip ->
-                startClientChecked { viewModel.startClientManually(ip) }
+                if (v3On) {
+                    startClientChecked {
+                        viewModel.connectManualV3(ip) { addr ->
+                            pendingV2 = addr to { startClientChecked { viewModel.startClientManually(addr) } }
+                        }
+                    }
+                } else {
+                    startClientChecked { viewModel.startClientManually(ip) }
+                }
             },
             onRefresh = viewModel::clearDiscoveredDevices,
             onMulticastModeChange = viewModel::setMulticastMode,
@@ -792,10 +867,32 @@ class MainActivity : ComponentActivity() {
             onOpenUsbTetherSettings = viewModel::openUsbTetherSettings,
             onActivateWfas = { viewModel.setWfasMode(WfasPolicy.MODE_OFF_ON_USB) },
             onScanQr = { requestQrScan() },
-            onGenerateInvite = { multicast -> viewModel.generateInvite(localIp, multicast) }
+            onGenerateInvite = { multicast -> viewModel.generateInvite(localIp, multicast) },
+            v3ServerContent = {
+                Wfas3ServerCard(currentSettings, isMulticastMode, isStreaming = false, onChange = viewModel::setV3Server, onMulticastChange = viewModel::setMulticastMode)
+            },
+            v3LiveServerContent = {
+                Wfas3ServerCard(currentSettings, isMulticastMode, isStreaming = true, onChange = viewModel::setV3Server)
+            },
+            v3ClientContent = {
+                Wfas3ServersSection(
+                    appSettings = currentSettings,
+                    onConnect = { slot -> startClientChecked { viewModel.connectV3(slot) } },
+                    onDisconnect = { viewModel.stopStreaming() }
+                )
+            }
         )
 
         QrPairingHost(localIp = localIp)
+
+        if (v3On) Wfas3Host(appSettings = currentSettings, onRequestScan = { requestV3Scan() })
+        pendingV2?.let { (name, go) ->
+            V2ConnectWarningDialog(
+                name = name,
+                onCancel = { pendingV2 = null },
+                onConnect = { pendingV2 = null; go() }
+            )
+        }
 
         ExpressiveSettingsScreen(
             isVisible = showSettingsScreen.value,
@@ -825,8 +922,17 @@ class MainActivity : ComponentActivity() {
             onConnectionSoundChange = viewModel::setConnectionSoundEnabled,
             onDisconnectionSoundChange = viewModel::setDisconnectionSoundEnabled,
             onHapticsChange = viewModel::setHapticsEnabled,
+            onDynamicColorChange = viewModel::setDynamicColor,
+            onCalmMotionChange = viewModel::setCalmMotion,
             onBackgroundSpectrumChange = viewModel::setBackgroundSpectrumSettings,
             onBlackoutOutlinedChange = viewModel::setBlackoutOutlinedUi,
+            protocolContent = {
+                Wfas3ProtocolSettings(
+                    appSettings = currentSettings,
+                    onProtocol = viewModel::setWfasProtocol,
+                    onDeviceName = viewModel::setV3DeviceName
+                )
+            },
             onDeveloperModeChange = viewModel::setDeveloperMode,
             onNoiseReductionChange = viewModel::setNoiseReduction,
             onShowDonation = {
@@ -896,7 +1002,7 @@ class MainActivity : ComponentActivity() {
                         pendingUnprotectedStart.value = null
                         lifecycleScope.launch {
                             SettingsDataStore(applicationContext).disableNonWfasProtocols()
-                            requestServerStart(pending.wfasOnly, confirmed = true)
+                            requestServerStart(pending.wfasOnly, confirmed = true, bypassMic = pending.bypassMic)
                         }
                     }
                 } else {
@@ -904,7 +1010,7 @@ class MainActivity : ComponentActivity() {
                 },
                 onContinue = {
                     pendingUnprotectedStart.value = null
-                    requestServerStart(pending.params, confirmed = true)
+                    requestServerStart(pending.params, confirmed = true, bypassMic = pending.bypassMic)
                 },
                 onCancel = { pendingUnprotectedStart.value = null }
             )
@@ -965,12 +1071,23 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // An invite link is a WFAS v2 one: with v3 on, the same notice as for any
+        // v2 server comes before the connection.
+        var inviteV2Notice by remember { mutableStateOf(false) }
         pendingPairing?.let { payload ->
-            QrDeepLinkConfirmDialog(
+            if (inviteV2Notice) {
+                V2ConnectWarningDialog(
+                    name = NetAddr.display(payload.ip),
+                    onCancel = { inviteV2Notice = false; viewModel.dismissPendingPairing() },
+                    onConnect = { inviteV2Notice = false; startClientChecked { viewModel.confirmPendingPairing() } }
+                )
+            } else QrDeepLinkConfirmDialog(
                 payload = payload,
                 serverRunning = viewModel.serverRunning,
                 onConnect = {
-                    startClientChecked { viewModel.confirmPendingPairing() }
+                    val v3 = viewModel.appSettings.value?.let { Wfas3Settings.isV3(it) } == true
+                    if (v3) inviteV2Notice = true
+                    else startClientChecked { viewModel.confirmPendingPairing() }
                 },
                 onDismiss = { viewModel.dismissPendingPairing() },
                 micOn = viewModel.appSettings.value?.sendClientMicrophone == true
@@ -1041,7 +1158,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun startMediaProjectionRequest() {
+    private fun startMediaProjectionRequest(bypassMic: Boolean = false) {
         val settings = viewModel.appSettings.value ?: return
         val userMulticast = viewModel.isMulticastMode.value
         fun command(sidecars: Boolean) = ScriptCommand(
@@ -1052,7 +1169,8 @@ class MainActivity : ComponentActivity() {
             settings.dlnaEnabled || settings.snapcastEnabled
         requestServerStart(
             ScriptExecutor.resolveServerParams(settings, command(sidecars)),
-            wfasOnly = ScriptExecutor.resolveWfasOnlyParams(settings, command(false))
+            wfasOnly = ScriptExecutor.resolveWfasOnlyParams(settings, command(false)),
+            bypassMic = bypassMic
         )
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

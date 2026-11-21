@@ -15,6 +15,8 @@
  * limitations under the Licence.
  */
 
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.cuscus.wifiaudiostreaming
 
 import android.content.Intent
@@ -62,6 +64,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.rounded.AddComment
+import android.os.Build
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -457,24 +468,27 @@ fun SettingsClickableItem(
     onClick: () -> Unit
 ) {
     val appHaptics = rememberAppHaptics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { appHaptics.tap(); onClick() }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SettingsRowIcon(icon)
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val nudge by animateFloatAsState(if (pressed) 6f else 0f, Motion.fastSpatial(), label = "slatNudge")
+    SettingsSlat(onClick = { appHaptics.tap(); onClick() }, interaction = interaction) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SettingsRowIcon(icon)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.graphicsLayer { translationX = nudge }
+            )
         }
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -505,6 +519,8 @@ fun ExpressiveSettingsScreen(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onDynamicColorChange: (Boolean) -> Unit = {},
+    onCalmMotionChange: (Boolean) -> Unit = {},
     onBackgroundSpectrumChange: (Boolean, String, Boolean, Int) -> Unit = { _, _, _, _ -> },
     onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
@@ -519,6 +535,7 @@ fun ExpressiveSettingsScreen(
     onUsbLatencyChange: (Int) -> Unit = {},
     onOpenUsbTetherSettings: () -> Unit = {},
     onWfasModeChange: (String) -> Unit = {},
+    protocolContent: (@Composable () -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -555,6 +572,8 @@ fun ExpressiveSettingsScreen(
             onConnectionSoundChange = onConnectionSoundChange,
             onDisconnectionSoundChange = onDisconnectionSoundChange,
             onHapticsChange = onHapticsChange,
+            onDynamicColorChange = onDynamicColorChange,
+            onCalmMotionChange = onCalmMotionChange,
             onBackgroundSpectrumChange = onBackgroundSpectrumChange,
             onBlackoutOutlinedChange = onBlackoutOutlinedChange,
             onShowDonation = onShowDonation,
@@ -568,7 +587,8 @@ fun ExpressiveSettingsScreen(
             onUsbModeChange = onUsbModeChange,
             onUsbLatencyChange = onUsbLatencyChange,
             onOpenUsbTetherSettings = onOpenUsbTetherSettings,
-            onWfasModeChange = onWfasModeChange
+            onWfasModeChange = onWfasModeChange,
+            protocolContent = protocolContent
         )
     }
 }
@@ -599,6 +619,8 @@ fun SettingsScreenContent(
     onConnectionSoundChange: (Boolean) -> Unit,
     onDisconnectionSoundChange: (Boolean) -> Unit,
     onHapticsChange: (Boolean) -> Unit = {},
+    onDynamicColorChange: (Boolean) -> Unit = {},
+    onCalmMotionChange: (Boolean) -> Unit = {},
     onBackgroundSpectrumChange: (Boolean, String, Boolean, Int) -> Unit = { _, _, _, _ -> },
     onBlackoutOutlinedChange: (Boolean) -> Unit = {},
     onShowDonation: () -> Unit = {},
@@ -613,6 +635,7 @@ fun SettingsScreenContent(
     onUsbLatencyChange: (Int) -> Unit = {},
     onOpenUsbTetherSettings: () -> Unit = {},
     onWfasModeChange: (String) -> Unit = {},
+    protocolContent: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val settingsHaptics = rememberAppHaptics()
@@ -636,100 +659,259 @@ fun SettingsScreenContent(
         )
     }
 
-    Scaffold(
-        topBar = {
-            var fredClickCount by remember { mutableIntStateOf(0) }
-            var showFred by remember { mutableStateOf(false) }
-            var currentToast by remember { mutableStateOf<Toast?>(null) }
+    // Fred lives on the large title now: seven taps, as before.
+    var fredClickCount by remember { mutableIntStateOf(0) }
+    var showFred by remember { mutableStateOf(false) }
+    var currentToast by remember { mutableStateOf<Toast?>(null) }
 
-            if (showFred) {
-                Dialog(onDismissRequest = { showFred = false }) {
-                    Card(
-                        shape = RoundedCornerShape(28.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    if (showFred) {
+        Dialog(onDismissRequest = { showFred = false }) {
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.fred),
+                        contentDescription = null,
                         modifier = Modifier
-                            .padding(16.dp)
                             .fillMaxWidth()
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.fred),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 400.dp)
-                                    .clip(RoundedCornerShape(20.dp)),
-                                contentScale = ContentScale.FillWidth
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
+                            .heightIn(max = 400.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        contentScale = ContentScale.FillWidth
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        }
+    }
+    val fredTap: () -> Unit = {
+        fredClickCount++
+        if (fredClickCount >= 7) settingsHaptics.confirm() else settingsHaptics.tick()
 
-            CenterAlignedTopAppBar(
-                title = {
+        if (fredClickCount < 7) {
+            val toastMessage = when (fredClickCount) {
+                1 -> context.getString(R.string.fred_hint_1)
+                2 -> context.getString(R.string.fred_hint_2)
+                3 -> context.getString(R.string.fred_hint_3)
+                4 -> context.getString(R.string.fred_hint_4)
+                5 -> context.getString(R.string.fred_hint_5)
+                else -> context.getString(R.string.fred_hint_6)
+            }
+
+            currentToast?.cancel()
+            val toast = Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT)
+            toast.show()
+            currentToast = toast
+
+        } else {
+            currentToast?.cancel()
+            showFred = true
+            fredClickCount = 0
+        }
+    }
+    val listState = rememberLazyListState()
+    val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 80 } }
+    val barColor by animateColorAsState(
+        if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.background,
+        Motion.defaultEffects(),
+        label = "settingsBar"
+    )
+    val titleIn by animateFloatAsState(if (scrolled) 1f else 0f, Motion.defaultSpatial(), label = "settingsBarTitle")
+
+    Scaffold(
+        topBar = {
+            Surface(color = barColor, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalIconButton(onClick = { settingsHaptics.tap(); onClose() }) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back_button_description))
+                    }
+                    Spacer(Modifier.width(12.dp))
                     Text(
-                        text = stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            fredClickCount++
-                            if (fredClickCount >= 7) settingsHaptics.confirm() else settingsHaptics.tick()
-
-                            if (fredClickCount < 7) {
-                                val toastMessage = when (fredClickCount) {
-                                    1 -> context.getString(R.string.fred_hint_1)
-                                    2 -> context.getString(R.string.fred_hint_2)
-                                    3 -> context.getString(R.string.fred_hint_3)
-                                    4 -> context.getString(R.string.fred_hint_4)
-                                    5 -> context.getString(R.string.fred_hint_5)
-                                    else -> context.getString(R.string.fred_hint_6)
-                                }
-
-                                currentToast?.cancel()
-                                val toast = Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT)
-                                toast.show()
-                                currentToast = toast
-
-                            } else {
-                                currentToast?.cancel()
-                                showFred = true
-                                fredClickCount = 0
-                            }
+                        stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = titleIn.coerceIn(0f, 1f)
+                            translationY = (1f - titleIn) * 24f
                         }
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { settingsHaptics.tap(); onClose() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back_button_description))
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
+                }
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            item(key = "title") {
+                Column(Modifier.padding(start = 8.dp, top = 4.dp)) {
+                    Text(
+                        stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = fredTap
+                        )
+                    )
+                    Text(
+                        stringResource(R.string.settings_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Appearance first: what is changed most often; then what shapes the
+            // sound, the protocol and the network; the rest after.
+            item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.settings_group_personalization),
+                    icon = Icons.Outlined.Palette,
+                    hue = Hue.Pink
+                ) {
+                    val canDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_dynamic_color_title),
+                        description = stringResource(
+                            if (canDynamic) R.string.settings_item_dynamic_color_desc else R.string.settings_item_dynamic_color_unavailable
+                        ),
+                        icon = Icons.Outlined.Wallpaper,
+                        isChecked = appSettings.dynamicColor && canDynamic,
+                        enabled = canDynamic,
+                        onCheckedChange = onDynamicColorChange
+                    )
+                    val systemCalm = LocalSystemCalmMotion.current
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_calm_motion_title),
+                        description = stringResource(
+                            if (systemCalm) R.string.settings_item_calm_motion_system else R.string.settings_item_calm_motion_desc
+                        ),
+                        icon = Icons.Outlined.Animation,
+                        isChecked = appSettings.calmMotion || systemCalm,
+                        enabled = !systemCalm,
+                        onCheckedChange = onCalmMotionChange
+                    )
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_connection_sound_title),
+                        description = stringResource(R.string.settings_item_connection_sound_desc),
+                        icon = Icons.Outlined.VolumeUp,
+                        isChecked = appSettings.connectionSoundEnabled,
+                        onCheckedChange = onConnectionSoundChange
+                    )
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_disconnection_sound_title),
+                        description = stringResource(R.string.settings_item_disconnection_sound_desc),
+                        icon = Icons.Outlined.VolumeOff,
+                        isChecked = appSettings.disconnectionSoundEnabled,
+                        onCheckedChange = onDisconnectionSoundChange
+                    )
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_haptics_title),
+                        description = stringResource(R.string.settings_item_haptics_desc),
+                        icon = Icons.Outlined.Vibration,
+                        isChecked = appSettings.hapticsEnabled,
+                        onCheckedChange = onHapticsChange
+                    )
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_background_spectrum_title),
+                        description = stringResource(R.string.settings_item_background_spectrum_desc),
+                        icon = Icons.Outlined.GraphicEq,
+                        isChecked = appSettings.backgroundSpectrumEnabled,
+                        onCheckedChange = { enabled ->
+                            onBackgroundSpectrumChange(enabled, appSettings.backgroundSpectrumStyle, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
+                        }
+                    )
+                    AnimatedVisibility(visible = appSettings.backgroundSpectrumEnabled) {
+                        Column {
+                            SettingsChoiceItem(
+                                title = stringResource(R.string.settings_item_spectrum_style_title),
+                                description = stringResource(R.string.settings_item_spectrum_style_desc),
+                                icon = Icons.Outlined.Equalizer,
+                                options = listOf(
+                                    ChoiceOption(
+                                        Icons.Outlined.Equalizer,
+                                        stringResource(R.string.spectrum_style_bars),
+                                        "BARS"
+                                    ),
+                                    ChoiceOption(
+                                        Icons.Outlined.GraphicEq,
+                                        stringResource(R.string.spectrum_style_wave),
+                                        "WAVE"
+                                    )
+                                ),
+                                selectedValue = appSettings.backgroundSpectrumStyle,
+                                selectedDescription = if (appSettings.backgroundSpectrumStyle == "WAVE")
+                                    stringResource(R.string.spectrum_style_wave_desc)
+                                else
+                                    stringResource(R.string.spectrum_style_bars_desc),
+                                onSelect = { style ->
+                                    onBackgroundSpectrumChange(true, style, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
+                                }
+                            )
+                            SettingsSliderItem(
+                                title = stringResource(R.string.settings_item_spectrum_groove_title),
+                                description = stringResource(R.string.settings_item_spectrum_groove_desc),
+                                icon = Icons.Outlined.AutoAwesome,
+                                value = appSettings.backgroundSpectrumGroove.toFloat(),
+                                range = 0f..160f,
+                                // A passi di 10 le tacche restano leggibili e
+                                // cadono su 50/100/150, cioe' soft/normal/hard.
+                                steps = ((160f - 0f) / 10f).toInt() - 1,
+                                valueSuffix = "",
+                                onValueChange = { groove ->
+                                    onBackgroundSpectrumChange(
+                                        true,
+                                        appSettings.backgroundSpectrumStyle,
+                                        appSettings.backgroundSpectrumBlackoutOnly,
+                                        groove.toInt()
+                                    )
+                                }
+                            )
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.settings_item_spectrum_blackout_only_title),
+                                description = stringResource(R.string.settings_item_spectrum_blackout_only_desc),
+                                icon = Icons.Outlined.VisibilityOff,
+                                isChecked = appSettings.backgroundSpectrumBlackoutOnly,
+                                onCheckedChange = { blackoutOnly ->
+                                    onBackgroundSpectrumChange(true, appSettings.backgroundSpectrumStyle, blackoutOnly, appSettings.backgroundSpectrumGroove)
+                                }
+                            )
+                        }
+                    }
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.settings_item_blackout_outlined_title),
+                        description = stringResource(R.string.settings_item_blackout_outlined_desc),
+                        icon = Icons.Outlined.DarkMode,
+                        isChecked = appSettings.blackoutOutlinedUi,
+                        onCheckedChange = onBlackoutOutlinedChange
+                    )
+                }
+            }
+
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_group_audio_sources),
-                    icon = Icons.Outlined.Source
+                    icon = Icons.Outlined.Source,
+                    hue = Hue.Teal
                 ) {
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_internal_audio_title),
@@ -760,7 +942,8 @@ fun SettingsScreenContent(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_group_audio),
-                    icon = Icons.Outlined.Tune
+                    icon = Icons.Outlined.Tune,
+                    hue = Hue.Violet
                 ) {
                     SettingsSelectionItem(
                         title = stringResource(R.string.settings_item_sample_rate_title),
@@ -781,9 +964,12 @@ fun SettingsScreenContent(
                         ),
                         onOptionSelected = { onChannelConfigChange(it) }
                     )
+                    // With v3 the server sets the latency of its sessions (on its
+                    // card): this one is left for v2 and RTP, and says so.
+                    val v3Latency = Wfas3Settings.isV3(appSettings)
                     SettingsSliderItem(
-                        title = stringResource(R.string.settings_item_latency_title),
-                        description = stringResource(R.string.settings_item_latency_desc),
+                        title = stringResource(if (v3Latency) R.string.settings_item_latency_v2_title else R.string.settings_item_latency_title),
+                        description = stringResource(if (v3Latency) R.string.settings_item_latency_v2_desc else R.string.settings_item_latency_desc),
                         icon = Icons.Outlined.Timer,
                         value = appSettings.latencyMs.toFloat(),
                         range = 40f..400f,
@@ -791,6 +977,7 @@ fun SettingsScreenContent(
                         valueSuffix = "ms",
                         onValueChange = { onAdvancedAudioChange(it.toInt(), appSettings.maxPayloadBytes) }
                     )
+                    if (!Wfas3Settings.isV3(appSettings)) {
                     SettingsSliderItem(
                         title = stringResource(R.string.settings_item_packet_size_title),
                         description = stringResource(R.string.settings_item_packet_size_desc),
@@ -801,14 +988,30 @@ fun SettingsScreenContent(
                         valueSuffix = "B",
                         onValueChange = { onAdvancedAudioChange(appSettings.latencyMs, it.toInt()) }
                     )
+                    }
+                }
+            }
+
+            // The protocol comes first among the network choices: it decides
+            // how devices find, pair with and talk to each other.
+            if (protocolContent != null) item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.w3_protocol_section),
+                    icon = Icons.Outlined.VerifiedUser,
+                    hue = Hue.Green
+                ) {
+                    protocolContent()
                 }
             }
 
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_group_network),
-                    icon = Icons.Outlined.SettingsEthernet
+                    icon = Icons.Outlined.SettingsEthernet,
+                    hue = Hue.Primary
                 ) {
+                    // The ports of v2: with v3 they sit in the group of the older devices.
+                    if (!Wfas3Settings.isV3(appSettings)) {
                     SettingsTextFieldItem(
                         title = stringResource(R.string.main_audio_port_title),
                         description = stringResource(R.string.main_audio_port_desc),
@@ -827,6 +1030,7 @@ fun SettingsScreenContent(
                             it.toIntOrNull()?.let(onMicPortChange)
                         }
                     )
+                    }
                     val interfaces = remember {
                         val map = mutableMapOf<String, String>("Auto" to "Auto")
                         try {
@@ -857,8 +1061,44 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
+                    title = stringResource(R.string.auto_connect_priorities_title),
+                    icon = Icons.Outlined.Autorenew,
+                    hue = Hue.Teal
+                ) {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.auto_connect_switch_title),
+                        description = stringResource(R.string.auto_connect_switch_desc),
+                        icon = Icons.Outlined.Autorenew,
+                        isChecked = appSettings.autoConnectEnabled,
+                        onCheckedChange = onAutoConnectEnabledChange
+                    )
+
+                    AnimatedVisibility(visible = appSettings.autoConnectEnabled) {
+                        if (Wfas3Settings.isV3(appSettings)) {
+                            // WFAS v3 goes back to the paired server used last; the
+                            // address list is for v2 servers and returns with v2.
+                            SettingsInfoItem(
+                                title = stringResource(R.string.w3_autoconnect_title),
+                                description = stringResource(R.string.w3_autoconnect_desc),
+                                icon = Icons.Outlined.Info
+                            )
+                        } else {
+                            SettingsSlat {
+                                AutoConnectPriorityListManager(
+                                    autoConnectListString = appSettings.autoConnectList,
+                                    onListChange = onSaveAutoConnectList
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                SettingsGroupCard(
                     title = stringResource(R.string.settings_group_usb),
-                    icon = Icons.Outlined.SettingsEthernet
+                    icon = Icons.Outlined.SettingsEthernet,
+                    hue = Hue.Orange
                 ) {
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_usb_mode_title),
@@ -868,13 +1108,14 @@ fun SettingsScreenContent(
                         onCheckedChange = onUsbModeChange
                     )
                     if (appSettings.usbModeEnabled) {
-                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                        Box(modifier = Modifier.padding(vertical = SETTINGS_SLAT_GAP / 2)) {
                             ExpressiveUsbStatusCard(
                                 linkState = usbLinkState,
                                 accent = MaterialTheme.colorScheme.primary,
                                 onOpenTetherSettings = onOpenUsbTetherSettings
                             )
                         }
+                        if (!Wfas3Settings.isV3(appSettings)) {
                         SettingsSliderItem(
                             title = stringResource(R.string.settings_item_usb_latency_title),
                             description = stringResource(R.string.settings_item_usb_latency_desc),
@@ -885,6 +1126,7 @@ fun SettingsScreenContent(
                             valueSuffix = "ms",
                             onValueChange = { onUsbLatencyChange(it.toInt()) }
                         )
+                        }
                     }
                 }
             }
@@ -892,7 +1134,8 @@ fun SettingsScreenContent(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_group_server_protocols),
-                    icon = Icons.Outlined.Hub
+                    icon = Icons.Outlined.Hub,
+                    hue = Hue.Tertiary
                 ) {
                     SettingsInfoItem(
                         title = stringResource(R.string.settings_item_wfas_title),
@@ -943,7 +1186,8 @@ fun SettingsScreenContent(
                             icon = Icons.Outlined.WarningAmber
                         )
                     }
-                    SettingsSwitchItem(
+                    // A v2 choice: a v3 server already stays up when a client leaves.
+                    if (!Wfas3Settings.isV3(appSettings)) SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_persist_title),
                         description = stringResource(R.string.settings_item_persist_desc),
                         icon = Icons.Outlined.AllInclusive,
@@ -993,21 +1237,23 @@ fun SettingsScreenContent(
                             }
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.http_latency_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    SettingsSlat(color = MaterialTheme.colorScheme.surfaceContainer) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.http_latency_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     DlnaSettingsSection(appSettings = appSettings)
@@ -1017,176 +1263,91 @@ fun SettingsScreenContent(
             }
 
             item {
-                SettingsGroupCard(
-                    title = stringResource(R.string.auto_connect_priorities_title),
-                    icon = Icons.Outlined.Autorenew
-                ) {
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.auto_connect_switch_title),
-                        description = stringResource(R.string.auto_connect_switch_desc),
-                        icon = Icons.Outlined.Autorenew,
-                        isChecked = appSettings.autoConnectEnabled,
-                        onCheckedChange = onAutoConnectEnabledChange
-                    )
-
-                    AnimatedVisibility(visible = appSettings.autoConnectEnabled) {
-                        AutoConnectPriorityListManager(
-                            autoConnectListString = appSettings.autoConnectList,
-                            onListChange = onSaveAutoConnectList
-                        )
-                    }
-                }
-            }
-
-            item {
                 var tileIpText by remember(appSettings.clientTileIp) { mutableStateOf(appSettings.clientTileIp) }
                 val focusManager = LocalFocusManager.current
 
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_tile_title),
-                    icon = Icons.Outlined.Widgets
+                    icon = Icons.Outlined.Widgets,
+                    hue = Hue.Amber
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = tileIpText,
-                            onValueChange = { tileIpText = it },
-                            label = { Text(stringResource(R.string.settings_tile_ip_label)) },
-                            placeholder = { Text(stringResource(R.string.settings_tile_ip_placeholder)) },
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(onDone = {
-                                onClientTileIpChange(tileIpText)
-                                focusManager.clearFocus()
-                            }),
-                            singleLine = true,
-                            leadingIcon = {
-                                Icon(imageVector = Icons.Rounded.AddComment, contentDescription = null)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp)
-                        )
+                    SettingsSlat {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 16.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = tileIpText,
+                                onValueChange = { tileIpText = it },
+                                label = { Text(stringResource(R.string.settings_tile_ip_label)) },
+                                placeholder = { Text(stringResource(R.string.settings_tile_ip_placeholder)) },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(onDone = {
+                                    onClientTileIpChange(tileIpText)
+                                    focusManager.clearFocus()
+                                }),
+                                singleLine = true,
+                                leadingIcon = {
+                                    Icon(imageVector = Icons.Rounded.AddComment, contentDescription = null)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp)
+                            )
 
-                        Text(
-                            text = stringResource(R.string.settings_tile_ip_description),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
-                        )
+                            Text(
+                                text = stringResource(R.string.settings_tile_ip_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp)
+                            )
+                        }
                     }
                 }
             }
 
             item {
                 SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_personalization),
-                    icon = Icons.Outlined.Palette
+                    title = stringResource(R.string.settings_group_automation),
+                    icon = Icons.Outlined.Bolt,
+                    hue = Hue.Amber
+                ) {
+                    SettingsClickableItem(
+                        title = stringResource(R.string.settings_item_scripting_title),
+                        description = stringResource(R.string.settings_item_scripting_desc),
+                        icon = Icons.Outlined.Link,
+                        onClick = onOpenScripting
+                    )
+                }
+            }
+
+            item {
+                SettingsGroupCard(
+                    title = Bilingual("Updates", "Aggiornamenti").text(),
+                    icon = Icons.Outlined.Update,
+                    hue = Hue.Green
                 ) {
                     SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_connection_sound_title),
-                        description = stringResource(R.string.settings_item_connection_sound_desc),
-                        icon = Icons.Outlined.VolumeUp,
-                        isChecked = appSettings.connectionSoundEnabled,
-                        onCheckedChange = onConnectionSoundChange
+                        title = Bilingual("Check for updates automatically", "Controlla aggiornamenti automaticamente").text(),
+                        description = Bilingual(
+                            "On launch, check GitHub for a newer release.",
+                            "All'avvio, controlla su GitHub se c'è una nuova versione."
+                        ).text(),
+                        icon = Icons.Outlined.Update,
+                        isChecked = appSettings.autoUpdateCheckEnabled,
+                        onCheckedChange = onAutoUpdateCheckChange
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_disconnection_sound_title),
-                        description = stringResource(R.string.settings_item_disconnection_sound_desc),
-                        icon = Icons.Outlined.VolumeOff,
-                        isChecked = appSettings.disconnectionSoundEnabled,
-                        onCheckedChange = onDisconnectionSoundChange
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_haptics_title),
-                        description = stringResource(R.string.settings_item_haptics_desc),
-                        icon = Icons.Outlined.Vibration,
-                        isChecked = appSettings.hapticsEnabled,
-                        onCheckedChange = onHapticsChange
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_background_spectrum_title),
-                        description = stringResource(R.string.settings_item_background_spectrum_desc),
-                        icon = Icons.Outlined.GraphicEq,
-                        isChecked = appSettings.backgroundSpectrumEnabled,
-                        onCheckedChange = { enabled ->
-                            onBackgroundSpectrumChange(enabled, appSettings.backgroundSpectrumStyle, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
-                        }
-                    )
-                    AnimatedVisibility(visible = appSettings.backgroundSpectrumEnabled) {
-                        Column {
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                            SettingsChoiceItem(
-                                title = stringResource(R.string.settings_item_spectrum_style_title),
-                                description = stringResource(R.string.settings_item_spectrum_style_desc),
-                                icon = Icons.Outlined.Equalizer,
-                                options = listOf(
-                                    ChoiceOption(
-                                        Icons.Outlined.Equalizer,
-                                        stringResource(R.string.spectrum_style_bars),
-                                        "BARS"
-                                    ),
-                                    ChoiceOption(
-                                        Icons.Outlined.GraphicEq,
-                                        stringResource(R.string.spectrum_style_wave),
-                                        "WAVE"
-                                    )
-                                ),
-                                selectedValue = appSettings.backgroundSpectrumStyle,
-                                selectedDescription = if (appSettings.backgroundSpectrumStyle == "WAVE")
-                                    stringResource(R.string.spectrum_style_wave_desc)
-                                else
-                                    stringResource(R.string.spectrum_style_bars_desc),
-                                onSelect = { style ->
-                                    onBackgroundSpectrumChange(true, style, appSettings.backgroundSpectrumBlackoutOnly, appSettings.backgroundSpectrumGroove)
-                                }
-                            )
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                            SettingsSliderItem(
-                                title = stringResource(R.string.settings_item_spectrum_groove_title),
-                                description = stringResource(R.string.settings_item_spectrum_groove_desc),
-                                icon = Icons.Outlined.AutoAwesome,
-                                value = appSettings.backgroundSpectrumGroove.toFloat(),
-                                range = 0f..160f,
-                                // A passi di 10 le tacche restano leggibili e
-                                // cadono su 50/100/150, cioe' soft/normal/hard.
-                                steps = ((160f - 0f) / 10f).toInt() - 1,
-                                valueSuffix = "",
-                                onValueChange = { groove ->
-                                    onBackgroundSpectrumChange(
-                                        true,
-                                        appSettings.backgroundSpectrumStyle,
-                                        appSettings.backgroundSpectrumBlackoutOnly,
-                                        groove.toInt()
-                                    )
-                                }
-                            )
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                            SettingsSwitchItem(
-                                title = stringResource(R.string.settings_item_spectrum_blackout_only_title),
-                                description = stringResource(R.string.settings_item_spectrum_blackout_only_desc),
-                                icon = Icons.Outlined.VisibilityOff,
-                                isChecked = appSettings.backgroundSpectrumBlackoutOnly,
-                                onCheckedChange = { blackoutOnly ->
-                                    onBackgroundSpectrumChange(true, appSettings.backgroundSpectrumStyle, blackoutOnly, appSettings.backgroundSpectrumGroove)
-                                }
-                            )
-                        }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsSwitchItem(
-                        title = stringResource(R.string.settings_item_blackout_outlined_title),
-                        description = stringResource(R.string.settings_item_blackout_outlined_desc),
-                        icon = Icons.Outlined.DarkMode,
-                        isChecked = appSettings.blackoutOutlinedUi,
-                        onCheckedChange = onBlackoutOutlinedChange
+                    SettingsClickableItem(
+                        title = Bilingual("Check for updates now", "Controlla aggiornamenti ora").text(),
+                        description = if (checkingForUpdate)
+                            Bilingual("Checking…", "Controllo in corso…").text()
+                        else
+                            Bilingual("Tap to check GitHub now.", "Tocca per controllare ora su GitHub.").text(),
+                        icon = Icons.Outlined.Refresh,
+                        onClick = onCheckForUpdates
                     )
                 }
             }
@@ -1194,7 +1355,8 @@ fun SettingsScreenContent(
             item {
                 SettingsGroupCard(
                     title = stringResource(R.string.settings_group_developer),
-                    icon = Icons.Outlined.DeveloperMode
+                    icon = Icons.Outlined.DeveloperMode,
+                    hue = Hue.Orange
                 ) {
                     SettingsSwitchItem(
                         title = stringResource(R.string.settings_item_developer_title),
@@ -1204,9 +1366,10 @@ fun SettingsScreenContent(
                         onCheckedChange = onDeveloperModeChange
                     )
 
-                    AnimatedVisibility(visible = appSettings.developerMode) {
+                    // The noise reduction works on v2 streams only: with v3 it sits
+                    // in the group of the older devices.
+                    if (!Wfas3Settings.isV3(appSettings)) AnimatedVisibility(visible = appSettings.developerMode) {
                         Column {
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SettingsSwitchItem(
                                 title = stringResource(R.string.nr_title),
                                 description = stringResource(R.string.nr_desc),
@@ -1232,12 +1395,104 @@ fun SettingsScreenContent(
                                             onNoiseReductionChange(true, v.toInt())
                                         }
                                     )
-                                    Text(
-                                        text = stringResource(R.string.nr_hint),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                                    SettingsSlat(color = MaterialTheme.colorScheme.surfaceContainer) {
+                                        Text(
+                                            text = stringResource(R.string.nr_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // With v3, what only v2 still uses stays reachable here, for the
+            // older devices that can be reached from the client screen.
+            if (Wfas3Settings.isV3(appSettings)) item {
+                SettingsGroupCard(
+                    title = stringResource(R.string.home_legacy_title),
+                    icon = Icons.Outlined.History,
+                    hue = Hue.Neutral
+                ) {
+                    SettingsTextFieldItem(
+                        title = stringResource(R.string.main_audio_port_title),
+                        description = stringResource(R.string.main_audio_port_desc),
+                        icon = Icons.Outlined.VpnKey,
+                        value = appSettings.streamingPort.toString(),
+                        onValueChange = {
+                            it.toIntOrNull()?.let(onStreamingPortChange)
+                        }
+                    )
+                    SettingsTextFieldItem(
+                        title = stringResource(R.string.client_mic_port_title),
+                        description = stringResource(R.string.client_mic_port_desc),
+                        icon = Icons.Outlined.Podcasts,
+                        value = appSettings.micPort.toString(),
+                        onValueChange = {
+                            it.toIntOrNull()?.let(onMicPortChange)
+                        }
+                    )
+                    SettingsSliderItem(
+                        title = stringResource(R.string.settings_item_packet_size_title),
+                        description = stringResource(R.string.settings_item_packet_size_desc),
+                        icon = Icons.Outlined.SettingsEthernet,
+                        value = appSettings.maxPayloadBytes.toFloat(),
+                        range = 256f..1390f,
+                        steps = ((1390f - 256f) / 32f).toInt() - 1,
+                        valueSuffix = "B",
+                        onValueChange = { onAdvancedAudioChange(appSettings.latencyMs, it.toInt()) }
+                    )
+                    if (appSettings.usbModeEnabled) {
+                        SettingsSliderItem(
+                            title = stringResource(R.string.settings_item_usb_latency_title),
+                            description = stringResource(R.string.settings_item_usb_latency_desc),
+                            icon = Icons.Outlined.Timer,
+                            value = appSettings.usbLatencyMs.toFloat(),
+                            range = UsbLink.MIN_USB_LATENCY_MS.toFloat()..UsbLink.MAX_USB_LATENCY_MS.toFloat(),
+                            steps = ((UsbLink.MAX_USB_LATENCY_MS - UsbLink.MIN_USB_LATENCY_MS) / 5) - 1,
+                            valueSuffix = "ms",
+                            onValueChange = { onUsbLatencyChange(it.toInt()) }
+                        )
+                    }
+                    AnimatedVisibility(visible = appSettings.developerMode) {
+                        Column {
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.nr_title),
+                                description = stringResource(R.string.nr_desc),
+                                icon = Icons.Outlined.GraphicEq,
+                                isChecked = appSettings.noiseReductionEnabled,
+                                onCheckedChange = { on ->
+                                    onNoiseReductionChange(on, appSettings.noiseReductionStrength)
+                                }
+                            )
+                            AnimatedVisibility(visible = appSettings.noiseReductionEnabled) {
+                                Column {
+                                    SettingsSliderItem(
+                                        title = stringResource(R.string.nr_title),
+                                        description = stringResource(
+                                            R.string.nr_strength, appSettings.noiseReductionStrength
+                                        ),
+                                        icon = Icons.Outlined.Tune,
+                                        value = appSettings.noiseReductionStrength.toFloat(),
+                                        range = 0f..100f,
+                                        steps = 19,
+                                        valueSuffix = "%",
+                                        onValueChange = { v ->
+                                            onNoiseReductionChange(true, v.toInt())
+                                        }
                                     )
+                                    SettingsSlat(color = MaterialTheme.colorScheme.surfaceContainer) {
+                                        Text(
+                                            text = stringResource(R.string.nr_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1247,57 +1502,15 @@ fun SettingsScreenContent(
 
             item {
                 SettingsGroupCard(
-                    title = stringResource(R.string.settings_group_automation),
-                    icon = Icons.Outlined.Bolt
-                ) {
-                    SettingsClickableItem(
-                        title = stringResource(R.string.settings_item_scripting_title),
-                        description = stringResource(R.string.settings_item_scripting_desc),
-                        icon = Icons.Outlined.Link,
-                        onClick = onOpenScripting
-                    )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
-                    title = Bilingual("Updates", "Aggiornamenti").text(),
-                    icon = Icons.Outlined.Update
-                ) {
-                    SettingsSwitchItem(
-                        title = Bilingual("Check for updates automatically", "Controlla aggiornamenti automaticamente").text(),
-                        description = Bilingual(
-                            "On launch, check GitHub for a newer release.",
-                            "All'avvio, controlla su GitHub se c'è una nuova versione."
-                        ).text(),
-                        icon = Icons.Outlined.Update,
-                        isChecked = appSettings.autoUpdateCheckEnabled,
-                        onCheckedChange = onAutoUpdateCheckChange
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsClickableItem(
-                        title = Bilingual("Check for updates now", "Controlla aggiornamenti ora").text(),
-                        description = if (checkingForUpdate)
-                            Bilingual("Checking…", "Controllo in corso…").text()
-                        else
-                            Bilingual("Tap to check GitHub now.", "Tocca per controllare ora su GitHub.").text(),
-                        icon = Icons.Outlined.Refresh,
-                        onClick = onCheckForUpdates
-                    )
-                }
-            }
-
-            item {
-                SettingsGroupCard(
                     title = stringResource(R.string.settings_group_info),
-                    icon = Icons.Outlined.Info
+                    icon = Icons.Outlined.Info,
+                    hue = Hue.Neutral
                 ) {
                     SettingsInfoItem(
                         title = stringResource(R.string.license_info_title),
                         description = stringResource(R.string.license_info_desc),
                         icon = Icons.Outlined.VerifiedUser
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.license_read_full_title),
                         description = stringResource(R.string.license_read_full_desc),
@@ -1307,14 +1520,12 @@ fun SettingsScreenContent(
                             context.startActivity(intent)
                         }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.licenses_open_source),
                         description = stringResource(R.string.licenses_open_source_desc),
                         icon = Icons.Outlined.Description,
                         onClick = { showLicensesDialog = true }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.settings_item_show_intro_title),
                         description = stringResource(R.string.settings_item_show_intro_desc),
@@ -1326,7 +1537,6 @@ fun SettingsScreenContent(
                         description = "Marco Morosi",
                         icon = Icons.Outlined.Person
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.support_kofi_title),
                         description = stringResource(R.string.support_kofi_desc),
@@ -1336,14 +1546,12 @@ fun SettingsScreenContent(
                             context.startActivity(intent)
                         }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.settings_item_show_donation_title),
                         description = stringResource(R.string.settings_item_show_donation_desc),
                         icon = Icons.Outlined.Redeem,
                         onClick = onShowDonation
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.source_code_android),
                         description = stringResource(R.string.source_code_view_on_github),
@@ -1362,7 +1570,6 @@ fun SettingsScreenContent(
                             context.startActivity(intent)
                         }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SettingsClickableItem(
                         title = stringResource(R.string.source_code_protocol),
                         description = stringResource(R.string.source_code_protocol_desc),
@@ -1438,53 +1645,55 @@ fun SettingsTextFieldItem(
         edited = false
     }
 
-    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SettingsRowIcon(icon)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        OutlinedTextField(
-            value = text,
-            onValueChange = { newValue ->
-                val ok = if (numeric) newValue.all { it.isDigit() }
-                else newValue.none { it.isISOControl() }
-                if (ok && newValue.length <= maxLength) {
-                    text = newValue
-                    edited = true
-                    if (commitWhileTyping) onValueChange(newValue)
+    SettingsSlat {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingsRowIcon(icon)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            },
-            label = { Text(title) },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text,
-                imeAction = ImeAction.Done
-            ),
-            singleLine = true,
-            leadingIcon = {
-                Icon(imageVector = icon, contentDescription = null)
-            },
-            shape = RoundedCornerShape(16.dp),
-            // Anche uscendo dal campo si tiene quel che si e' scritto: prima
-            // valeva solo il tasto Fine della tastiera, e chi toccava altrove
-            // -- che e' il modo normale di finire di scrivere -- si vedeva
-            // tornare il valore di prima senza capire perche'.
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp)
-                .onFocusChanged { state ->
-                    if (hadFocus && !state.isFocused) commit()
-                    hadFocus = state.isFocused
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { newValue ->
+                    val ok = if (numeric) newValue.all { it.isDigit() }
+                    else newValue.none { it.isISOControl() }
+                    if (ok && newValue.length <= maxLength) {
+                        text = newValue
+                        edited = true
+                        if (commitWhileTyping) onValueChange(newValue)
+                    }
                 },
-            keyboardActions = KeyboardActions(onDone = {
-                fieldHaptics.confirm()
-                commit()
-                focusManager.clearFocus()
-            })
-        )
+                label = { Text(title) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(imageVector = icon, contentDescription = null)
+                },
+                shape = RoundedCornerShape(16.dp),
+                // Anche uscendo dal campo si tiene quel che si e' scritto: prima
+                // valeva solo il tasto Fine della tastiera, e chi toccava altrove
+                // -- che e' il modo normale di finire di scrivere -- si vedeva
+                // tornare il valore di prima senza capire perche'.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .onFocusChanged { state ->
+                        if (hadFocus && !state.isFocused) commit()
+                        hadFocus = state.isFocused
+                    },
+                keyboardActions = KeyboardActions(onDone = {
+                    fieldHaptics.confirm()
+                    commit()
+                    focusManager.clearFocus()
+                })
+            )
+        }
     }
 }
 
@@ -1624,58 +1833,72 @@ fun SettingsSwitchItem(
     description: String,
     icon: ImageVector,
     isChecked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val appHaptics = rememberAppHaptics()
-
-    Row(
+    val interaction = remember { MutableInteractionSource() }
+    val scale by rememberPressScale(interaction, 0.98f)
+    val scheme = MaterialTheme.colorScheme
+    val turn by animateFloatAsState(if (isChecked) 90f else 0f, Motion.fastSpatial(), label = "rowTurn")
+    val cookie = remember { PolygonShape(MaterialShapes.Cookie4Sided) }
+    // The whole slat is the target: the switch only shows the state.
+    Surface(
+        checked = isChecked,
+        onCheckedChange = { on ->
+            appHaptics.toggle(on)
+            onCheckedChange(on)
+        },
+        enabled = enabled,
+        interactionSource = interaction,
+        shape = RoundedCornerShape(SETTINGS_SLAT_CORNER),
+        color = scheme.surfaceContainerHigh,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                appHaptics.toggle(!isChecked)
-                onCheckedChange(!isChecked)
+            .padding(vertical = SETTINGS_SLAT_GAP / 2)
+            .semantics { role = Role.Switch }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = if (enabled) 1f else 0.6f
             }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsRowIcon(icon)
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .graphicsLayer { rotationZ = turn }
+                    .background(if (isChecked) scheme.primary else scheme.surfaceContainerHighest, cookie),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (isChecked) scheme.onPrimary else scheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = -turn }
+                )
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp)
+            ) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(text = description, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Switch(
+                checked = isChecked,
+                onCheckedChange = null,
+                enabled = enabled,
+                thumbContent = if (isChecked) {
+                    { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
+                } else {
+                    null
+                }
             )
         }
-        Spacer(Modifier.width(16.dp))
-        Switch(
-            checked = isChecked,
-            onCheckedChange = {
-                appHaptics.toggle(it)
-                onCheckedChange(it)
-            },
-            thumbContent = {
-                AnimatedContent(
-                    targetState = isChecked,
-                    transitionSpec = {
-                        scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow)) togetherWith
-                                scaleOut(animationSpec = tween(100))
-                    },
-                    label = "SettingsSwitchThumbIcon"
-                ) { checkedState ->
-                    Icon(
-                        imageVector = if (checkedState) Icons.Default.Check else Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                    )
-                }
-            }
-        )
     }
 }
 
@@ -1690,36 +1913,38 @@ fun SettingsChoiceItem(
     selectedDescription: String,
     onSelect: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SettingsRowIcon(icon)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    SettingsSlat {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingsRowIcon(icon)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
+            Spacer(Modifier.height(14.dp))
+            ExpressiveChoiceRow(
+                options = options,
+                selectedValue = selectedValue,
+                accent = MaterialTheme.colorScheme.primary,
+                onSelect = onSelect
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = selectedDescription,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        Spacer(Modifier.height(14.dp))
-        ExpressiveChoiceRow(
-            options = options,
-            selectedValue = selectedValue,
-            accent = MaterialTheme.colorScheme.primary,
-            onSelect = onSelect
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = selectedDescription,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -1736,54 +1961,56 @@ fun <T> SettingsSelectionItem(
     var expanded by remember { mutableStateOf(false) }
     val appHaptics = rememberAppHaptics()
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { appHaptics.tap(); expanded = !expanded },
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SettingsRowIcon(icon)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = currentValue,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.End,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 150.dp)
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = stringResource(R.string.open_selection_desc)
-                )
-            }
-        }
-        ExposedDropdownMenu(
+    SettingsSlat {
+        ExposedDropdownMenuBox(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            onExpandedChange = { appHaptics.tap(); expanded = !expanded },
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
         ) {
-            options.forEach { (label, value) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    onClick = {
-                        appHaptics.confirm()
-                        onOptionSelected(value)
-                        expanded = false
-                    }
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsRowIcon(icon)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = currentValue,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.End,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 150.dp)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = stringResource(R.string.open_selection_desc)
+                    )
+                }
+            }
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            ) {
+                options.forEach { (label, value) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            appHaptics.confirm()
+                            onOptionSelected(value)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -1806,47 +2033,49 @@ fun SettingsSliderItem(
     // Ricordiamo l’ultimo intero attraversato per evitare vibrazioni continue
     var lastStep by remember { mutableIntStateOf(value.toInt()) }
 
-    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SettingsRowIcon(icon)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+    SettingsSlat {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingsRowIcon(icon)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
                 Text(
-                    text = title,
+                    text = "${sliderValue.toInt()} $valueSuffix",
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Light
                 )
             }
-            Spacer(Modifier.width(16.dp))
-            Text(
-                text = "${sliderValue.toInt()} $valueSuffix",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Light
+
+            Slider(
+                value = sliderValue,
+                onValueChange = { newValue ->
+                    sliderValue = newValue
+
+                    val currentStep = newValue.toInt()
+                    if (currentStep != lastStep) {
+                        appHaptics.tick()
+                        lastStep = currentStep
+                    }
+                },
+                valueRange = range,
+                steps = steps,
+                onValueChangeFinished = { appHaptics.gestureEnd(); onValueChange(sliderValue) },
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
-
-        Slider(
-            value = sliderValue,
-            onValueChange = { newValue ->
-                sliderValue = newValue
-
-                val currentStep = newValue.toInt()
-                if (currentStep != lastStep) {
-                    appHaptics.tick()
-                    lastStep = currentStep
-                }
-            },
-            valueRange = range,
-            steps = steps,
-            onValueChangeFinished = { appHaptics.gestureEnd(); onValueChange(sliderValue) },
-            modifier = Modifier.padding(top = 8.dp)
-        )
     }
 }
 
@@ -3384,30 +3613,40 @@ fun SettingsInfoItem(
     description: String,
     painter: Painter
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painter,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(20.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    SettingsSlat {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val cookie = remember { PolygonShape(MaterialShapes.Cookie4Sided) }
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, cookie),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painter,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -4289,47 +4528,49 @@ fun SettingsCodecSelectorItem(
 ) {
     val haptic = rememberAppHaptics()
 
-    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        // Intestazione (Sopra)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SettingsRowIcon(icon)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SettingsSlat {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            // Intestazione (Sopra)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingsRowIcon(icon)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-        // Contenitore Pulsanti (Sotto, orizzontale)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            CodecAnimatedButton(
-                text = stringResource(R.string.codec_opus),
-                selected = !isSafariMode,
-                onClick = {
-                    haptic.tick()
-                    onCodecChange(false)
-                },
-                modifier = Modifier.weight(1f)
-            )
+            // Contenitore Pulsanti (Sotto, orizzontale)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                CodecAnimatedButton(
+                    text = stringResource(R.string.codec_opus),
+                    selected = !isSafariMode,
+                    onClick = {
+                        haptic.tick()
+                        onCodecChange(false)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
 
-            CodecAnimatedButton(
-                text = stringResource(R.string.codec_aac),
-                selected = isSafariMode,
-                onClick = {
-                    haptic.tick()
-                    onCodecChange(true)
-                },
-                modifier = Modifier.weight(1f)
-            )
+                CodecAnimatedButton(
+                    text = stringResource(R.string.codec_aac),
+                    selected = isSafariMode,
+                    onClick = {
+                        haptic.tick()
+                        onCodecChange(true)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
@@ -4632,11 +4873,11 @@ fun SettingsRowIcon(
     icon: ImageVector,
     tint: Color = MaterialTheme.colorScheme.primary
 ) {
+    val cookie = remember { PolygonShape(MaterialShapes.Cookie4Sided) }
     Box(
         modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .size(40.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, cookie),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -4652,30 +4893,63 @@ fun SettingsRowIcon(
 fun SettingsGroupCard(
     title: String,
     icon: ImageVector,
+    hue: Hue = Hue.Primary,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val tone = toneOf(hue)
     Column(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(
-            label = title,
-            accent = MaterialTheme.colorScheme.primary,
-            trailing = {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
-            }
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .padding(start = 6.dp, bottom = 10.dp)
+                .semantics { heading() }
+        ) {
+            ShapeIcon(icon, tone.container, tone.onContainer, shape = MaterialShapes.Cookie6Sided, size = 36.dp, iconSize = 18.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        }
+        // One connected group: the slats have small corners, the group clips
+        // the outer ones large; the gaps between slats show the page.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .clip(RoundedCornerShape(26.dp)),
             content = content
         )
+    }
+}
+
+/**
+ * One row of a settings group, for content that is not one of the items
+ * above: the same slat, optionally a target as a whole.
+ */
+@Composable
+fun SettingsSlat(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    interaction: MutableInteractionSource? = null,
+    color: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    content: @Composable () -> Unit
+) {
+    val outer = modifier
+        .fillMaxWidth()
+        .padding(vertical = SETTINGS_SLAT_GAP / 2)
+    if (onClick != null) {
+        val source = interaction ?: remember { MutableInteractionSource() }
+        val scale by rememberPressScale(source, 0.98f)
+        Surface(
+            onClick = onClick,
+            interactionSource = source,
+            shape = RoundedCornerShape(SETTINGS_SLAT_CORNER),
+            color = color,
+            modifier = outer.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+            content = content
+        )
+    } else {
+        Surface(shape = RoundedCornerShape(SETTINGS_SLAT_CORNER), color = color, modifier = outer, content = content)
     }
 }
 

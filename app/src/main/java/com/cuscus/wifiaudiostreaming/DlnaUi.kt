@@ -102,134 +102,136 @@ fun DlnaSettingsSection(appSettings: AppSettings) {
                 }
             )
 
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Text(
-                    text = stringResource(R.string.dlna_format_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-                val availableFormats = remember(appSettings.sampleRate, appSettings.channelConfig) {
-                    val channels = if (appSettings.channelConfig == "STEREO") 2 else 1
-                    DlnaCodecSupport.available(appSettings.sampleRate, channels)
-                }
-                val options = remember(availableFormats) {
-                    listOf(DlnaFormatPreference.AUTO) +
-                            DlnaFormatPreference.entries.filter { it.codec()?.let(availableFormats::contains) == true }
-                }
-                options.forEach { option ->
-                    val selected = DlnaFormatPreference.fromId(appSettings.dlnaFormat) == option
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 4.dp)
-                            .clickable {
-                                scope.launch { store.saveDlnaSettings(appSettings.dlnaPort, option.id) }
-                            }
-                    ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            Text(
-                                text = dlnaFormatLabel(option),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                            if (selected) {
+            SettingsSlat {
+                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+                    Text(
+                        text = stringResource(R.string.dlna_format_label),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    val availableFormats = remember(appSettings.sampleRate, appSettings.channelConfig) {
+                        val channels = if (appSettings.channelConfig == "STEREO") 2 else 1
+                        DlnaCodecSupport.available(appSettings.sampleRate, channels)
+                    }
+                    val options = remember(availableFormats) {
+                        listOf(DlnaFormatPreference.AUTO) +
+                                DlnaFormatPreference.entries.filter { it.codec()?.let(availableFormats::contains) == true }
+                    }
+                    options.forEach { option ->
+                        val selected = DlnaFormatPreference.fromId(appSettings.dlnaFormat) == option
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp)
+                                .clickable {
+                                    scope.launch { store.saveDlnaSettings(appSettings.dlnaPort, option.id) }
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 Text(
-                                    text = dlnaFormatDescription(option),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = dlnaFormatLabel(option),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                                 )
+                                if (selected) {
+                                    Text(
+                                        text = dlnaFormatDescription(option),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
-                }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.dlna_devices_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (discovery.scanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    }
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                DlnaDiscoveryService.scan(
-                                    NetworkManager.getWifiNetworkInterface(appSettings.networkInterface)
-                                )
-                            }
-                        },
-                        enabled = !discovery.scanning
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Text(
-                            text = stringResource(R.string.dlna_rescan),
-                            modifier = Modifier.padding(start = 6.dp)
+                            text = stringResource(R.string.dlna_devices_label),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.weight(1f)
                         )
+                        if (discovery.scanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        }
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    DlnaDiscoveryService.scan(
+                                        NetworkManager.getWifiNetworkInterface(appSettings.networkInterface)
+                                    )
+                                }
+                            },
+                            enabled = !discovery.scanning
+                        ) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = stringResource(R.string.dlna_rescan),
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
                     }
-                }
 
-                val entries = dlnaVisibleEntries(
-                    appSettings.dlnaDevices,
-                    discovery.renderers,
-                    stringResource(R.string.dlna_offline)
-                )
+                    val entries = dlnaVisibleEntries(
+                        appSettings.dlnaDevices,
+                        discovery.renderers,
+                        stringResource(R.string.dlna_offline)
+                    )
 
-                if (entries.isEmpty()) {
+                    if (entries.isEmpty()) {
+                        Text(
+                            text = if (discovery.scanning) stringResource(R.string.dlna_scanning)
+                            else stringResource(R.string.dlna_no_devices),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        entries.forEach { entry ->
+                            DlnaDeviceRow(
+                                entry = entry,
+                                checked = DlnaSelection.contains(appSettings.dlnaDevices, entry.udn),
+                                status = targets.firstOrNull { it.udn == entry.udn },
+                                onToggle = {
+                                    val updated = if (DlnaSelection.contains(appSettings.dlnaDevices, entry.udn)) {
+                                        appSettings.dlnaDevices.filterNot { DlnaSelection.udnOf(it) == entry.udn }
+                                    } else {
+                                        appSettings.dlnaDevices + DlnaSelection.encode(entry.udn, entry.name)
+                                    }
+                                    scope.launch { store.saveDlnaDevices(updated) }
+                                }
+                            )
+                        }
+                    }
+
                     Text(
-                        text = if (discovery.scanning) stringResource(R.string.dlna_scanning)
-                        else stringResource(R.string.dlna_no_devices),
+                        text = stringResource(R.string.dlna_selection_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        modifier = Modifier.padding(top = 8.dp)
                     )
-                } else {
-                    entries.forEach { entry ->
-                        DlnaDeviceRow(
-                            entry = entry,
-                            checked = DlnaSelection.contains(appSettings.dlnaDevices, entry.udn),
-                            status = targets.firstOrNull { it.udn == entry.udn },
-                            onToggle = {
-                                val updated = if (DlnaSelection.contains(appSettings.dlnaDevices, entry.udn)) {
-                                    appSettings.dlnaDevices.filterNot { DlnaSelection.udnOf(it) == entry.udn }
-                                } else {
-                                    appSettings.dlnaDevices + DlnaSelection.encode(entry.udn, entry.name)
-                                }
-                                scope.launch { store.saveDlnaDevices(updated) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = { copyDlnaDiagnostics(context) }) {
+                            Icon(Icons.Outlined.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = stringResource(R.string.dlna_copy_diagnostics),
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                        if (appSettings.dlnaDevices.isNotEmpty()) {
+                            TextButton(onClick = { scope.launch { store.saveDlnaDevices(emptyList()) } }) {
+                                Text(stringResource(R.string.dlna_clear_selection))
                             }
-                        )
-                    }
-                }
-
-                Text(
-                    text = stringResource(R.string.dlna_selection_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(onClick = { copyDlnaDiagnostics(context) }) {
-                        Icon(Icons.Outlined.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(
-                            text = stringResource(R.string.dlna_copy_diagnostics),
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-                    }
-                    if (appSettings.dlnaDevices.isNotEmpty()) {
-                        TextButton(onClick = { scope.launch { store.saveDlnaDevices(emptyList()) } }) {
-                            Text(stringResource(R.string.dlna_clear_selection))
                         }
                     }
                 }

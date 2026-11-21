@@ -623,7 +623,11 @@ fun ExpressiveSourceSection(
     onStreamMicChange: (Boolean) -> Unit,
     onMulticastChange: (Boolean) -> Unit,
     onSecurityChange: (String, String) -> Unit,
-    onEncryptionChange: (Boolean) -> Unit
+    onEncryptionChange: (Boolean) -> Unit,
+    // False with WFAS v3: its pairing replaces the v2 security modes.
+    showV2Security: Boolean = true,
+    // False with WFAS v3: the v3 server card has its own picture of it.
+    showTransmission: Boolean = true
 ) {
     val secMode = securityMode.uppercase()
     // RTP e HTTP trasmettono entrambi a tutti gli ascoltatori: con uno dei due
@@ -661,6 +665,7 @@ fun ExpressiveSourceSection(
             onCheckedChange = onStreamMicChange
         )
 
+        if (showTransmission) {
         Spacer(Modifier.height(28.dp))
         SectionHeader(stringResource(R.string.transmission_mode_title), accent)
 
@@ -741,7 +746,9 @@ fun ExpressiveSourceSection(
                 }
             }
         }
+        }
 
+        if (showV2Security) {
         Spacer(Modifier.height(28.dp))
         SectionHeader(stringResource(R.string.settings_group_security), accent)
 
@@ -839,6 +846,7 @@ fun ExpressiveSourceSection(
                 EncryptionNoticeCard(accent = accent)
             }
         }
+        }
     }
 }
 
@@ -903,10 +911,39 @@ fun ExpressiveUsbSection(
     linkState: UsbLink.State,
     accent: Color,
     onEnabledChange: (Boolean) -> Unit,
+    onOpenTetherSettings: () -> Unit,
+    folded: Boolean = false
+) {
+    if (folded) {
+        // With v3 the cable is one more way in, folded with the others. The
+        // one line of the header says the thing people ask: it works with v3 too.
+        Disclosure(
+            key = "home.usb",
+            icon = Icons.Outlined.Usb,
+            title = stringResource(R.string.usb_section_title),
+            detail = stringResource(R.string.usb_v3_detail),
+            badge = if (enabled) stringResource(R.string.usb_v3_on) else null
+        ) {
+            UsbBody(isServer, enabled, linkState, accent, onEnabledChange, onOpenTetherSettings)
+        }
+        return
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(stringResource(R.string.usb_section_title), accent)
+        UsbBody(isServer, enabled, linkState, accent, onEnabledChange, onOpenTetherSettings)
+    }
+}
+
+@Composable
+private fun UsbBody(
+    isServer: Boolean,
+    enabled: Boolean,
+    linkState: UsbLink.State,
+    accent: Color,
+    onEnabledChange: (Boolean) -> Unit,
     onOpenTetherSettings: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(stringResource(R.string.usb_section_title), accent)
         ExpressiveToggleTile(
             icon = Icons.Outlined.Usb,
             activeIcon = Icons.Filled.Usb,
@@ -1081,13 +1118,15 @@ fun ExpressiveDiscoverySection(
     devices: Map<String, ServerInfo>,
     accent: Color,
     onConnect: (ServerInfo) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    // With WFAS v3 on, only v2 servers announce themselves: they get the badge.
+    legacy: Boolean = false
 ) {
     val haptics = rememberAppHaptics()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(
-            label = stringResource(R.string.nearby_devices_title),
+            label = stringResource(if (legacy) R.string.w3_legacy_title else R.string.nearby_devices_title),
             accent = accent,
             trailing = {
                 if (devices.isNotEmpty()) {
@@ -1173,7 +1212,8 @@ fun ExpressiveDiscoverySection(
                             info = info,
                             hostname = info.hostname.ifBlank { hostname },
                             accent = accent,
-                            onConnect = { onConnect(info) }
+                            onConnect = { onConnect(info) },
+                            legacyBadge = legacy
                         )
                     }
                 }
@@ -1188,7 +1228,8 @@ private fun ExpressiveDeviceRow(
     info: ServerInfo,
     hostname: String,
     accent: Color,
-    onConnect: () -> Unit
+    onConnect: () -> Unit,
+    legacyBadge: Boolean = false
 ) {
     val haptics = rememberAppHaptics()
     val interaction = remember { MutableInteractionSource() }
@@ -1260,13 +1301,19 @@ private fun ExpressiveDeviceRow(
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             val title = hostname.ifBlank { info.ip }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (legacyBadge) {
+                    V2Badge()
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = NetAddr.hostPort(info.ip, info.port),
                 style = MaterialTheme.typography.bodySmall,

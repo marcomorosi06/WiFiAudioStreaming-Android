@@ -525,6 +525,86 @@ fun ExpressiveLongTextDialog(
     }
 }
 
+/**
+ * A question with two answers. Cancel is the large, filled one, so that the
+ * safe answer is the easy one; [confirmLabel] does what was asked.
+ */
+@Composable
+fun ExpressiveConfirmDialog(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    confirmLabel: String,
+    dismissLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val haptics = rememberAppHaptics()
+    val scheme = MaterialTheme.colorScheme
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(36.dp),
+            color = scheme.surfaceContainerLow,
+            tonalElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DialogShapeBadge(icon, scheme.primary, alert = false)
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    color = scheme.onSurface
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = scheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                ExpressiveDialogButton(
+                    label = dismissLabel,
+                    icon = null,
+                    container = scheme.primary,
+                    content = scheme.onPrimary,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptics.tap()
+                    onDismiss()
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                ExpressiveDialogButton(
+                    label = confirmLabel,
+                    icon = null,
+                    container = scheme.secondaryContainer,
+                    content = scheme.onSecondaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    onConfirm()
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ExpressiveInfoDialog(
     icon: ImageVector,

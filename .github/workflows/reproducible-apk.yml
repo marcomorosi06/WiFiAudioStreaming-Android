@@ -50,7 +50,8 @@ jobs:
       - name: Install the Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: "platforms;android-36 build-tools;35.0.0"
+          # The NDK and CMake build libwfas3 (WFAS v3); pinned like the rest.
+          packages: "platforms;android-36 build-tools;35.0.0 ndk;27.2.12479018 cmake;3.22.1"
           log-accepted-android-sdk-licenses: false
 
       - name: Build the unsigned release APK
@@ -106,6 +107,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Install the same NDK and CMake
+        run: |
+          sdk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018" "cmake;3.22.1" > /dev/null
 
       - name: Build on two CPU cores
         run: taskset -c 0,1 sh ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache --no-daemon

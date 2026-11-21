@@ -154,6 +154,8 @@ data class AppSettings(
      */
     val rtpSources: List<String> = emptyList(),
     val lastMulticastMode: Boolean = false,
+    // The screen the app was on, server or client: it opens there next time.
+    val lastModeServer: Boolean = true,
     // Muto il volume media mentre catturo l'audio interno, cosi' non si sente due
     // volte; spento, si sente sia qui che sul client.
     val muteRender: Boolean = true,
@@ -176,6 +178,10 @@ data class AppSettings(
     val qrPairingEnabled: Boolean = false,
     val manualAuthKey: String = "",
     val hapticsEnabled: Boolean = true,
+    // Colours from the wallpaper (Android 12+); off: the app's own violet palette.
+    val dynamicColor: Boolean = true,
+    // Fewer bounces and shapes that barely turn; on by itself when Android's animations are off.
+    val calmMotion: Boolean = false,
     val blackoutOutlinedUi: Boolean = false,
     val developerMode: Boolean = false,
     val noiseReductionEnabled: Boolean = false,
@@ -189,7 +195,19 @@ data class AppSettings(
     val backgroundSpectrumGroove: Int = 0,
     // Spento di default: chi non usa Tasker o i tag NFC non ha nessun ingresso
     // esterno aperto, e chi li usa lo accende sapendo cosa sta accendendo.
-    val automationEnabled: Boolean = false
+    val automationEnabled: Boolean = false,
+    // WFAS v3 is the protocol unless the user chose v2 (legacy); only one is on.
+    // Its keys and pairings are not settings: they live in Wfas3Android's store.
+    val wfasProtocol: String = "v3",
+    val v3DeviceName: String = "",
+    val v3Codec: String = "pcm",
+    val v3OpusKbps: Int = 256,
+    val v3OpusFrameSamples: Int = 480,
+    val v3LatencyMs: Int = 60,
+    val v3Sync: Boolean = false,
+    val v3AcceptNew: Boolean = true,
+    val v3PairAsk: Boolean = true,
+    val v3LastPair: Int = -1
 )
 
 class SettingsDataStore(context: Context) {
@@ -212,6 +230,7 @@ class SettingsDataStore(context: Context) {
         val MIC_PORT = intPreferencesKey("mic_port")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val LAST_MULTICAST_MODE = booleanPreferencesKey("last_multicast_mode")
+        val LAST_MODE_SERVER = booleanPreferencesKey("last_mode_server")
         val MUTE_RENDER = booleanPreferencesKey("mute_render")
         val SERVER_PERSIST = booleanPreferencesKey("server_persist")
         val NETWORK_INTERFACE = stringPreferencesKey("network_interface")
@@ -242,6 +261,8 @@ class SettingsDataStore(context: Context) {
         val LAST_SEEN_CHANGELOG_VERSION = stringPreferencesKey("last_seen_changelog_version")
         val AUTO_UPDATE_CHECK_ENABLED = booleanPreferencesKey("auto_update_check_enabled")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val CALM_MOTION = booleanPreferencesKey("calm_motion")
         val BLACKOUT_OUTLINED_UI = booleanPreferencesKey("blackout_outlined_ui")
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         val NOISE_REDUCTION_ENABLED = booleanPreferencesKey("noise_reduction_enabled")
@@ -254,6 +275,16 @@ class SettingsDataStore(context: Context) {
         val BACKGROUND_SPECTRUM_BLACKOUT_ONLY = booleanPreferencesKey("background_spectrum_blackout_only")
         val BACKGROUND_SPECTRUM_GROOVE = intPreferencesKey("background_spectrum_groove")
         val AUTOMATION_ENABLED = booleanPreferencesKey("automation_enabled")
+        val WFAS_PROTOCOL = stringPreferencesKey("wfas_protocol")
+        val V3_DEVICE_NAME = stringPreferencesKey("wfas3_device_name")
+        val V3_CODEC = stringPreferencesKey("wfas3_codec")
+        val V3_OPUS_KBPS = intPreferencesKey("wfas3_opus_kbps")
+        val V3_OPUS_FRAME = intPreferencesKey("wfas3_opus_frame")
+        val V3_LATENCY_MS = intPreferencesKey("wfas3_latency_ms")
+        val V3_SYNC = booleanPreferencesKey("wfas3_sync")
+        val V3_ACCEPT_NEW = booleanPreferencesKey("wfas3_accept_new")
+        val V3_PAIR_ASK = booleanPreferencesKey("wfas3_pair_ask")
+        val V3_LAST_PAIR = intPreferencesKey("wfas3_last_pair")
         val LEGACY_AUTOMATION_TOKEN = stringPreferencesKey("automation_token")
         // Read once, to be moved into SecretStore and deleted. Nothing writes
         // them any more: see [authKeysFlow].
@@ -347,6 +378,7 @@ class SettingsDataStore(context: Context) {
             micPort = preferences[PreferencesKeys.MIC_PORT] ?: 9092,
             onboardingCompleted = preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false,
             lastMulticastMode = preferences[PreferencesKeys.LAST_MULTICAST_MODE] ?: false,
+            lastModeServer = preferences[PreferencesKeys.LAST_MODE_SERVER] ?: true,
             muteRender = preferences[PreferencesKeys.MUTE_RENDER] ?: true,
             serverPersist = preferences[PreferencesKeys.SERVER_PERSIST] ?: false,
             networkInterface = preferences[PreferencesKeys.NETWORK_INTERFACE] ?: "Auto",
@@ -384,6 +416,8 @@ class SettingsDataStore(context: Context) {
             connectionSoundEnabled = preferences[PreferencesKeys.CONNECTION_SOUND_ENABLED] ?: true,
             disconnectionSoundEnabled = preferences[PreferencesKeys.DISCONNECTION_SOUND_ENABLED] ?: true,
             hapticsEnabled = preferences[PreferencesKeys.HAPTICS_ENABLED] ?: true,
+            dynamicColor = preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true,
+            calmMotion = preferences[PreferencesKeys.CALM_MOTION] ?: false,
             blackoutOutlinedUi = preferences[PreferencesKeys.BLACKOUT_OUTLINED_UI] ?: false,
             developerMode = preferences[PreferencesKeys.DEVELOPER_MODE] ?: false,
             noiseReductionEnabled = preferences[PreferencesKeys.NOISE_REDUCTION_ENABLED] ?: false,
@@ -404,8 +438,43 @@ class SettingsDataStore(context: Context) {
             backgroundSpectrumStyle = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_STYLE] ?: "BARS",
             backgroundSpectrumBlackoutOnly = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_BLACKOUT_ONLY] ?: false,
             backgroundSpectrumGroove = preferences[PreferencesKeys.BACKGROUND_SPECTRUM_GROOVE] ?: 0,
-            automationEnabled = preferences[PreferencesKeys.AUTOMATION_ENABLED] ?: false
+            automationEnabled = preferences[PreferencesKeys.AUTOMATION_ENABLED] ?: false,
+            wfasProtocol = preferences[PreferencesKeys.WFAS_PROTOCOL] ?: "v3",
+            v3DeviceName = preferences[PreferencesKeys.V3_DEVICE_NAME] ?: "",
+            v3Codec = preferences[PreferencesKeys.V3_CODEC] ?: "pcm",
+            v3OpusKbps = preferences[PreferencesKeys.V3_OPUS_KBPS] ?: 256,
+            v3OpusFrameSamples = preferences[PreferencesKeys.V3_OPUS_FRAME] ?: 480,
+            v3LatencyMs = preferences[PreferencesKeys.V3_LATENCY_MS] ?: 60,
+            v3Sync = preferences[PreferencesKeys.V3_SYNC] ?: false,
+            v3AcceptNew = preferences[PreferencesKeys.V3_ACCEPT_NEW] ?: true,
+            v3PairAsk = preferences[PreferencesKeys.V3_PAIR_ASK] ?: true,
+            v3LastPair = preferences[PreferencesKeys.V3_LAST_PAIR] ?: -1
         )
+    }
+
+    suspend fun saveWfasProtocol(protocol: String) {
+        dataStore.edit { it[PreferencesKeys.WFAS_PROTOCOL] = if (protocol == "v2") "v2" else "v3" }
+    }
+
+    suspend fun saveV3DeviceName(name: String) {
+        dataStore.edit { it[PreferencesKeys.V3_DEVICE_NAME] = name.take(32) }
+    }
+
+    suspend fun saveV3Server(codec: String, opusKbps: Int, opusFrame: Int, latencyMs: Int, sync: Boolean,
+                             acceptNew: Boolean, pairAsk: Boolean) {
+        dataStore.edit {
+            it[PreferencesKeys.V3_CODEC] = if (codec == "opus") "opus" else "pcm"
+            it[PreferencesKeys.V3_OPUS_KBPS] = opusKbps.coerceIn(32, 510)
+            it[PreferencesKeys.V3_OPUS_FRAME] = opusFrame
+            it[PreferencesKeys.V3_LATENCY_MS] = latencyMs.coerceIn(20, 1000)
+            it[PreferencesKeys.V3_SYNC] = sync
+            it[PreferencesKeys.V3_ACCEPT_NEW] = acceptNew
+            it[PreferencesKeys.V3_PAIR_ASK] = pairAsk
+        }
+    }
+
+    suspend fun saveV3LastPair(slot: Int) {
+        dataStore.edit { it[PreferencesKeys.V3_LAST_PAIR] = slot }
     }
 
     suspend fun setAutomationEnabled(enabled: Boolean) {
@@ -622,6 +691,12 @@ class SettingsDataStore(context: Context) {
         }
     }
 
+    suspend fun saveLastModeServer(isServer: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_MODE_SERVER] = isServer
+        }
+    }
+
     suspend fun saveLastMulticastMode(isMulticast: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.LAST_MULTICAST_MODE] = isMulticast
@@ -781,6 +856,18 @@ class SettingsDataStore(context: Context) {
     suspend fun saveHapticsEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.HAPTICS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveDynamicColor(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DYNAMIC_COLOR] = enabled
+        }
+    }
+
+    suspend fun saveCalmMotion(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CALM_MOTION] = enabled
         }
     }
 

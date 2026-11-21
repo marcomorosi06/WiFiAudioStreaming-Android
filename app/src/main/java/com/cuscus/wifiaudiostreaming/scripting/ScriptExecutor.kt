@@ -27,6 +27,9 @@ import com.cuscus.wifiaudiostreaming.NetworkManager
 import com.cuscus.wifiaudiostreaming.SecurityMode
 import com.cuscus.wifiaudiostreaming.UsbLink
 import com.cuscus.wifiaudiostreaming.WfasPolicy
+import com.cuscus.wifiaudiostreaming.Wfas3Android
+import com.cuscus.wifiaudiostreaming.Wfas3Settings
+import com.cuscus.wifiaudiostreaming.R
 import com.cuscus.wifiaudiostreaming.ServerInfo
 import com.cuscus.wifiaudiostreaming.data.AppSettings
 import com.cuscus.wifiaudiostreaming.data.SettingsDataStore
@@ -232,6 +235,28 @@ object ScriptExecutor {
             ?: return
         val port = command.port(ScriptParams.PORT) ?: settings.streamingPort
         val clientMic = command.bool(ScriptParams.CLIENTMIC) ?: settings.sendClientMicrophone
+
+        if (Wfas3Settings.isV3(settings)) {
+            // WFAS v3: a paired server at that address is reached with v3. A v2
+            // server is never joined without the confirmation the app asks for.
+            // The probes and the wait run off the main thread.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val addr = runCatching { java.net.InetAddress.getByName(ip) }.getOrNull()
+                val found = if (addr != null) Wfas3Android.locate(context.applicationContext, 3000L, addr) else emptyMap()
+                val hit = found.entries.firstOrNull { it.value.sameHost(addr) }
+                if (hit == null) {
+                    NetworkManager.connectionStatus.value = context.getString(R.string.w3_script_v2_refused, ip)
+                } else {
+                    val clientIntent = Intent(context, ClientService::class.java)
+                    context.startService(clientIntent)
+                    if (!Wfas3Android.connect(context.applicationContext, settings.copy(sendClientMicrophone = clientMic), hit.key, hit.value, clientMic)) {
+                        context.stopService(clientIntent)
+                        NetworkManager.connectionStatus.value = Wfas3Android.failureText(context)
+                    }
+                }
+            }
+            return
+        }
 
         NetworkManager.connectionStatus.value = "Detecting mode for $ip..."
         val known = NetworkManager.discoveredDevices.value.values.find { it.ip == ip }

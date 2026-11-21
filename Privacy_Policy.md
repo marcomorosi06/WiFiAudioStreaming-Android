@@ -1,6 +1,6 @@
 # Privacy Policy for WiFi Audio Streaming (Android)
 
-Last updated: November 2026 (app version 1.2.2)
+Last updated: November 2026 (app version 1.3)
 
 This policy describes what the **WiFi Audio Streaming** Android app sends,
 to whom, what it keeps on the device, and why it needs each permission.
@@ -23,7 +23,23 @@ to whom, what it keeps on the device, and why it needs each permission.
 These exchanges happen only between devices on the same network (or USB
 tethering link), and only while you use the related feature.
 
-- **Discovery beacon** (server mode): every few seconds the app sends a UDP
+- **WFAS v3** (the default protocol): a server sends no announcements. A
+  client looking for a paired server sends small probes on the local network
+  that only that server can recognise; they carry no name or identifier that
+  others can read. While a pairing window you opened is open (at most two
+  minutes), the server broadcasts a beacon once per second: in code mode it
+  carries nothing readable, in PIN mode it carries the device name you chose
+  (by default the phone model), so that the other device can find it. Audio,
+  talk-back microphone and control messages travel only between paired
+  devices and are always encrypted (ChaCha20-Poly1305, with keys from an
+  X25519 and ML-KEM-768 handshake). The v3 ports (UDP 14114, and 14115 for
+  multicast) are open only while a server, a client or a pairing needs them. On a
+  network without IPv4 (IPv6 only) the probes and beacons go to the link's
+  all-nodes address (ff02::1) instead of the IPv4 broadcast, never beyond the
+  local link, and the v3 port accepts only devices on that same link
+  (link-local addresses or the network's own prefixes): nothing from the
+  Internet reaches it, even with a public IPv6 address.
+- **Discovery beacon** (WFAS v2, legacy, server mode): every few seconds the app sends a UDP
   multicast message to `239.255.0.1:9091` with your **device name**, the
   streaming port and mode, the protocols offered, the audio format and the
   security hints (`auth=`, `enc=`, `mic=`). Anyone on the network can read it.
@@ -42,7 +58,7 @@ tethering link), and only while you use the related feature.
   on the network with your device name (mDNS/DNS-SD) and searches for DLNA
   renderers (SSDP). A Snapcast server started on the phone identifies itself
   with a random identifier generated once, not with a hardware identifier.
-- **Security modes**: in **Off** mode any device on the network can connect
+- **Security modes** (WFAS v2): in **Off** mode any device on the network can connect
   and listen. In **Ask** mode you approve each device. In **Key** mode a
   device must prove it knows the key; the key itself never travels.
 
@@ -78,6 +94,11 @@ The app makes no other connection to the internet.
 - **Secrets** (EncryptedSharedPreferences, with a key in the Android
   Keystore): the pre-shared key, the automation token and the keys of saved
   auto-connect servers. Excluded from cloud backup and device transfer.
+- **WFAS v3 keys and pairings** (in the app's `no_backup` folder): this
+  phone's keys and one file per paired device, each encrypted with
+  AES-256-GCM under a key held by the Android Keystore, which never leaves
+  it. The system never backs up or transfers this folder. Guest pairings are
+  kept in memory only. You can erase everything in Settings > WFAS protocol.
 - **Random identifiers** for Snapcast (client and server), generated once.
 - No audio is recorded or saved: audio is processed in memory while
   streaming and discarded.

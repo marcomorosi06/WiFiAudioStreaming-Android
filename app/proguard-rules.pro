@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# WFAS v3: libwfas3 binds its methods by class name (RegisterNatives), so
+# these classes and their native methods keep their names if R8 is enabled.
+-keep class com.cuscus.wifiaudiostreaming.wfas3.Wfas3Native { native <methods>; }
+-keep class com.cuscus.wifiaudiostreaming.wfas3.Wfas3Opus { native <methods>; }

@@ -644,6 +644,7 @@ object NetworkManager {
                 if (changed) {
                     networkRevision.value++
                     restartBroadcastOnNetworkChange()
+                    Wfas3Android.networkChanged()
                 }
             }
             override fun onAvailable(network: android.net.Network) = refresh("available")
@@ -1416,7 +1417,10 @@ object NetworkManager {
             channels = if (channelConfig == "STEREO") 2 else 1,
             bitDepth = 16
         )
-        startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled, serverFormat)
+        // WFAS v3 servers announce nothing: only paired devices look for them.
+        val v3 = Wfas3Android.v3Enabled(context)
+        v3Serving = v3
+        if (!v3) startBroadcastingPresence(context, isMulticast, streamingPort, networkInterfaceName, rtpEnabled, serverFormat)
 
         // Il volume salvato serve solo se lo abbassiamo davvero: con muteRender
         // spento il ripristino nel finally non deve toccare nulla, altrimenti
@@ -1562,6 +1566,13 @@ object NetworkManager {
                         // Feed ambient spectrum visualizer (server side)
                         com.cuscus.wifiaudiostreaming.dsp.AmbientSpectrumAnalyzer
                             .feedFrame(chunk, 0, aligned, channels, sampleRate)
+                        if (v3) {
+                            // WFAS v3 takes the audio here; the v2 queue below has no reader.
+                            Wfas3Android.feedBytes(chunk, aligned, channels, sampleRate)
+                            producerLoopCount++
+                            producerTotalBytes += aligned
+                            continue
+                        }
                         var dropped = 0
                         while (udpAudioQueue.remainingCapacity() == 0) {
                             if (udpAudioQueue.poll() == null) break
@@ -1763,6 +1774,45 @@ object NetworkManager {
                     } else if (!vpnActive) {
                         wifiNet?.let { runCatching { cm.bindProcessToNetwork(it) } }
                     }
+                }
+
+                if (v3) {
+                    // WFAS v3: its own engine, port and pairing. None of the v2
+                    // sockets, beacons or handshakes is opened. The RTP sidecar
+                    // goes to its multicast group, as v3 does not hand out the
+                    // addresses of its clients.
+                    applyProcessNetwork()
+                    val app = SettingsDataStore(context).settingsFlow.first()
+                    // WFAS turned off by the user (see WfasPolicy): only the other
+                    // protocols run, as with v2.
+                    val wfasWanted = WfasPolicy.enabledAnywhere()
+                    val srv = if (wfasWanted) Wfas3Android.startServer(context, app, isMulticast) else null
+                    if (wfasWanted && srv == null) {
+                        connectionStatus.value = Wfas3Android.failureText(context)
+                        hasError = true
+                        return@launch
+                    }
+                    setupAudioRecorders(safeBufferSize)
+                    if (rtpEnabled) {
+                        rtpJob = scope.launchRtpSidecar(
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            port = rtpPort,
+                            isMulticast = true,
+                            clientIp = null,
+                            wifiIface = getWifiNetworkInterface(networkInterfaceName)
+                        )
+                    }
+                    launchAudioProducer()
+                    isStreamingCurrent.value = true
+                    if (srv != null) connectionStatus.value = context.getString(R.string.w3_status_serving)
+                    // Constant cadence also in silence: the server sends what the
+                    // capture did not give, so a quiet stream looks like any other.
+                    while (isActive) {
+                        Wfas3Android.pace()
+                        delay(10)
+                    }
+                    return@launch
                 }
 
                 if (isMulticast) {
@@ -2195,8 +2245,12 @@ object NetworkManager {
                     originalMediaVolume = null
                 }
 
-                stopBroadcastingPresence()
-                announceServerGone(context, networkInterfaceName)
+                if (v3) {
+                    if (streamGeneration == generation) Wfas3Android.stopServer()
+                } else {
+                    stopBroadcastingPresence()
+                    announceServerGone(context, networkInterfaceName)
+                }
                 if (isActive && !hasError) connectionStatus.value = context.getString(R.string.status_server_stopped)
             }
         }
@@ -3175,11 +3229,18 @@ object NetworkManager {
         }
 
         stopBroadcastingPresence()
-        if (wasServing) announceServerGone(context)
+        if (wasServing && !v3Serving) announceServerGone(context)
+        // Off the main thread: ending a v3 session sends its goodbye.
+        Wfas3Android.stopServerAsync()
+        Wfas3Android.disconnectAsync()
+        v3Serving = false
 
         connectionStatus.value = context.getString(R.string.status_idle)
         isStreamingCurrent.value = false
     }
+
+    /** The running server is a WFAS v3 one: nothing of v2 is announced or withdrawn. */
+    @Volatile private var v3Serving = false
 
     fun playConnectionSound(context: Context) {
         try {

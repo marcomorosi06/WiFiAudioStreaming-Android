@@ -83,6 +83,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     WfasPolicy.configure(wfas)
                 }
         }
+        // WFAS v3 follows every change of the settings: protocol, server choices, name.
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsDataStore.settingsFlow.collect { Wfas3Android.configure(getApplication(), it) }
+        }
+    }
+
+    // -- WFAS v3 ---------------------------------------------------------------
+
+    /**
+     * Only one generation is on at a time. A stream of one never continues on
+     * the other, so switching stops what is running.
+     */
+    fun setWfasProtocol(protocol: String) {
+        viewModelScope.launch {
+            val current = settingsDataStore.settingsFlow.first().wfasProtocol
+            if (current == protocol) return@launch
+            if (isStreaming.value) stopStreaming()
+            settingsDataStore.saveWfasProtocol(protocol)
+        }
+    }
+
+    fun setV3DeviceName(name: String) {
+        viewModelScope.launch { settingsDataStore.saveV3DeviceName(name) }
+    }
+
+    fun setV3Server(codec: String, opusKbps: Int, opusFrame: Int, latencyMs: Int, sync: Boolean, acceptNew: Boolean, pairAsk: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveV3Server(codec, opusKbps, opusFrame, latencyMs, sync, acceptNew, pairAsk) }
+    }
+
+    /** Play a paired v3 server; [at] when its address is already known. */
+    fun connectV3(slot: Int, at: com.cuscus.wifiaudiostreaming.wfas3.Wfas3Addr? = null) {
+        val s = appSettings.value ?: return
+        val app = getApplication<Application>()
+        app.startService(Intent(app, ClientService::class.java))
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!Wfas3Android.connect(app, s, slot, at, s.sendClientMicrophone)) {
+                updateStatus(Wfas3Android.failureText(app))
+                app.stopService(Intent(app, ClientService::class.java))
+            }
+        }
+    }
+
+    fun disconnectV3() = stopStreaming()
+
+    /**
+     * An address typed with v3 on: a paired server there is played with v3.
+     * Otherwise [onNotV3] runs, and the screen asks before trying WFAS v2.
+     */
+    fun connectManualV3(rawIp: String, onNotV3: (String) -> Unit) {
+        val ip = NetAddr.normalize(rawIp)
+        if (ip.isBlank()) return
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            updateStatus(app.getString(R.string.w3_manual_looking, NetAddr.display(ip)))
+            val addr = runCatching { java.net.InetAddress.getByName(ip) }.getOrNull()
+            val found = if (addr != null) Wfas3Android.locate(app, 2500L, addr) else emptyMap()
+            val hit = found.entries.firstOrNull { it.value.sameHost(addr) }
+            if (hit != null) {
+                launch(Dispatchers.Main) { connectV3(hit.key, hit.value) }
+            } else {
+                updateStatus(app.getString(R.string.status_idle))
+                launch(Dispatchers.Main) { onNotV3(ip) }
+            }
+        }
+    }
+
+    fun setV3Microphone(on: Boolean) {
+        val app = getApplication<Application>()
+        Wfas3Android.bg { Wfas3Android.setMicrophone(app, on) }
     }
 
     fun setWfasMode(mode: String) {
@@ -200,13 +269,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Set as soon as something chooses the mode (a tap, a shortcut, a QR):
+    // the remembered mode then must not take it back when it is read.
+    @Volatile private var modeChosen = false
+
     init {
         viewModelScope.launch {
             settingsDataStore.settingsFlow.first().let { settings ->
                 if (!NetworkManager.isStreamingCurrent.value) {
                     _isMulticastMode.value = settings.lastMulticastMode
+                    // Open on the screen of last time, server or client.
+                    if (!modeChosen) _isServer.value = settings.lastModeServer
                 }
             }
+            // From now on every change of mode is remembered.
+            _isServer.drop(1).distinctUntilChanged().collect { settingsDataStore.saveLastModeServer(it) }
         }
         // Il token deve esistere prima che arrivi il primo comando esterno:
         // senza, il gate nega e basta. Aprire il file cifrato passa dal
@@ -248,6 +325,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     fun toggleMode(isServerMode: Boolean) {
+        modeChosen = true
         _isServer.value = isServerMode
         if (isServerMode) {
             NetworkManager.stopListeningForDevices()
@@ -545,6 +623,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             stopCaptureServiceIfRunning()
 
+            modeChosen = true
             _isServer.value = false
             _isMulticastMode.value = payload.isMulticast
 
@@ -571,6 +650,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setSendClientMicrophone(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.saveSendClientMicrophone(enabled)
+        }
+        // A running v3 session follows the switch; the server still decides.
+        if (Wfas3Android.clientState.value is com.cuscus.wifiaudiostreaming.wfas3.Wfas3ClientState.Connected) {
+            val app = getApplication<Application>()
+            Wfas3Android.bg { Wfas3Android.setMicrophone(app, enabled) }
         }
     }
 
@@ -667,6 +751,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setHapticsEnabled(enabled: Boolean) {
         viewModelScope.launch { settingsDataStore.saveHapticsEnabled(enabled) }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveDynamicColor(enabled) }
+    }
+
+    fun setCalmMotion(enabled: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveCalmMotion(enabled) }
     }
 
     fun setBackgroundSpectrumSettings(enabled: Boolean, style: String, blackoutOnly: Boolean = false, groove: Int = 0) {
