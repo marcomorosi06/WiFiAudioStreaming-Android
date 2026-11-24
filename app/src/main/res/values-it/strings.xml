@@ -864,6 +864,7 @@
     <string name="w3_ask_no">Rifiuta</string>
     <string name="w3_ask_yes">Abbina</string>
     <string name="w3_ask_unknown">Abbina solo dispositivi che riconosci.</string>
+    <string name="w3_ask_from">Chiede da %1$s.</string>
     <string name="w3_servers_title">Server abbinati</string>
     <string name="w3_servers_empty">Nessun server abbinato. Abbinane uno una volta con il suo QR, il suo codice o un PIN.</string>
     <string name="w3_pair_server_button">Abbina un server</string>
@@ -908,6 +909,7 @@
     <string name="w3_cpair_pin_hint">Sul server apri \"Abbina con un PIN\". Comparirà qui:</string>
     <string name="w3_cpair_pin_searching">Ricerca dei server con una finestra PIN aperta...</string>
     <string name="w3_cpair_pin_label">PIN (8 cifre)</string>
+    <string name="w3_cpair_pin_used">%1$s, finestra gi\u00e0 usata</string>
     <string name="w3_cpair_pin_names_note">Questi nomi non sono verificati: a confermare il server è il controllo a 6 cifre che segue.</string>
     <string name="w3_cpair_mic">Chiedi di inviare il mio microfono</string>
     <string name="w3_cpair_guest">Come ospite (non salvato)</string>
@@ -939,6 +941,7 @@
     <string name="w3_fail_library">Il modulo WFAS v3 non è disponibile per questo sistema.</string>
     <string name="w3_fail_selftest">Il controllo iniziale della crittografia non è riuscito su questo dispositivo, quindi WFAS v3 resta spento per precauzione.</string>
     <string name="w3_fail_device_record">I dati di sicurezza di WFAS v3 salvati su questo dispositivo non sono leggibili. Puoi reimpostarli dalle impostazioni; poi i dispositivi andranno abbinati di nuovo.</string>
+    <string name="w3_fail_store_key">Manca la chiave che apre i dati di WFAS v3 salvati su questo telefono (per esempio dopo un ripristino del Keystore di Android). Non \u00e8 stato sovrascritto nulla: reimposta i dati di WFAS v3 nelle impostazioni e abbina di nuovo i dispositivi.</string>
     <string name="w3_fail_storage">Non è stato possibile salvare le chiavi di WFAS v3. Controlla lo spazio libero e i permessi della cartella di configurazione.</string>
     <string name="w3_fail_port">La porta UDP %1$d è già usata da un altro programma.</string>
     <string name="w3_fail_network">Non è stato possibile aprire la porta di rete di WFAS v3.</string>

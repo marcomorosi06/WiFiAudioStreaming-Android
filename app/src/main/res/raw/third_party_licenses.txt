@@ -90,7 +90,7 @@ SLF4J API 1.7 (used by Ktor and kotlinx-coroutines-slf4j) - MIT: B.4
 Built from app/src/main/cpp/wfas3 of the source repository; the build checks
 every file against MANIFEST.sha256 there. Compiled into it:
 
-WFAS v3 reference core (draft 6) - MIT: B.8
+WFAS v3 reference core (draft 7) - MIT: B.8
   Copyright (c) 2026 Marco Morosi. Its NOTICE (B.8) lists the components
   below and reproduces their licences in full.
 HACL* (hacl-packages, commit 05c3d8fb321ed65e3db3a6a8b853019e86fb40a2):
@@ -968,5 +968,5 @@ B.4 https://github.com/qos-ch/slf4j  v_1.7.36  LICENSE.txt
 B.5 https://github.com/JetBrains/kotlin  v2.0.21  license/NOTICE.txt
 B.6 https://github.com/Kotlin/kotlinx.coroutines  1.8.1  license/NOTICE.txt
 B.7 https://github.com/zxing/zxing  zxing-3.5.3  NOTICE
-B.8 app/src/main/cpp/wfas3/core  LICENSE and NOTICE (byte-identical to the WFAS v3 reference core, archive SHA-256 22782132be44ad39a201a19665a1b0218896a606779b4b5416aa6c2a7027911b)
+B.8 app/src/main/cpp/wfas3/core  LICENSE and NOTICE (byte-identical to the WFAS v3 reference core, archive SHA-256 c9a0f7ff53ca78d4a0b24d20008bd8839abc28cd13c6f75af15885ef18de1213)
 B.9 https://github.com/xiph/opus  v1.5.2  COPYING

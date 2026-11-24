@@ -22,6 +22,8 @@ package com.cuscus.wifiaudiostreaming
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -125,6 +127,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -196,6 +199,26 @@ private fun SecureActivityWindow() {
     DisposableEffect(activity) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
+}
+
+/**
+ * Inside a dialog that decides a pairing (the server's question, the
+ * client's code comparison). Android 11 and earlier deliver touches that
+ * pass through a window another app draws on top, so a fake screen could
+ * make the user press Pair or confirm a code unseen. While shown, the views
+ * of this dialog's window drop touches that arrive through such a window.
+ * Android 12 and later block those touches by themselves.
+ */
+@Composable
+private fun ObscuredTouchGuard() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val chain = generateSequence(view) { it.parent as? View }.toList()
+        val before = chain.map { it.filterTouchesWhenObscured }
+        chain.forEach { it.filterTouchesWhenObscured = true }
+        onDispose { chain.forEachIndexed { i, v -> v.filterTouchesWhenObscured = before[i] } }
     }
 }
 
@@ -1459,11 +1482,13 @@ private fun PairRequestDialog(a: Wfas3Android.AskState) {
     AskDialog(
         status = W3Look.Asked,
         title = stringResource(R.string.w3_ask_title, a.name.ifBlank { "?" }),
-        detail = stringResource(R.string.w3_ask_unknown),
+        detail = if (a.from.isBlank()) stringResource(R.string.w3_ask_unknown)
+            else stringResource(R.string.w3_ask_from, a.from) + " " + stringResource(R.string.w3_ask_unknown),
         onDismiss = { touch.reject(); Wfas3Android.bg { Wfas3Android.answer(a, false, false) } },
         secure = a.pin,
         dismissable = false
     ) {
+        ObscuredTouchGuard()
         if (a.pin) {
             Text(stringResource(R.string.w3_ask_compare), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             CodeTiles(a.code, 3, violet.accent, violet.container, Modifier.fillMaxWidth(), tile = 40.dp)
@@ -1565,10 +1590,14 @@ private fun ClientPairDialog(appSettings: AppSettings, onRequestScan: () -> Unit
         delay(700)
         if (pairing is Wfas3Android.ClientPairing.Idle) go()
     }
-    // the only server with a PIN window nearby is chosen by itself;
+    // the only server with an open PIN window nearby is chosen by itself;
     LaunchedEffect(beacons, usePin) {
-        if (usePin && chosen == null && beacons.size == 1) chosen = beacons.first()
+        if (usePin && chosen == null && beacons.size == 1 && !beacons.first().used) chosen = beacons.first()
         if (chosen != null && beacons.none { it.key == chosen?.key }) { chosen = null; pin = "" }
+    }
+    // servers whose beacons stopped leave the list;
+    LaunchedEffect(usePin) {
+        while (usePin) { delay(1000); Wfas3Android.pruneBeacons() }
     }
     // and the eighth digit of the PIN starts it.
     LaunchedEffect(pin, chosen) {
@@ -1616,6 +1645,7 @@ private fun ClientPairDialog(appSettings: AppSettings, onRequestScan: () -> Unit
         secure = true,
         dismissable = p is Wfas3Android.ClientPairing.Idle || p is Wfas3Android.ClientPairing.Done || p is Wfas3Android.ClientPairing.Failed
     ) {
+        ObscuredTouchGuard()
         when (p) {
             is Wfas3Android.ClientPairing.Idle -> MethodBody(
                 usePin = usePin, onUsePin = { usePin = it },
@@ -1844,8 +1874,15 @@ private fun BeaconRow(b: Wfas3Beacon, selected: Boolean, onClick: () -> Unit) {
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             DeviceBadge(b.name, live = selected, size = 40)
-            Text(b.name.ifBlank { "?" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f).padding(start = 12.dp))
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(b.name.ifBlank { "?" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                // The address tells apart two servers that declare the same name.
+                val at = b.addr.hostText()
+                val where = if (b.used) stringResource(R.string.w3_cpair_pin_used, at) else at
+                if (where.isNotBlank()) {
+                    Text(where, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
             if (selected) Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = scheme.primary)
             else Icon(Icons.Rounded.WifiFind, contentDescription = null, tint = scheme.onSurfaceVariant)
         }

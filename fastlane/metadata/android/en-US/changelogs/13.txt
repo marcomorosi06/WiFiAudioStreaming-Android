@@ -1,4 +1,4 @@
-🔐 WFAS v3 by default: pair once (QR, code or PIN), always encrypted (X25519 + ML-KEM-768)
+🔐 WFAS v3 (draft 7) by default: pair once (QR, code or PIN), always encrypted (X25519 + ML-KEM-768)
 🙈 Nothing announced on the network; codes hidden from screenshots
 🎚️ One-tap sound presets; PCM/Opus, latency, sync to fine-tune
 ✨ Scan to pair: it connects and plays by itself

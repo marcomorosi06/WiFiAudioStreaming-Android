@@ -53,6 +53,7 @@ import com.cuscus.wifiaudiostreaming.wfas3.Wfas3Store
 import com.cuscus.wifiaudiostreaming.wfas3.Wfas3WindowCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -113,6 +114,12 @@ object Wfas3Settings {
  * two devices. Each file is sealed with AES-256-GCM under a key kept in the
  * Android Keystore, which never leaves it. Writes go to a temporary file,
  * are synced, then renamed, so a record is either the old or the new one.
+ *
+ * The Keystore key is made only for an empty folder. With records on disk
+ * and no key (a Keystore reset by the system, a folder copied from another
+ * install) a new key would make every record unreadable and the next save
+ * would replace the device record: the store stops with STORE_KEY instead
+ * and touches nothing.
  */
 class Wfas3KeystoreStore(context: Context) : Wfas3Store {
     private val dir = File(context.noBackupFilesDir, "wfas3")
@@ -121,10 +128,19 @@ class Wfas3KeystoreStore(context: Context) : Wfas3Store {
         if (!dir.isDirectory && !dir.mkdirs()) throw Wfas3Exception(Wfas3Failure.STORAGE, "store folder")
     }
 
+    private fun hasRecords(): Boolean =
+        dir.listFiles()?.any { it.isFile && it.name.endsWith(".rec") } ?: false
+
+    override fun hasPairRecords(): Boolean =
+        dir.listFiles()?.any { it.isFile && it.name.startsWith("pair-") && it.name.endsWith(".rec") } ?: false
+
     private fun key(create: Boolean): SecretKey? {
         val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
         if (!create) return null
+        // generateKey replaces an entry of the same alias: never while the
+        // alias is still there, nor while records sealed by a lost key exist.
+        if (ks.containsAlias(ALIAS) || hasRecords()) throw Wfas3Exception(Wfas3Failure.STORE_KEY, "store key missing")
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
         gen.init(
             KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
@@ -154,16 +170,18 @@ class Wfas3KeystoreStore(context: Context) : Wfas3Store {
         val ivLen = blob[MAGIC.size].toInt() and 0xFF
         if (ivLen < 12 || blob.size < MAGIC.size + 1 + ivLen + 16) return null
         val iv = blob.copyOfRange(MAGIC.size + 1, MAGIC.size + 1 + ivLen)
-        val k = key(create = false) ?: return null
+        // A record and no key to open it: say so, never treat it as missing.
+        val k = key(create = false) ?: throw Wfas3Exception(Wfas3Failure.STORE_KEY, "store key missing")
         val c = Cipher.getInstance(TRANSFORM)
         c.init(Cipher.DECRYPT_MODE, k, GCMParameterSpec(128, iv))
         c.updateAAD((AAD + name).toByteArray(Charsets.US_ASCII))
         return c.doFinal(blob, MAGIC.size + 1 + ivLen, blob.size - MAGIC.size - 1 - ivLen)
     }
 
+    /** Null if the record does not exist; throws if it exists and cannot be read or opened. */
     private fun read(name: String): ByteArray? {
         val f = File(dir, name)
-        if (!f.isFile) return null
+        if (!f.exists()) return null
         return try {
             open(name, f.readBytes()) ?: throw Wfas3Exception(Wfas3Failure.DEVICE_RECORD, "unreadable $name")
         } catch (x: Wfas3Exception) {
@@ -370,7 +388,8 @@ object Wfas3Android : Wfas3Listener {
     private const val LOCK_OWNER = "wfas3"
 
     data class WindowState(val kind: Int, val text: String, val qr: String?, val openedAtMs: Long, val ask: Boolean, val paired: String? = null)
-    data class AskState(val ask: Int, val name: String, val flags: Int, val code: String, val pin: Boolean) {
+    /** [from]: the address the client asks from, shown with the question. */
+    data class AskState(val ask: Int, val name: String, val flags: Int, val code: String, val pin: Boolean, val from: String = "") {
         val wantsGuest: Boolean get() = (flags and W3.PAIR_GUEST) != 0
         val wantsMic: Boolean get() = (flags and W3.PAIR_MIC) != 0
     }
@@ -503,6 +522,7 @@ object Wfas3Android : Wfas3Listener {
         Wfas3Failure.DEVICE_RECORD -> context.getString(R.string.w3_fail_device_record)
         Wfas3Failure.STORAGE -> context.getString(R.string.w3_fail_storage)
         Wfas3Failure.PORT_IN_USE -> context.getString(R.string.w3_fail_port, W3.UDP_PORT)
+        Wfas3Failure.STORE_KEY -> context.getString(R.string.w3_fail_store_key)
         Wfas3Failure.IN_USE, Wfas3Failure.NETWORK, null -> context.getString(R.string.w3_fail_network)
     }
 
@@ -547,6 +567,31 @@ object Wfas3Android : Wfas3Listener {
             ?: Wfas3Engine.defaultMulticastInterface()
         e.multicastInterface = ifc
         e.broadcastTargets = ifc?.let { Wfas3Engine.broadcastsOf(it) } ?: emptyList()
+        ctx?.let { e.notLocal4 = mobileInterfaces(it) }
+    }
+
+    /**
+     * The interfaces of mobile data networks, with their 464XLAT ones
+     * ("v4-" + name). Their IPv4 subnet is the carrier's, which can span
+     * many subscribers (some modems report a /8): pairing datagrams from
+     * there are not from the local network. A VPN is not one of them, even
+     * when it runs over mobile data.
+     */
+    private fun mobileInterfaces(context: Context): Set<String> = try {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val names = HashSet<String>()
+        @Suppress("DEPRECATION")
+        for (n in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(n) ?: continue
+            if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+            val name = cm.getLinkProperties(n)?.interfaceName ?: continue
+            names += name
+            names += "v4-$name"
+        }
+        names
+    } catch (_: Exception) {
+        emptySet()
     }
 
     /** The Wi-Fi changed: probes and the group follow the new interface. */
@@ -935,7 +980,7 @@ object Wfas3Android : Wfas3Listener {
 
     fun answer(a: AskState, yes: Boolean, guest: Boolean) {
         engine?.answer(a.ask, yes, W3.PERM_RECEIVE, guest || a.wantsGuest)
-        asks.value = asks.value.filterNot { it.ask == a.ask }
+        asks.update { list -> list.filterNot { it.ask == a.ask } }
     }
 
     fun codeValid(text: String): Boolean = runCatching {
@@ -943,6 +988,8 @@ object Wfas3Android : Wfas3Listener {
         Wfas3Engine.codeValid(text)
     }.getOrDefault(false)
 
+    // A pairing from this phone is made to listen: the server gets no
+    // permission to receive this phone's audio (see Wfas3Engine.pairWithCode).
     fun pairWithCode(context: Context, code: String, guest: Boolean, mic: Boolean, replace: Int = -1): Boolean {
         val e = ensure(context) ?: return false
         pairing.value = ClientPairing.Waiting(pin = false)
@@ -1035,9 +1082,10 @@ object Wfas3Android : Wfas3Listener {
 
     private fun nameOf(pair: Int): String = pairs.value.firstOrNull { it.slot == pair }?.name.orEmpty()
 
-    override fun onPairAsk(ask: Int, name: String, flags: Int, code: String) {
+    override fun onPairAsk(ask: Int, name: String, flags: Int, code: String, from: Wfas3Addr) {
         val w = window.value
-        asks.value = asks.value.filterNot { it.ask == ask } + AskState(ask, name, flags, code, w?.kind == W3.PAIR_PIN)
+        val a = AskState(ask, name, flags, code, w?.kind == W3.PAIR_PIN, from.hostText())
+        asks.update { list -> list.filterNot { it.ask == ask } + a }
     }
 
     override fun onPaired(pair: Int, name: String, flags: Int) {
@@ -1082,12 +1130,39 @@ object Wfas3Android : Wfas3Listener {
         if (window.value == null) updateNetwork()
     }
 
+    /** When each listed beacon was last heard: a window sends one every second. */
+    private val beaconHeard = HashMap<String, Long>()
+    private const val BEACON_FRESH_MS = 4_000L
+
     override fun onBeacon(beacon: Wfas3Beacon) {
-        // At most 8 names, as the specification asks; later ones replace none.
-        val cur = beacons.value
-        if (cur.any { it.key == beacon.key }) return
-        if (cur.size >= 8) return
-        beacons.value = cur + beacon
+        // At most 8 names, as the specification asks. A server stays listed
+        // while it is heard; one not heard for 4 s leaves, so that the list
+        // follows the windows that are open and old or forged entries do not
+        // keep a real server out for good.
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(beaconHeard) {
+            val cur = fresh(now)
+            val known = cur.indexOfFirst { it.key == beacon.key }
+            when {
+                known >= 0 -> { beaconHeard[beacon.key] = now; beacons.value = cur.toMutableList().also { it[known] = beacon } }
+                cur.size < 8 -> { beaconHeard[beacon.key] = now; beacons.value = cur + beacon }
+                else -> beacons.value = cur
+            }
+        }
+    }
+
+    /** Drop the beacons not heard lately; the pairing dialog calls it every second. */
+    fun pruneBeacons() {
+        synchronized(beaconHeard) {
+            val cur = fresh(android.os.SystemClock.elapsedRealtime())
+            if (cur.size != beacons.value.size) beacons.value = cur
+        }
+    }
+
+    private fun fresh(now: Long): List<Wfas3Beacon> {
+        val cur = beacons.value.filter { now - (beaconHeard[it.key] ?: Long.MIN_VALUE / 2) <= BEACON_FRESH_MS }
+        beaconHeard.keys.retainAll(cur.map { it.key }.toSet())
+        return cur
     }
 
     override fun onSuspect(pair: Int) {

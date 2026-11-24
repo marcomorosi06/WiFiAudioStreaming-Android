@@ -154,6 +154,14 @@ object Changelog {
                     )
                 ),
                 ChangelogItem(
+                    icon = Icons.Filled.Shield,
+                    title = Bilingual("Pairing that holds up", "Un abbinamento che regge"),
+                    body = Bilingual(
+                        "Pairing follows draft 7 of the WFAS v3 specification. Recorded pairing signals of a label, played again, cannot stop a pairing or raise a false alarm; floods of fake requests from addresses that do not answer cannot keep a PIN window busy; a reply with the wrong key does not stop the real one. The request shows the address it comes from, servers with a PIN window show theirs, and names that would look empty are cleaned. Pairing is accepted only from the local network, never through mobile data, and on Android 11 and earlier the questions that decide a pairing ignore taps that pass through another app drawn on top. A pairing made to listen does not let the server receive this phone's audio. Both devices need WFAS v3 draft 7, as in the 1.3 apps; pairings already made keep working.",
+                        "L'abbinamento segue la draft 7 della specifica WFAS v3. I segnali di abbinamento di un'etichetta registrati e ritrasmessi non possono fermare un abbinamento n\u00e9 dare falsi allarmi; le raffiche di richieste false da indirizzi che non rispondono non possono bloccare una finestra PIN; una risposta con la chiave sbagliata non ferma quella vera. La richiesta mostra l'indirizzo da cui arriva, i server con una finestra PIN mostrano il loro, e i nomi che sembrerebbero vuoti vengono ripuliti. L'abbinamento \u00e8 accettato solo dalla rete locale, mai attraverso i dati mobili, e su Android 11 e precedenti le domande che decidono un abbinamento ignorano i tocchi che passano attraverso un'altra app disegnata sopra. Un abbinamento fatto per ascoltare non permette al server di ricevere l'audio di questo telefono. Servono WFAS v3 draft 7 su entrambi i dispositivi, come nelle app 1.3; gli abbinamenti gi\u00e0 fatti continuano a funzionare."
+                    )
+                ),
+                ChangelogItem(
                     icon = Icons.Filled.SpeakerGroup,
                     title = Bilingual("Every server control", "Tutti i controlli del server"),
                     body = Bilingual(
@@ -213,8 +221,8 @@ object Changelog {
                     icon = Icons.Filled.Lock,
                     title = Bilingual("Your keys stay with you", "Le tue chiavi restano tue"),
                     body = Bilingual(
-                        "The v3 keys and pairings are kept only on this phone, encrypted with a key held by the Android Keystore, and are left out of every backup. You can erase them at any time.",
-                        "Le chiavi e gli abbinamenti di v3 restano solo su questo telefono, cifrati con una chiave custodita dal Keystore di Android, ed esclusi da ogni backup. Puoi cancellarli in qualsiasi momento."
+                        "The v3 keys and pairings are kept only on this phone, encrypted with a key held by the Android Keystore, and are left out of every backup. If that key is lost while pairings exist, nothing is overwritten and the app says so. You can erase them at any time.",
+                        "Le chiavi e gli abbinamenti di v3 restano solo su questo telefono, cifrati con una chiave custodita dal Keystore di Android, ed esclusi da ogni backup. Se quella chiave va persa mentre esistono abbinamenti, non viene sovrascritto nulla e l'app lo dice. Puoi cancellarli in qualsiasi momento."
                     )
                 )
             )
